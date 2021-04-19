@@ -23,6 +23,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Host
                       .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true);
             });
 
+            consoleBuilder.ConfigureCustomCertificates();
+
             consoleBuilder.ConfigureConsul(options?.ConsulConfigurationOptions);
             consoleBuilder.ConfigureSerilogLogging();
             consoleBuilder.ConfigBasicHttpService(opts =>

@@ -16,6 +16,7 @@ using Serilog;
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using Winton.Extensions.Configuration.Consul;
 using static Monq.Core.BasicDotNetMicroservice.MicroserviceConstants.HostConfiguration;
 
@@ -33,6 +34,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             this IHostBuilder hostBuilder,
             ConsulConfigurationOptions? consulConfigurationOptions = null)
         {
+            hostBuilder.ConfigureCustomCertificates();
             hostBuilder.ConfigureConsul(consulConfigurationOptions);
             hostBuilder.ConfigureSerilogLogging();
             hostBuilder.UseVersionApiPoint();
@@ -67,7 +69,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         public static IHostBuilder ConfigureConsul(this IHostBuilder hostBuilder, ConsulConfigurationOptions? configOptions = null)
         {
             hostBuilder
-                .ConfigureAppConfiguration((builderContext, config) => ConfigureConsul(builderContext.Configuration, config, configOptions, builderContext.HostingEnvironment));
+                .ConfigureAppConfiguration((builderContext, config) =>
+                    ConfigureConsul(builderContext.Configuration, config, configOptions, builderContext.HostingEnvironment));
             return hostBuilder;
         }
 
@@ -180,6 +183,47 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             return hostBuilder;
         }
 
+        /// <summary>
+        /// Load custom certificates from the 
+        /// </summary>
+        /// <param name="hostBuilder"></param>
+        /// <param name="certsDir">Certificates directory that will be used to load custom certificates. 
+        /// This option has highest priority on the ENV variable.</param>
+        /// <returns></returns>
+        public static IHostBuilder ConfigureCustomCertificates(this IHostBuilder hostBuilder, string? certsDir = null)
+        {
+            if (string.IsNullOrEmpty(certsDir))
+                certsDir = Environment.GetEnvironmentVariable(MicroserviceConstants.CertsDirEnv);
+            if (string.IsNullOrEmpty(certsDir))
+                certsDir = MicroserviceConstants.CertsDirDefault;
+
+            if (!Directory.Exists(certsDir))
+                return hostBuilder;
+
+            var certsCount = Directory.EnumerateFiles(certsDir).Count();
+            Console.WriteLine($"Installing {certsCount} certificates from {certsDir} ...");
+
+            using (X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
+            {
+                foreach (var cerFileName in Directory.EnumerateFiles(certsDir))
+                {
+                    store.Open(OpenFlags.ReadWrite);
+                    try
+                    {
+                        X509Certificate2 certificate = new X509Certificate2(cerFileName);
+                        store.Add(certificate); //where cert is an X509Certificate object
+                        Console.WriteLine($"Successfully installed {cerFileName}");
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"Error while installing {cerFileName}. Detailes: {e.Message}");
+                    }
+                }
+            }
+
+            return hostBuilder;
+        }
+
         static void ConfigureConsul(
             this IConfiguration configuration,
             IConfigurationBuilder configBuilder,
@@ -202,7 +246,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             var consulConfigFile = ConsulConfigFileDefault;
             if (!File.Exists(ConsulConfigFileDefault) && !string.IsNullOrEmpty(configuration[ConsulConfigFileEnv]))
             {
-                Console.WriteLine("Файл подключение к Consul обнаружен по переменной среды.");
+                Console.WriteLine("Consul connection file detected by environment variable.");
                 consulConfigFile = configuration[ConsulConfigFileEnv];
             }
             configBuilder.AddJsonFile(consulConfigFile, optional: false, reloadOnChange: false);
@@ -216,7 +260,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             var consulConfig = consulBuilder.Build();
 
             if (string.IsNullOrEmpty(consulConfig[ConsulConfigFileSectionName + ":Address"]))
-                throw new ConsulConfigurationException($"Не удалось загрузить адрес сервера Consul из файла {consulConfigFile}. Возможно, использован неверный формат данных.");
+                throw new ConsulConfigurationException($"Failed to load Consul server address from {consulConfigFile}. The wrong data format may have been used.");
 
             var consulRoot = env.EnvironmentName?.ToLower();
             if (!string.IsNullOrEmpty(consulConfig[ConsulConfigFileSectionName + ":RootFolder"]))

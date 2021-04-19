@@ -20,6 +20,17 @@
         /// </summary>
         public const string CultureHeader = "Accept-Language";
 
+        /// <summary>
+        /// Certificates directory environment variable name.
+        /// </summary>
+        public const string CertsDirEnv = "CERTS_DIR";
+
+        /// <summary>
+        /// Default certificates directory that will be used if ENV CERTS_DIR is not set.
+        /// </summary>
+        public const string CertsDirDefault = "/certs";
+
+
         internal static class HostConfiguration
         {
             public const string ConsulConfigFileEnv = "CONSUL_CONFIG_FILE";
