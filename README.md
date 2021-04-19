@@ -21,9 +21,9 @@ using Monq.Core.BasicDotNetMicroservice.Extensions;
 public static void Main(string[] args)
 {
     Console.OutputEncoding = Encoding.UTF8;
-    __CreateHostBuilder(args).Build().Run();
+    CreateHostBuilder(args).Build().Run();
 }
-public static IHostBuilder __CreateHostBuilder(string[] args) =>
+public static IHostBuilder CreateHostBuilder(string[] args) =>
     Host.CreateDefaultBuilder(args)
         .ConfigureSerilogLogging()
         .ConfigureWebHostDefaults(webBuilder =>
@@ -70,9 +70,9 @@ using Monq.Core.BasicDotNetMicroservice.Extensions;
 public static void Main(string[] args)
 {
     Console.OutputEncoding = Encoding.UTF8;
-    __CreateHostBuilder(args).Build().Run();
+    CreateHostBuilder(args).Build().Run();
 }
-public static IHostBuilder __CreateHostBuilder(string[] args) =>
+public static IHostBuilder CreateHostBuilder(string[] args) =>
     Host.CreateDefaultBuilder(args)
         .ConfigureConsul()
         .ConfigureWebHostDefaults(webBuilder =>
@@ -123,9 +123,9 @@ using Monq.Core.BasicDotNetMicroservice.Extensions;
 public static void Main(string[] args)
 {
     Console.OutputEncoding = Encoding.UTF8;
-    __CreateHostBuilder(args).Build().Run();
+    CreateHostBuilder(args).Build().Run();
 }
-public static IHostBuilder __CreateHostBuilder(string[] args) =>
+public static IHostBuilder CreateHostBuilder(string[] args) =>
     Host.CreateDefaultBuilder(args)
         .UseVersionApiPoint()
         .ConfigureWebHostDefaults(webBuilder =>
@@ -184,13 +184,22 @@ public void Configure(IApplicationBuilder app)
 
 Данное расширение выполняет подключение стандартного набора расширений для использования микросервисом типа AspNetCore MVC  в повседневной жизни.
 
-В версии 3.1.1 включает в себя:
+В версии 4.0.0 включает в себя:
 
+- hostBuilder.ConfigureCustomCertificates();
 - hostBuilder.ConfigureConsul();
 - hostBuilder.ConfigureSerilogLogging();
 - hostBuilder.UseVersionApiPoint();
 - hostBuilder.ConfigureAuthorizationPolicies();
 - hostBuilder.ConfigBasicHttpService();
+
+hostBuilder.ConfigureServices((context, services) =>
+{
+    services.AddHttpContextAccessor();
+    services.AddOptions();
+    services.AddDistributedMemoryCache();
+    services.Configure<AppConfiguration>(context.Configuration);
+});
 
 Подключение производится в файле `Program.cs`.
 ```csharp
@@ -201,9 +210,9 @@ using Monq.Core.BasicDotNetMicroservice.Extensions;
 public static void Main(string[] args)
 {
     Console.OutputEncoding = Encoding.UTF8;
-    __CreateHostBuilder(args).Build().Run();
+    CreateHostBuilder(args).Build().Run();
 }
-public static IHostBuilder __CreateHostBuilder(string[] args) =>
+public static IHostBuilder CreateHostBuilder(string[] args) =>
     Host.CreateDefaultBuilder(args)
         .ConfigureBasicMicroservice()
         .ConfigureWebHostDefaults(webBuilder =>
@@ -244,7 +253,6 @@ public class Program
             {
                 var connectionString = hostContext.Configuration[AppConstants.Configuration.PostgresConnectionString];
                 services
-                    .AddEntityFrameworkNpgsql()
                     .AddDbContext<SyntheticTriggersContext>(opt => opt.UseNpgsql(connectionString));
                 services.AddLogging();
                 services.AddAutoMapper(typeof(Program), typeof(TrackedEntityProfile));
@@ -253,11 +261,11 @@ public class Program
             .ConfigureServices(StartMessageHandlers)
             .Build() as IConsoleApplication;
         var log = consoleApplication?.Services.GetRequiredService<ILogger<Program>>();
+        var consumer = consoleApplication?.Services.GetRequiredService<IQueueConsumer>();
         var exitCode = 0;
         try
         {
-            queueService = _rabbitMqCoreClientBuilder
-                .StartClient();
+            consumer.Start();
             Closing.WaitOne();
         }
         catch (Exception e)
@@ -269,8 +277,7 @@ public class Program
         {
             try
             {
-                // Закрываем соединение, иначе программа не завершается.
-                queueService?.Dispose();
+                consumer?.Dispose();
                 Log.CloseAndFlush();
             }
             catch (Exception e)
@@ -279,22 +286,18 @@ public class Program
                 exitCode = 1;
             }
         }
-        if (consoleApplication?.HostEnvironment?.IsDevelopment() == true)
-            Console.ReadKey();
+
         Environment.Exit(exitCode);
     }
     static void StartMessageHandlers(HostBuilderContext hostContext, IServiceCollection services)
     {
         _rabbitMqCoreClientBuilder = services
-            .AddRabbitMQCoreClient(hostContext.Configuration.GetSection(RabbitMqSection))
-            .AddHandler<UserDeleteMessageHandler>(UserDelete)
-            .AddHandler<UserUpdateMessageHandler>(UserUpdate)
-            .AddHandler<UserspaceDeleteMessageHandler>(UserspaceDelete)
-            .AddHandler<WorkGroupUpdateMessageHandler>(WorkGroupUpdate)
-            .AddHandler<WorkGroupDeleteMessageHandler>(WorkGroupDelete)
-            .AddHandler<ConfigItemDeleteMessageHandler>(ConfigItemDelete)
-            .AddHandler<ConfigItemUpdateMessageHandler>(ConfigItemUpdate)
-            .AddHandler<HistoryEventMessageHandler>(HistoryAutomatonNew);
+            services
+            .AddRabbitMQCoreClient(opt => opt.Host = "localhost")
+            .AddExchange("default")
+            .AddConsumer()
+            .AddHandler<Handler>("test_routing_key")
+            .AddQueue("my-test-queue");
     }
     protected static void Exit(object sender, ConsoleCancelEventArgs args)
     {
@@ -399,7 +402,7 @@ public void Configure(IApplicationBuilder app)
   "Authentication": {
     "AuthenticationEndpoint": "https://identity.example.com",
     "ApiResource": {
-      "Login": "smon-api",
+      "Login": "service-api",
       "Password": "RIHY1vsevEO7WEVC"
     },
     "RequireHttpsMetadata": false, // не обязательно. По умолчанию false.
