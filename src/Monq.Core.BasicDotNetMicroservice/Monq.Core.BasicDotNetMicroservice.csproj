@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<Version>4.0.0</Version>
+		<VersionSuffix>$(VersionSuffix)</VersionSuffix>
+		<Version Condition=" '$(VersionSuffix)' != '' ">$(Version)-$(VersionSuffix)</Version>
+    <IsPackable>true</IsPackable>
+    <TargetFrameworks>netcoreapp3.1;net5.0</TargetFrameworks>
+    <Authors>Sergey Pismennyi, Evgeniy Cherniayev</Authors>
+    <Company>MONQ Digital lab</Company>
+    <Title>Monq.Core.BasicDotNetMicroservice</Title>
+    <PackageId>Monq.Core.BasicDotNetMicroservice</PackageId>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageTags>library microservice consul aspnet</PackageTags>
+    <PackageProjectUrl>https://github.com/MONQDL/Monq.Core.BasicDotNetMicroservice</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/MONQDL/Monq.Core.BasicDotNetMicroservice</RepositoryUrl>
+    <Description>NetCore Microservice extensions library that brings simplicity to configure asp.net and console programs as microservices.</Description>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <Nullable>enable</Nullable>
+    <LangVersion>9.0</LangVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="App.Metrics.Prometheus" Version="4.2.0" />
+		<PackageReference Include="IdentityServer4.AccessTokenValidation" Version="3.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="5.0.0" />
+		<PackageReference Include="Monq.Core.HttpClientExtensions" Version="4.0.0" />
+		<PackageReference Include="Winton.Extensions.Configuration.Consul" Version="3.1.1" />
+		<PackageReference Include="Serilog.AspNetCore" Version="4.1.0" />
+		<PackageReference Include="Serilog.Settings.Configuration" Version="3.1.0" />
+		<PackageReference Include="Serilog.Sinks.Console" Version="3.1.1" />
+		<PackageReference Include="Serilog.Sinks.Elasticsearch" Version="8.4.1" />
+		<PackageReference Include="App.Metrics.AspNetCore.All" Version="4.2.0" />
+		<PackageReference Include="App.Metrics.Reporting.InfluxDB" Version="4.2.0" />
+		<PackageReference Include="App.Metrics.AspNetCore.Health" Version="3.2.0" />
+		<PackageReference Include="App.Metrics.AspNetCore.Health.Hosting" Version="3.2.0" />
+	</ItemGroup>
+
+</Project>

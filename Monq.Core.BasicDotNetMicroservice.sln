@@ -1,0 +1,60 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29418.71
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{1180E82B-E9A6-456F-926B-83D257A393EB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{6D276C85-729F-4862-8924-F83D1A0095DE}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		.github\workflows\netcorelibrary.yml = .github\workflows\netcorelibrary.yml
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Monq.Core.BasicDotNetMicroservice", "src\Monq.Core.BasicDotNetMicroservice\Monq.Core.BasicDotNetMicroservice.csproj", "{701B400D-144C-45AE-BA49-D696699B60FE}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Monq.Core.BasicDotNetMicroservice.Tests", "src\Monq.Core.BasicDotNetMicroservice.Tests\Monq.Core.BasicDotNetMicroservice.Tests.csproj", "{AC629BF2-7C96-4462-B76C-44EB8B0E5ED6}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Monq.Core.BasicDotNetMicroservice.WebApp", "samples\Monq.Core.BasicDotNetMicroservice.WebApp\Monq.Core.BasicDotNetMicroservice.WebApp.csproj", "{DEB9D144-712B-4C31-927E-757D7E2C96A3}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Monq.Core.BasicDotNetMicroservice.ConsoleApp", "samples\Monq.Core.BasicDotNetMicroservice.ConsoleApp\Monq.Core.BasicDotNetMicroservice.ConsoleApp.csproj", "{E93C368C-451C-4BD8-B6E6-D9B0325E1534}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{2790B65E-AA60-4066-B386-CE8842AE65BE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{701B400D-144C-45AE-BA49-D696699B60FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{701B400D-144C-45AE-BA49-D696699B60FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{701B400D-144C-45AE-BA49-D696699B60FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{701B400D-144C-45AE-BA49-D696699B60FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AC629BF2-7C96-4462-B76C-44EB8B0E5ED6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AC629BF2-7C96-4462-B76C-44EB8B0E5ED6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AC629BF2-7C96-4462-B76C-44EB8B0E5ED6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AC629BF2-7C96-4462-B76C-44EB8B0E5ED6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DEB9D144-712B-4C31-927E-757D7E2C96A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DEB9D144-712B-4C31-927E-757D7E2C96A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DEB9D144-712B-4C31-927E-757D7E2C96A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DEB9D144-712B-4C31-927E-757D7E2C96A3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E93C368C-451C-4BD8-B6E6-D9B0325E1534}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E93C368C-451C-4BD8-B6E6-D9B0325E1534}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E93C368C-451C-4BD8-B6E6-D9B0325E1534}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E93C368C-451C-4BD8-B6E6-D9B0325E1534}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{701B400D-144C-45AE-BA49-D696699B60FE} = {1180E82B-E9A6-456F-926B-83D257A393EB}
+		{AC629BF2-7C96-4462-B76C-44EB8B0E5ED6} = {1180E82B-E9A6-456F-926B-83D257A393EB}
+		{DEB9D144-712B-4C31-927E-757D7E2C96A3} = {2790B65E-AA60-4066-B386-CE8842AE65BE}
+		{E93C368C-451C-4BD8-B6E6-D9B0325E1534} = {2790B65E-AA60-4066-B386-CE8842AE65BE}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {473AFF62-4A4D-4B8C-94D4-F32B8F0BA793}
+	EndGlobalSection
+EndGlobal
