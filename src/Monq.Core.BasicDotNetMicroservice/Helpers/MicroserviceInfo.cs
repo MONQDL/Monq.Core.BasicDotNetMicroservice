@@ -32,8 +32,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Helpers
         public static string GetEntryPointAssembleVersion()
         {
             var programAssembly = (from t in Assembly.GetEntryAssembly()!.GetTypes() // Can't be called from unmanaged code.
-                where t.IsClass && t.Name == "Program"
-                select t).FirstOrDefault();
+                                   where t.IsClass && t.Name == "Program"
+                                   select t).FirstOrDefault();
 
             if (programAssembly is null)
                 return DefaultVersion.ToString();

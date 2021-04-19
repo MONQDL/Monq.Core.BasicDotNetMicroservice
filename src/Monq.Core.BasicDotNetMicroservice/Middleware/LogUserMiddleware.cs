@@ -1,10 +1,10 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Monq.Core.BasicDotNetMicroservice.Helpers;
 using Serilog.Context;
 using System;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using Monq.Core.BasicDotNetMicroservice.Helpers;
 
 namespace Monq.Core.BasicDotNetMicroservice.Middleware
 {

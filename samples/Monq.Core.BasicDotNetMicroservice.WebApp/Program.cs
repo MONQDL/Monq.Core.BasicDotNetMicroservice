@@ -1,8 +1,8 @@
-﻿using System;
-using System.Text;
-using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
+using System;
+using System.Text;
 
 namespace Monq.Core.BasicDotNetMicroservice.WebApp
 {

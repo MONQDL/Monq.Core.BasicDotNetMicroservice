@@ -1,8 +1,8 @@
-﻿using System;
-using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
+using System;
 
 namespace Monq.Core.BasicDotNetMicroservice.Host
 {
@@ -14,7 +14,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Host
         /// <param name="hostBuilder">The <see cref="IWebHostBuilder" /> to configure.</param>
         /// <param name="configureLogging">The delegate that configures the <see cref="ILoggingBuilder"/>.</param>
         /// <returns>The <see cref="IWebHostBuilder"/>.</returns>
-        public static IHostBuilder ConfigureLogging(this IHostBuilder hostBuilder, Action<ILoggingBuilder> configureLogging) => 
+        public static IHostBuilder ConfigureLogging(this IHostBuilder hostBuilder, Action<ILoggingBuilder> configureLogging) =>
             hostBuilder.ConfigureServices(collection => collection.AddLogging(configureLogging));
 
         /// <summary>
@@ -23,7 +23,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Host
         /// <param name="hostBuilder">The <see cref="IWebHostBuilder" /> to configure.</param>
         /// <param name="configureLogging">The delegate that configures the <see cref="LoggerFactory"/>.</param>
         /// <returns>The <see cref="IWebHostBuilder"/>.</returns>
-        public static IHostBuilder ConfigureLogging(this IHostBuilder hostBuilder, Action<HostBuilderContext, ILoggingBuilder> configureLogging) => 
+        public static IHostBuilder ConfigureLogging(this IHostBuilder hostBuilder, Action<HostBuilderContext, ILoggingBuilder> configureLogging) =>
             hostBuilder.ConfigureServices((context, collection) => collection.AddLogging(builder => configureLogging(context, builder)));
     }
 }

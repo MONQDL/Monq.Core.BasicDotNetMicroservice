@@ -11,7 +11,7 @@ namespace Microsoft.Extensions.DependencyInjection
         /// <summary>
         /// Добавляет обработку поля X-Trace-Event-Id в IApplicationBuilder request pipeline.
         /// </summary>
-        public static IApplicationBuilder UseTraceEventId(this IApplicationBuilder builder) => 
+        public static IApplicationBuilder UseTraceEventId(this IApplicationBuilder builder) =>
             builder.UseMiddleware<TraceEventIdMiddleware>();
     }
 }

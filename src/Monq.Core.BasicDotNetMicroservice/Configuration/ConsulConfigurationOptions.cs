@@ -1,5 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using static Monq.Core.BasicDotNetMicroservice.MicroserviceConstants.HostConfiguration;
+﻿using static Monq.Core.BasicDotNetMicroservice.MicroserviceConstants.HostConfiguration;
 
 namespace Monq.Core.BasicDotNetMicroservice.Models
 {

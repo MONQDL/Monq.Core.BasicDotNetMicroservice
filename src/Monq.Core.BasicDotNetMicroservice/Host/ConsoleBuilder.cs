@@ -1,12 +1,12 @@
-﻿using System;
-using System.IO;
-using Microsoft.AspNetCore.Http;
-using System.Collections.Generic;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.ObjectPool;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.Internal;
+using Microsoft.Extensions.ObjectPool;
+using System;
+using System.Collections.Generic;
+using System.IO;
 using static Monq.Core.BasicDotNetMicroservice.MicroserviceConstants.HostConfiguration;
 
 namespace Monq.Core.BasicDotNetMicroservice.Host
@@ -17,9 +17,9 @@ namespace Monq.Core.BasicDotNetMicroservice.Host
         readonly IConfiguration _config;
         readonly HostBuilderContext _context;
         readonly IHostEnvironment _hostEnvironment = new HostingEnvironment();
-        readonly List<Action<HostBuilderContext, IServiceCollection>> _configureServicesDelegates = 
+        readonly List<Action<HostBuilderContext, IServiceCollection>> _configureServicesDelegates =
             new List<Action<HostBuilderContext, IServiceCollection>>();
-        readonly List<Action<HostBuilderContext, IConfigurationBuilder>> _configureAppConfigurationBuilderDelegates = 
+        readonly List<Action<HostBuilderContext, IConfigurationBuilder>> _configureAppConfigurationBuilderDelegates =
             new List<Action<HostBuilderContext, IConfigurationBuilder>>();
 
         public ConsoleBuilder()

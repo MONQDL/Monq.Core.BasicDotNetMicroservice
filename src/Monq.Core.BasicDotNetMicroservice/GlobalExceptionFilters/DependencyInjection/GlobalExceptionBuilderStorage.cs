@@ -21,7 +21,7 @@ namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInj
             {
                 if (action is not null && exception.GetType() == exceptionType)
                 {
-                    return (IActionResult?) action.DynamicInvoke(exception);
+                    return (IActionResult?)action.DynamicInvoke(exception);
                 }
             }
 
