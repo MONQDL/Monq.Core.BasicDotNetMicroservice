@@ -147,10 +147,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         public static IWebHostBuilder ConfigureMetricsAndHealth(this IWebHostBuilder hostBuilder)
         {
             hostBuilder
-                .ConfigureHealthWithDefaults(builder =>
-                {
-                    //builder.HealthChecks.AddCheck("DatabaseConnected", () => new ValueTask<HealthCheckResult>(HealthCheckResult.Healthy("Database Connection OK")));
-                })
+                .ConfigureHealthWithDefaults(builder => { })
                 .ConfigureMetricsWithDefaults((builderContext, metricsBuilder) =>
                 {
                     metricsBuilder.OutputMetrics.AsPrometheusPlainText();
