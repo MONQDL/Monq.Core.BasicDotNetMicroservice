@@ -1,0 +1,22 @@
+{
+  "profiles": {
+    "DEV": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "http://localhost:5005/api/values",
+      "environmentVariables": {
+        "ASPNETCORE_APPLICATION_NAME": "basic-microservice-test-project",
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "INT": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "http://localhost:5005/api/values",
+      "environmentVariables": {
+        "ASPNETCORE_APPLICATION_NAME": "pl/pl-userspaces-api-service",
+        "ASPNETCORE_ENVIRONMENT": "Integration"
+      }
+    }
+  }
+}

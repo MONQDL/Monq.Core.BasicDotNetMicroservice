@@ -1,0 +1,18 @@
+{
+  "profiles": {
+    "DEV": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASPNETCORE_APPLICATION_NAME": "basic-microservice-test-project",
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "INT": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASPNETCORE_APPLICATION_NAME": "pl/pl-userspaces-api-service",
+        "ASPNETCORE_ENVIRONMENT": "Integration"
+      }
+    }
+  }
+}
