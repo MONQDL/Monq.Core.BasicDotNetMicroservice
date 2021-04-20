@@ -1,5 +1,4 @@
 ﻿using IdentityServer4.AccessTokenValidation;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -21,13 +20,11 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                 enableCaching = true;
 
             services.AddAuthentication(IdentityServerAuthenticationDefaults.AuthenticationScheme)
-                .AddIdentityServerAuthentication(IdentityServerAuthenticationDefaults.AuthenticationScheme, x =>
+                .AddOAuth2Introspection(IdentityServerAuthenticationDefaults.AuthenticationScheme, x =>
                 {
                     x.Authority = authConfig[AuthConstants.AuthenticationConfiguration.Authority];
-                    x.ApiName = authConfig[AuthConstants.AuthenticationConfiguration.ScopeName];
-                    x.ApiSecret = authConfig[AuthConstants.AuthenticationConfiguration.ScopeSecret];
-                    x.SupportedTokens = SupportedTokens.Both;
-                    x.RequireHttpsMetadata = requireHttps;
+                    x.ClientId = authConfig[AuthConstants.AuthenticationConfiguration.ScopeName];
+                    x.ClientSecret = authConfig[AuthConstants.AuthenticationConfiguration.ScopeSecret];
                     x.EnableCaching = enableCaching;
                     x.CacheDuration = TimeSpan.FromMinutes(5);
                     x.NameClaimType = "fullName";
