@@ -28,6 +28,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                     x.EnableCaching = enableCaching;
                     x.CacheDuration = TimeSpan.FromMinutes(5);
                     x.NameClaimType = "fullName";
+                    x.DiscoveryPolicy.RequireHttps = requireHttps;
                 });
 
             return services;
