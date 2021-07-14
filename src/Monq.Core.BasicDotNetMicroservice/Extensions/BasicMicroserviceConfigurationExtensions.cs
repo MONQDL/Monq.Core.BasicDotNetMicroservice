@@ -203,7 +203,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             var certsCount = Directory.EnumerateFiles(certsDir).Count();
             Console.WriteLine($"Installing {certsCount} certificates from {certsDir} ...");
 
-            using (X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
+            using (X509Store store = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
             {
                 foreach (var cerFileName in Directory.EnumerateFiles(certsDir))
                 {
