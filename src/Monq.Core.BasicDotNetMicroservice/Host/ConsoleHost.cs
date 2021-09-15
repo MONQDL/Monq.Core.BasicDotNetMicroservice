@@ -29,7 +29,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Host
             consoleBuilder.ConfigureSerilogLogging();
             consoleBuilder.ConfigBasicHttpService(opts =>
             {
-                var headerOptions = new BasicHttpServiceHeaderOptions();
+                var headerOptions = new RestHttpClientHeaderOptions();
                 headerOptions.AddForwardedHeader(MicroserviceConstants.EventIdHeader);
                 headerOptions.AddForwardedHeader(MicroserviceConstants.UserspaceIdHeader);
                 headerOptions.AddForwardedHeader(MicroserviceConstants.CultureHeader);
@@ -50,7 +50,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Host
 
         static void ConfigureMetrics(HostBuilderContext context, IServiceCollection services)
         {
-            var metricsBuilder = new MetricsBuilder()
+            var metricsBuilder = AppMetrics.CreateDefaultBuilder()
                 .Configuration.Configure(
                     options =>
                     {
