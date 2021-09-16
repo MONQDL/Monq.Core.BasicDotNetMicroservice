@@ -41,7 +41,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             hostBuilder.ConfigureAuthorizationPolicies();
             hostBuilder.ConfigBasicHttpService(opts =>
             {
-                var headerOptions = new BasicHttpServiceHeaderOptions();
+                var headerOptions = new RestHttpClientHeaderOptions();
                 headerOptions.AddForwardedHeader(MicroserviceConstants.EventIdHeader);
                 headerOptions.AddForwardedHeader(MicroserviceConstants.UserspaceIdHeader);
                 headerOptions.AddForwardedHeader(MicroserviceConstants.CultureHeader);
