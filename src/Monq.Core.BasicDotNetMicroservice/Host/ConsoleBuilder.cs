@@ -125,7 +125,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Host
             var configuration = builder.Build();
             services.AddSingleton<IConfiguration>(configuration);
             _context.Configuration = configuration;
-            services.AddTransient<IHttpContextAccessor>(x => null);
+            services.AddHttpContextAccessor();
             services.AddOptions();
 
             // Conjure up a RequestServices
