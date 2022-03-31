@@ -70,15 +70,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             services.AddSingleton(metrics.OutputEnvFormatters);
             services.AddSingleton<IMetrics>(metrics);
             services.AddSingleton(metrics);
-
-            AddSystemMetrics(services, metricsOptions);
-
-            services.AddHostedService(
-                serviceProvider =>
-                    new MetricsReporterService(
-                        serviceProvider.GetService<IMetricsRoot>(),
-                        serviceProvider.GetService<ILoggerFactory>(),
-                        metricsOptions));
+            services.AddSystemMetrics(metricsOptions);
+            services.AddMetricsReporter(metricsOptions);
 
             return services;
         }
@@ -88,9 +81,11 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// </summary>
         /// <param name="services"></param>
         /// <param name="metricsOptions"></param>
-        static void AddSystemMetrics(IServiceCollection services, MetricsConfigurationOptions metricsOptions)
+        /// <returns></returns>
+        static IServiceCollection AddSystemMetrics(this IServiceCollection services, MetricsConfigurationOptions metricsOptions)
         {
             if (metricsOptions.AddSystemMetrics) services.AddAppMetricsCollectors();
+            return services;
         }
 
         /// <summary>
@@ -122,6 +117,20 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             httpOptions.MetricsOutputFormatter = new MetricsPrometheusTextOutputFormatter();
 
             metricsBuilder.Report.OverHttp(httpOptions);
+        }
+
+        /// <summary>
+        /// Добавить репортера для отправки метрик.
+        /// </summary>
+        /// <param name="services"></param>
+        /// <param name="metricsOptions"></param>
+        /// <returns></returns>
+        static IServiceCollection AddMetricsReporter(this IServiceCollection services, MetricsConfigurationOptions metricsOptions)
+        {
+            var metricsReporterOptions = new MetricsReporterOptions(metricsOptions);
+            services.AddSingleton(metricsReporterOptions);
+            services.AddHostedService<MetricsReporterService>();
+            return services;
         }
     }
 }
