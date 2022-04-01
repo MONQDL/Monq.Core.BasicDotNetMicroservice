@@ -409,5 +409,58 @@ public void Configure(IApplicationBuilder app)
 	"EnableCaching": true          // не обязательно. По умолчанию true.
   }
 ```
-
 Длительность кэширования данных: 5 мин.
+
+### Отправка метрик
+
+Расширение добавляет возможность отправки метрик очереди сообщений, заданий, а также метрик нагрузки системы и данных сборщика мусора.
+
+Подключение производится в файле `Program.cs`.
+```csharp
+using Monq.Core.BasicDotNetMicroservice.Extensions;
+```
+
+```csharp
+var consoleApplication = ConsoleHost
+            .CreateDefaultBuilder(args)
+            .ConfigureServices((hostContext, services) =>
+            {
+                ...
+                services.AddDataAsyncMetrics(hostContext);
+                ...
+            })
+            .ConfigureServices(StartMessageHandlers)
+            .Build() as IConsoleApplication;
+```
+
+Конфигурация должна при этом содержать такой JSON:
+
+```json
+{
+  "Metrics": {
+    "ReportingInfluxDb": {
+      "FlushInterval": "00:00:10",
+      "InfluxDb": {
+        "Consistenency": "",
+        "Endpoint": "",
+        "BaseUri": "http://influxdb:8888",
+        "Database": "",
+        "Password": "",
+        "RetensionPolicy": "",
+        "UserName": ""
+      }
+    },
+    "ReportingOverHttp": {
+      "FlushInterval": "00:00:10",
+      "HttpSettings": {
+        "RequestUri": "http://localhost:9091/metrics"
+      }
+    },
+    "AddSystemMetrics": true
+  }
+}
+```
+
+ReportingInfluxDb - настройка InfluxDb, не обязательна.
+ReportingOverHttp - настройка Http, не обязательна. Для приема метрик в Prometheus Pushgetway необходимо, чтобы адрес Http оканчивался на "/metrics".
+AddSystemMetrics - если устнановлена, то приложение будет отсылать метрики нагрузки системы и данные сборщика мусора.
