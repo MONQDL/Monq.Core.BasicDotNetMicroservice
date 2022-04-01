@@ -7,22 +7,22 @@ using App.Metrics.Timer;
 namespace Monq.Core.BasicDotNetMicroservice
 {
     /// <summary>
-    /// Набор константных значений для обслуживания Http запросов.
+    /// Unified microservice constants.
     /// </summary>
     public class MicroserviceConstants
     {
         /// <summary>
-        /// Название заголовка, в котором хранится Id запроса системы логирования.
+        /// Http header containing logging event Id.
         /// </summary>
         public const string EventIdHeader = "X-Trace-Event-Id";
 
         /// <summary>
-        /// Название Http заголовка, в котором хранится Id пространства пользователя.
+        /// Http header containing userspace Id.
         /// </summary>
         public const string UserspaceIdHeader = "X-Smon-Userspace-Id";
 
         /// <summary>
-        /// Наименование Http заголовок с наименованием локализации (культуры).
+        /// Http header containing culture info.
         /// </summary>
         public const string CultureHeader = "Accept-Language";
 
@@ -54,7 +54,7 @@ namespace Monq.Core.BasicDotNetMicroservice
         }
 
         /// <summary>
-        /// Параметры метрик для RabbitMQ.
+        /// Metrics parameters for RabbitMQ.
         /// </summary>
         internal static class RabbitMQMetrics
         {
@@ -93,7 +93,7 @@ namespace Monq.Core.BasicDotNetMicroservice
         }
 
         /// <summary>
-        /// Параметры метрик для заданий.
+        /// Metrics parameters for tasks.
         /// </summary>
         internal static class TasksMetrics
         {

@@ -4,19 +4,19 @@ using static App.Metrics.AppMetricsConstants;
 namespace Monq.Core.BasicDotNetMicroservice.Configuration
 {
     /// <summary>
-    /// Настройки для репортера.
+    /// Metrics reporter options.
     /// </summary>
     public class MetricsReporterOptions
     {
         /// <summary>
-        /// Временно интервал отправки метрик.
+        /// Time interval for flushing metrics.
         /// </summary>
         public TimeSpan FlushInterval { get; set; }
 
         /// <summary>
-        /// Коструктор.
+        /// Constructor.
         /// </summary>
-        /// <param name="options"></param>
+        /// <param name="options">Metrics configuration options.</param>
         public MetricsReporterOptions(MetricsConfigurationOptions options)
         {
             FlushInterval = options.ReportingInfluxDb.FlushInterval.CompareTo(options.ReportingOverHttp.FlushInterval) < 0

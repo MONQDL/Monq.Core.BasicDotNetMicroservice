@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace Monq.Core.BasicDotNetMicroservice.Services.Implementation
 {
     /// <summary>
-    /// Сервис отправки отправки метрик.
+    /// Metrics reporter service.
     /// </summary>
     public class MetricsReporterService : IHostedService, IDisposable
     {
@@ -20,10 +20,9 @@ namespace Monq.Core.BasicDotNetMicroservice.Services.Implementation
         readonly MetricsReporterOptions _options;
 
         /// <summary>
-        /// Инициализирует новый экземпляр <see cref="MetricsReporterService"/> класса.
+        /// Constructor of metrics reporter service.
+        /// Creates new instance of class <see cref="MetricsReporterService"/>.
         /// </summary>
-        /// <param name="metricsRoot"></param>
-        /// <param name="loggerFactory"></param>
         public MetricsReporterService(IMetricsRoot metricsRoot, ILoggerFactory loggerFactory, MetricsReporterOptions options)
         {
             _logger = loggerFactory.CreateLogger<MetricsReporterService>();

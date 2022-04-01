@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace Monq.Core.BasicDotNetMicroservice.Extensions
 {
     /// <summary>
-    /// Расширение для IMetricsRoot.
+    /// IMetricsRoot extensions.
     /// </summary>
     public static class MetricsRootExtensions
     {
@@ -17,42 +17,42 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         static readonly MetricTags _failedTags = new("Action", "failed");
 
         /// <summary>
-        /// Увеличить на 1 количество принятых событий.
+        /// Increments by 1 count of recieved events.
         /// </summary>
-        /// <param name="metrics"></param>
-        /// <param name="item"></param>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="item">Item identifier for a message handler.</param>
         public static void IncrementRabbitMQReceived(this IMetricsRoot metrics, string item = DefaultItem)
             => metrics.IncreaseRabbitMQMetricsValues(_recievedTags, item);
 
         /// <summary>
-        /// Увеличить на 1 количество отброшенных событий.
+        /// Increments by 1 count of rejected events.
         /// </summary>
-        /// <param name="metrics"></param>
-        /// <param name="item"></param>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="item">Item identifier for a message handler.</param>
         public static void IncrementRabbitMQRejected(this IMetricsRoot metrics, string item = DefaultItem)
             => metrics.IncreaseRabbitMQMetricsValues(_rejectedTags, item);
 
         /// <summary>
-        /// Увеличить на 1 количество обработанных событий.
+        /// Increments by 1 count of processed events.
         /// </summary>
-        /// <param name="metrics"></param>
-        /// <param name="item"></param>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="item">Item identifier for a message handler.</param>
         public static void IncrementRabbitMQProcessed(this IMetricsRoot metrics, string item = DefaultItem)
             => metrics.IncreaseRabbitMQMetricsValues(_processedTags, item);
 
         /// <summary>
-        /// Увеличить на 1 количество событий, обработанных с ошибкой.
+        /// Increments by 1 count of failed events.
         /// </summary>
-        /// <param name="metrics"></param>
-        /// <param name="item"></param>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="item">Item identifier for a message handler.</param>
         public static void IncrementRabbitMQFailed(this IMetricsRoot metrics, string item = DefaultItem)
             => metrics.IncreaseRabbitMQMetricsValues(_failedTags, item);
 
         /// <summary>
-        /// Выполнить делегат-парсер и измерить время обработки сборки.
+        /// Measures the time taken to process an action.
         /// </summary>
-        /// <param name="metrics"></param>
-        /// <param name="action"></param>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="action">The action to measure.</param>
         public static void MeasureRabbitMQPreprocessingTime(this IMetricsRoot metrics, Action action)
         {
             using (metrics.Measure.Timer.Time(MicroserviceConstants.RabbitMQMetrics.Timers.EventProcessTimer))
@@ -62,11 +62,10 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         }
 
         /// <summary>
-        /// Выполнить делегат-парсер и измерить время обработки сборки.
+        /// Measures the time taken to process an action.
         /// </summary>
-        /// <param name="metrics"></param>
-        /// <param name="action"></param>
-        /// <returns></returns>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="action">The action to measure.</param>
         public static async Task MeasureRabbitMQPreprocessingTimeAsync(this IMetricsRoot metrics, Func<Task> action)
         {
             using (metrics.Measure.Timer.Time(MicroserviceConstants.RabbitMQMetrics.Timers.EventProcessTimer))
@@ -82,42 +81,42 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         }
 
         /// <summary>
-        /// Увеличить на 1 количество принятых заданий.
+        /// Increments by 1 count of recieved tasks.
         /// </summary>
-        /// <param name="metrics"></param>
-        /// <param name="item"></param>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="item">Item identifier for a message handler.</param>
         public static void IncrementTasksReceived(this IMetricsRoot metrics, string item = DefaultItem)
             => metrics.IncreaseTasksMetricsValues(_recievedTags, item);
 
         /// <summary>
-        /// Увеличить на 1 количество отброшенных заданий.
+        /// Increments by 1 count of rejected tasks.
         /// </summary>
-        /// <param name="metrics"></param>
-        /// <param name="item"></param>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="item">Item identifier for a message handler.</param>
         public static void IncrementTasksRejected(this IMetricsRoot metrics, string item = DefaultItem)
             => metrics.IncreaseTasksMetricsValues(_rejectedTags, item);
 
         /// <summary>
-        /// Увеличить на 1 количество обработанных заданий.
+        /// Increments by 1 count of processed tasks.
         /// </summary>
-        /// <param name="metrics"></param>
-        /// <param name="item"></param>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="item">Item identifier for a message handler.</param>
         public static void IncrementTasksProcessed(this IMetricsRoot metrics, string item = DefaultItem)
             => metrics.IncreaseTasksMetricsValues(_processedTags, item);
 
         /// <summary>
-        /// Увеличить на 1 количество заданий, обработанных с ошибкой.
+        /// Increments by 1 count of failed tasks.
         /// </summary>
-        /// <param name="metrics"></param>
-        /// <param name="item"></param>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="item">Item identifier for a message handler.</param>
         public static void IncrementTasksFailed(this IMetricsRoot metrics, string item = DefaultItem)
             => metrics.IncreaseTasksMetricsValues(_failedTags, item);
 
         /// <summary>
-        /// Выполнить делегат-парсер и измерить время обработки задания.
+        /// Measures the time taken to process an action.
         /// </summary>
-        /// <param name="metrics"></param>
-        /// <param name="action"></param>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="action">The action to measure.</param>
         public static void MeasureTasksPreprocessingTime(this IMetricsRoot metrics, Action action)
         {
             using (metrics.Measure.Timer.Time(MicroserviceConstants.TasksMetrics.Timers.TaskProcessTimer))
@@ -127,10 +126,10 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         }
 
         /// <summary>
-        /// Выполнить делегат-парсер и измерить время обработки задания.
+        /// Measures the time taken to process an action.
         /// </summary>
-        /// <param name="metrics"></param>
-        /// <param name="action"></param>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="action">The action to measure.</param>
         /// <returns></returns>
         public static async Task MeasureTasksPreprocessingTimeAsync(this IMetricsRoot metrics, Func<Task> action)
         {

@@ -6,7 +6,6 @@ using IdentityServer4.AccessTokenValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Services.Implementation;
 using System;
@@ -16,8 +15,12 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
     public static class ServiceCollectionExtensions
     {
         /// <summary>
-        /// Выполнить конфигурацию аутентификации на проекте из провайдера <paramref name="configuration"/>.
+        /// Configures authentication.
         /// </summary>
+        /// <param name="services">IServiceCollection to add the services to.</param>
+        /// <param name="configuration">The configuration being bound.</param>
+        /// <returns>The Microsoft.Extensions.DependencyInjection.IServiceCollection so that additional
+        /// calls can be chained.</returns>
         public static IServiceCollection ConfigureSMAuthentication(this IServiceCollection services, IConfiguration configuration)
         {
             var authConfig = configuration.GetSection("Authentication");
@@ -43,11 +46,13 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         }
 
         /// <summary>
-        /// Добавить отправку метрик на проекте.
+        /// Configures sending message handlers, tasks, system and GC events metrics
+        /// over http and into InfluxDb.
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="hostContext"></param>
-        /// <returns></returns>
+        /// <param name="services">IServiceCollection to add the services to.</param>
+        /// <param name="hostContext">Context containing the common services on the IHost.</param>
+        /// <returns>The Microsoft.Extensions.DependencyInjection.IServiceCollection so that additional
+        /// calls can be chained.</returns>
         public static IServiceCollection AddDataAsyncMetrics(this IServiceCollection services, HostBuilderContext hostContext)
         {
             var metricsBuilder = AppMetrics.CreateDefaultBuilder()
@@ -70,29 +75,30 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             services.AddSingleton(metrics.OutputEnvFormatters);
             services.AddSingleton<IMetrics>(metrics);
             services.AddSingleton(metrics);
-            services.AddSystemMetrics(metricsOptions);
+            services.AddSystemAndGcEventsMetrics(metricsOptions);
             services.AddMetricsReporter(metricsOptions);
 
             return services;
         }
 
         /// <summary>
-        /// Добавить отправку системных метрик.
+        /// Adds hosted services to collect system usage and gc event metrics.
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="metricsOptions"></param>
-        /// <returns></returns>
-        static IServiceCollection AddSystemMetrics(this IServiceCollection services, MetricsConfigurationOptions metricsOptions)
+        /// <param name="services">IServiceCollection to add the services to.</param>
+        /// <param name="metricsOptions">Metrics configuration options.</param>
+        /// <returns>The Microsoft.Extensions.DependencyInjection.IServiceCollection so that additional
+        /// calls can be chained.</returns>
+        static IServiceCollection AddSystemAndGcEventsMetrics(this IServiceCollection services, MetricsConfigurationOptions metricsOptions)
         {
             if (metricsOptions.AddSystemMetrics) services.AddAppMetricsCollectors();
             return services;
         }
 
         /// <summary>
-        /// Добавить отправку метрик в InfluxDb.
+        /// Adds InfluxDB reporting.
         /// </summary>
-        /// <param name="metricsBuilder"></param>
-        /// <param name="influxDbOptions"></param>
+        /// <param name="metricsBuilder">IMetricBuilder to add InfluxDB reporting to.</param>
+        /// <param name="influxDbOptions">Configuration options for InfluxDB reporting.</param>
         static void AddInfluxDb(this IMetricsBuilder metricsBuilder, MetricsReportingInfluxDbOptions influxDbOptions)
         {
             if (influxDbOptions.InfluxDb.BaseUri == null) return;
@@ -101,11 +107,11 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         }
 
         /// <summary>
-        /// Добавить отправку метрик через Http.
+        /// Adds HTTP reporting.
         /// </summary>
-        /// <param name="metricsBuilder"></param>
-        /// <param name="hostEnvironment"></param>
-        /// <param name="httpOptions"></param>
+        /// <param name="metricsBuilder">IMetricBuilder to add InfluxDB reporting to.</param>
+        /// <param name="hostEnvironment">Provides information about the hosting environment an application is running in.</param>
+        /// <param name="httpOptions">Configuration options of HTTP reporting. </param>
         static void AddOverHttp(this IMetricsBuilder metricsBuilder, IHostEnvironment hostEnvironment, MetricsReportingHttpOptions httpOptions)
         {
             if (httpOptions.HttpSettings.RequestUri == null) return;
@@ -120,10 +126,10 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         }
 
         /// <summary>
-        /// Добавить репортера для отправки метрик.
+        /// Add metrics reporter.
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="metricsOptions"></param>
+        /// <param name="services">IServiceCollection to add the services to.</param>
+        /// <param name="metricsOptions">Metrics configuration options.</param>
         /// <returns></returns>
         static IServiceCollection AddMetricsReporter(this IServiceCollection services, MetricsConfigurationOptions metricsOptions)
         {
