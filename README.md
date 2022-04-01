@@ -461,14 +461,14 @@ var consoleApplication = ConsoleHost
 }
 ```
 
-## ReportingInfluxDb
+#### ReportingInfluxDb
 
 Настройка InfluxDb, не обязательна.
 
-## ReportingOverHttp
+#### ReportingOverHttp
 
 Настройка Http, не обязательна. Для приема метрик в Prometheus Pushgateway необходимо, чтобы адрес http оканчивался на "/metrics".
 
-## AddSystemMetrics
+#### AddSystemMetrics
 
 Если устнановлена, то приложение будет отсылать метрики нагрузки системы и данные сборщика мусора.
