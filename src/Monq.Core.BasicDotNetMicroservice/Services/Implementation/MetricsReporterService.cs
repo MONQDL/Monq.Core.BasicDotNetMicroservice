@@ -6,7 +6,6 @@ using Monq.Core.BasicDotNetMicroservice.Configuration;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using static App.Metrics.AppMetricsConstants;
 
 namespace Monq.Core.BasicDotNetMicroservice.Services.Implementation
 {
@@ -61,30 +60,6 @@ namespace Monq.Core.BasicDotNetMicroservice.Services.Implementation
         {
             _scheduler?.Dispose();
             _logger?.LogInformation($"Stopped {nameof(MetricsReporterService)}");
-        }
-    }
-
-    /// <summary>
-    /// Настройки для репортера.
-    /// </summary>
-    public class MetricsReporterOptions
-    {
-        /// <summary>
-        /// Временно интервал отправки метрик.
-        /// </summary>
-        public TimeSpan FlushInterval { get; set; }
-
-        /// <summary>
-        /// Коструктор.
-        /// </summary>
-        /// <param name="options"></param>
-        public MetricsReporterOptions(MetricsConfigurationOptions options)
-        {
-            FlushInterval = options.ReportingInfluxDb.FlushInterval.CompareTo(options.ReportingOverHttp.FlushInterval) < 0
-                ? options.ReportingInfluxDb.FlushInterval
-                : options.ReportingOverHttp.FlushInterval;
-
-            if (FlushInterval == TimeSpan.Zero) FlushInterval = Reporting.DefaultFlushInterval;
         }
     }
 }
