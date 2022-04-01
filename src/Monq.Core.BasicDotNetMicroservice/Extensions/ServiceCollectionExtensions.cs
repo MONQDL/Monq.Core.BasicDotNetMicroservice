@@ -75,22 +75,10 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             services.AddSingleton(metrics.OutputEnvFormatters);
             services.AddSingleton<IMetrics>(metrics);
             services.AddSingleton(metrics);
-            services.AddSystemAndGcEventsMetrics(metricsOptions);
             services.AddMetricsReporter(metricsOptions);
 
-            return services;
-        }
-
-        /// <summary>
-        /// Adds hosted services to collect system usage and gc event metrics.
-        /// </summary>
-        /// <param name="services">IServiceCollection to add the services to.</param>
-        /// <param name="metricsOptions">Metrics configuration options.</param>
-        /// <returns>The Microsoft.Extensions.DependencyInjection.IServiceCollection so that additional
-        /// calls can be chained.</returns>
-        static IServiceCollection AddSystemAndGcEventsMetrics(this IServiceCollection services, MetricsConfigurationOptions metricsOptions)
-        {
             if (metricsOptions.AddSystemMetrics) services.AddAppMetricsCollectors();
+
             return services;
         }
 
@@ -131,12 +119,11 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <param name="services">IServiceCollection to add the services to.</param>
         /// <param name="metricsOptions">Metrics configuration options.</param>
         /// <returns></returns>
-        static IServiceCollection AddMetricsReporter(this IServiceCollection services, MetricsConfigurationOptions metricsOptions)
+        static void AddMetricsReporter(this IServiceCollection services, MetricsConfigurationOptions metricsOptions)
         {
             var metricsReporterOptions = new MetricsReporterOptions(metricsOptions);
             services.AddSingleton(metricsReporterOptions);
             services.AddHostedService<MetricsReporterService>();
-            return services;
         }
     }
 }

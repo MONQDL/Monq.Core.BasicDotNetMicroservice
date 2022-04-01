@@ -55,7 +55,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <param name="action">The action to measure.</param>
         public static void MeasureRabbitMQPreprocessingTime(this IMetricsRoot metrics, Action action)
         {
-            using (metrics.Measure?.Timer.Time(MicroserviceConstants.RabbitMQMetrics.Timers.EventProcessTimer))
+            using (metrics.Measure.Timer.Time(MicroserviceConstants.RabbitMQMetrics.Timers.EventProcessTimer))
             {
                 action();
             }
@@ -68,16 +68,10 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <param name="action">The action to measure.</param>
         public static async Task MeasureRabbitMQPreprocessingTimeAsync(this IMetricsRoot metrics, Func<Task> action)
         {
-            using (metrics.Measure?.Timer.Time(MicroserviceConstants.RabbitMQMetrics.Timers.EventProcessTimer))
+            using (metrics.Measure.Timer.Time(MicroserviceConstants.RabbitMQMetrics.Timers.EventProcessTimer))
             {
                 await action();
             }
-        }
-
-        static void IncreaseRabbitMQMetricsValues(this IMetricsRoot metrics, MetricTags tags, string item)
-        {
-            metrics.Measure?.Counter.Increment(MicroserviceConstants.RabbitMQMetrics.Counters.EventsCounter, tags, item);
-            metrics.Measure?.Meter.Mark(MicroserviceConstants.RabbitMQMetrics.Meters.EventsRate, tags, item);
         }
 
         /// <summary>
@@ -119,7 +113,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <param name="action">The action to measure.</param>
         public static void MeasureTasksPreprocessingTime(this IMetricsRoot metrics, Action action)
         {
-            using (metrics.Measure?.Timer.Time(MicroserviceConstants.TasksMetrics.Timers.TaskProcessTimer))
+            using (metrics.Measure.Timer.Time(MicroserviceConstants.TasksMetrics.Timers.TaskProcessTimer))
             {
                 action();
             }
@@ -133,16 +127,36 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <returns></returns>
         public static async Task MeasureTasksPreprocessingTimeAsync(this IMetricsRoot metrics, Func<Task> action)
         {
-            using (metrics.Measure?.Timer.Time(MicroserviceConstants.TasksMetrics.Timers.TaskProcessTimer))
+            using (metrics.Measure.Timer.Time(MicroserviceConstants.TasksMetrics.Timers.TaskProcessTimer))
             {
                 await action();
             }
         }
 
+        /// <summary>
+        /// Increments by 1 count of taged events.
+        /// </summary>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="tags">The runtime tags to set in addition to those defined on the options, this will
+        /// create a separate metric per unique App.Metrics.MetricTags</param>
+        /// <param name="item">Item identifier for a message handler.</param>
+        static void IncreaseRabbitMQMetricsValues(this IMetricsRoot metrics, MetricTags tags, string item)
+        {
+            metrics.Measure.Counter.Increment(MicroserviceConstants.RabbitMQMetrics.Counters.EventsCounter, tags, item);
+            metrics.Measure.Meter.Mark(MicroserviceConstants.RabbitMQMetrics.Meters.EventsRate, tags, item);
+        }
+
+        /// <summary>
+        /// Increments by 1 count of taged tasks.
+        /// </summary>
+        /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
+        /// <param name="tags">The runtime tags to set in addition to those defined on the options, this will
+        /// create a separate metric per unique App.Metrics.MetricTags</param>
+        /// <param name="item">Item identifier for a message handler.</param>
         static void IncreaseTasksMetricsValues(this IMetricsRoot metrics, MetricTags tags, string item)
         {
-            metrics.Measure?.Counter.Increment(MicroserviceConstants.TasksMetrics.Counters.TasksCounter, tags, item);
-            metrics.Measure?.Meter.Mark(MicroserviceConstants.TasksMetrics.Meters.TasksRate, tags, item);
+            metrics.Measure.Counter.Increment(MicroserviceConstants.TasksMetrics.Counters.TasksCounter, tags, item);
+            metrics.Measure.Meter.Mark(MicroserviceConstants.TasksMetrics.Meters.TasksRate, tags, item);
         }
     }
 }
