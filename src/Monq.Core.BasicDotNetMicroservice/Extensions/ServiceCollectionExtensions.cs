@@ -53,7 +53,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <param name="hostContext">Context containing the common services on the IHost.</param>
         /// <returns>The Microsoft.Extensions.DependencyInjection.IServiceCollection so that additional
         /// calls can be chained.</returns>
-        public static IServiceCollection AddDataAsyncMetrics(this IServiceCollection services, HostBuilderContext hostContext)
+        public static IServiceCollection AddConsoleMetrics(this IServiceCollection services, HostBuilderContext hostContext)
         {
             var metricsBuilder = AppMetrics.CreateDefaultBuilder()
                 .Configuration.Configure(options =>
@@ -77,7 +77,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             services.AddSingleton(metrics);
             services.AddMetricsReporter(metricsOptions);
 
-            if (metricsOptions.AddSystemMetrics) services.AddAppMetricsCollectors();
+            if (metricsOptions.AddSystemMetrics) 
+                services.AddAppMetricsCollectors();
 
             return services;
         }
