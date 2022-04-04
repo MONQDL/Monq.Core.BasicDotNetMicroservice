@@ -426,7 +426,7 @@ var consoleApplication = ConsoleHost
             .ConfigureServices((hostContext, services) =>
             {
                 ...
-                services.AddDataAsyncMetrics(hostContext);
+                services.AddConsoleMetrics(hostContext);
                 ...
             })
             .ConfigureServices(StartMessageHandlers)
