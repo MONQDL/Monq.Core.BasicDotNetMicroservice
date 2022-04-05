@@ -97,7 +97,7 @@ For configuring Consul management the `aspnet_consul_config.json` file need to b
 
 `"Token"` - the token to connect to the Consul server.
 
-`"RootFolder"` - the path to the Consul configuration. By default equals the ASPNETCORE_ENVIRONMENT variable.
+`"RootFolder"` - the path to the Consul configuration. By default equals the `ASPNETCORE_ENVIRONMENT` variable.
 
 The `aspnet_consul_config.json` file path can be set by the environment variable `ASPNETCORE_CONSUL_CONFIG_FILE`.
 
@@ -146,7 +146,7 @@ public void Configure(IApplicationBuilder app)
 }
 ```
 
-The `app.UseTraceEventId()` call have to be added stricly after the _UseRouting()_ call in the pipeline.
+The `app.UseTraceEventId()` call have to be added stricly after the `UseRouting()` call in the pipeline.
 
 ### The logging user basic information
 
@@ -168,7 +168,7 @@ public void Configure(IApplicationBuilder app)
 }
 ```
 
-The `app.UseLogUser()` call have to be added stricly after the _UseAuthentication()_ call in the pipeline.
+The `app.UseLogUser()` call have to be added stricly after the `UseAuthentication()` call in the pipeline.
 
 ### ConfigureBasicMicroservice
 
@@ -183,6 +183,7 @@ Version 6.0.0 contains:
 - hostBuilder.ConfigureAuthorizationPolicies();
 - hostBuilder.ConfigBasicHttpService();
 
+```csharp
 hostBuilder.ConfigureServices((context, services) =>
 {
     services.AddHttpContextAccessor();
@@ -190,6 +191,7 @@ hostBuilder.ConfigureServices((context, services) =>
     services.AddDistributedMemoryCache();
     services.Configure<AppConfiguration>(context.Configuration);
 });
+```
 
 Set up the basic microservice extension in the `Program.cs`.
 ```csharp
