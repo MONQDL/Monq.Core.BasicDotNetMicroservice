@@ -1,18 +1,18 @@
-# Библиотека поддержки микросервисов .net core
+# The NetCore Microservice extensions library
 
-Библиотека содержит набор методов, который применяется большинством микросервисов .net core.
+The library contains extension methods that used by most .net core microservices.
 
-### Установка
+### Installing
 
 ```powershell
 Install-Package Monq.Core.BasicDotNetMicroservice
 ```
 
-### Логирование (ElasticSearch)
+### Configures logging (ElasticSearch)
 
-Данное расширение предлагает переключение из стандартного механизма логирования ASP.NET на Serilog.
+The extension configures logging by the Serilog.
 
-Подключение производится в файле `Program.cs`.
+Set up the logging extension in the `Program.cs`.
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
@@ -34,9 +34,9 @@ public static IHostBuilder CreateHostBuilder(string[] args) =>
         });
 ```
 
-По умолчанию используется логирование в консоль, но возможно использование конфигурации из appsettings.json.
+By default, logging to the console is used. For adding other logging outputs confugure the appsettings.json configuration file.
 
-Данный пакет содержит sinc для подключения к серверу ElasticSearch. В данном случае конфигурация будет такого вида:
+Logging to the ElasticSearch can be added. To achive that, add the properties from the rendered JSON format example to the appsettings.json file. 
 
 ```json
 {
@@ -57,11 +57,11 @@ public static IHostBuilder CreateHostBuilder(string[] args) =>
 }
 ```
 
-### Использования центрального хранилища конфигураций Consul
+### Configures Consul
 
-Данное расширение предлагает альтернативный механизм загрузки файла конфигурации appsettings.json, используя центральное хранилище конфигураций `Consul`.
+The extension adds the configuration management with Consule. 
 
-Подключение производится в файле `Program.cs`.
+Set up the Consul configuring in the `Program.cs`.
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
@@ -83,7 +83,7 @@ public static IHostBuilder CreateHostBuilder(string[] args) =>
         });
 ```
 
-Реализация данного расширения предполагает наличие файла `aspnet_consul_config.json` в корне проекта с таким содержанием:
+For configuring Consul management the `aspnet_consul_config.json` file need to be added to the root of a project.
 
 ```json
 {
@@ -92,29 +92,20 @@ public static IHostBuilder CreateHostBuilder(string[] args) =>
     "RootFolder": "custom-root/keys"
 }
 ```
-где 
 
-`"Address"` - http(s) адрес сервера Consul, с которого можно получить конфигурацию;
+`"Address"` - the http(s) address of a Consul server, where the configuration is stored.
 
-`"Token"` - токен доступа к серверу.
+`"Token"` - the token to connect to the Consul server.
 
-`"RootFolder"` - базовый путь к конфигурации Consul. Если опция не задана, то будет использоваться значение переменной _ASPNETCORE_ENVIRONMENT_.
+`"RootFolder"` - the path to the Consul configuration. By default equals the `ASPNETCORE_ENVIRONMENT` variable.
 
-Путь к файлу `aspnet_consul_config.json` можно задать через переменную среды `ASPNETCORE_CONSUL_CONFIG_FILE`.
+The `aspnet_consul_config.json` file path can be set by the environment variable `ASPNETCORE_CONSUL_CONFIG_FILE`.
 
-В реализации 1.1.0 предполагается, что конфигурация содержится в по пути:
+### API point with project version.
 
-`$"{rootFolder}/{applicationName?.ToLower()}/appsettings.json"`,
+The extension adds the new API point `/api/version`. This API contains the information about the package version of the start point of a program `class Program` is located at.
 
-где
-
-`applicationName` - название программы из переменной среды `ASPNETCORE_APPLICATION_NAME` *или*, если переменная среды не задана Environment.ApplicationName.
-
-### Точка API с версией проекта.
-
-Данное расширение вносит дополнительную точку API `/api/version` содержающую информацию по версии пакета (сборки), в которой располагается точка запуска программы `class Program`.
-
-Подключение производится в файле `Program.cs`.
+Set up the Api version point in the `Program.cs`.
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
@@ -136,13 +127,12 @@ public static IHostBuilder CreateHostBuilder(string[] args) =>
         });
 ```
 
-### Логирование цепочек запросов TraceEventId
+### The TraceEventId logging request chain
 
-Данное расширение вводит механизм добавления идентификатора запроса из HTTP заголовка, если он присутствовал, как уникальный идентификатор выполнения запроса MVC в текущем сервисе.
-Таким образом по заголовку можно отследить какой запрос в вызывающем сервисе привел к выполнению запроса в вызываемом сервисе и так по всей цепочке от первого вызывающего до последнего
-вызываемого сервиса.
+The EventId is the unique identificator of the query execution in the current service.
+The extension adds the EventId to the HTTP header, so that the chain of calls from the first service to the last service can be tracked.
 
-Подключение производится в файле `Startup.cs`.
+Set up the logging request chain in the `Startup.cs`.
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 ```
@@ -156,14 +146,14 @@ public void Configure(IApplicationBuilder app)
 }
 ```
 
-`app.UseTraceEventId();` должен стоять строго после _UseRouting_ в цепочке вызовов (pipline).
+The `app.UseTraceEventId()` call have to be added stricly after the `UseRouting()` call in the pipeline.
 
-### Логирование базовой информации по пользователю
+### The logging user basic information
 
-Данное расширение вводит механизм логирования Id, и имени пользователя, если он аутентифицирован.
-Таким образом можно отслеживать действия пользователя по API.
+The extension adds the logging user by Id. A user name also adds to the logging if the user is authenticated.
+So the user action can be tracked by the API.
 
-Подключение производится в файле `Startup.cs`.
+Set up the user logging in the `Startup.cs`.
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 ```
@@ -178,13 +168,13 @@ public void Configure(IApplicationBuilder app)
 }
 ```
 
-`app.UseLogUser();` должен стоять строго после _UseAuthentication_ в цепочке вызовов (pipline).
+The `app.UseLogUser()` call have to be added stricly after the `UseAuthentication()` call in the pipeline.
 
 ### ConfigureBasicMicroservice
 
-Данное расширение выполняет подключение стандартного набора расширений для использования микросервисом типа AspNetCore MVC  в повседневной жизни.
+The extension configures the standard extension set for using by the AspNetCore MVC microservice.
 
-В версии 4.0.0 включает в себя:
+Version 6.0.0 contains:
 
 - hostBuilder.ConfigureCustomCertificates();
 - hostBuilder.ConfigureConsul();
@@ -193,6 +183,7 @@ public void Configure(IApplicationBuilder app)
 - hostBuilder.ConfigureAuthorizationPolicies();
 - hostBuilder.ConfigBasicHttpService();
 
+```csharp
 hostBuilder.ConfigureServices((context, services) =>
 {
     services.AddHttpContextAccessor();
@@ -200,8 +191,9 @@ hostBuilder.ConfigureServices((context, services) =>
     services.AddDistributedMemoryCache();
     services.Configure<AppConfiguration>(context.Configuration);
 });
+```
 
-Подключение производится в файле `Program.cs`.
+Set up the basic microservice extension in the `Program.cs`.
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
@@ -223,13 +215,13 @@ public static IHostBuilder CreateHostBuilder(string[] args) =>
         });
 ```
 
-### Конфигуратор консольной программы
+### The console app configuration
 
-Набор расширений предоставляет возможность выполнять конфигурацию консольных программ в максимально упрощенном виде.
+The extension brings simplicity to the console program configuration.
 
-Конфигуратор расширяет интерфейс `IHostBuilder`, поэтому некоторые методы не реализованы.
+This configuration extends the `IHostBuilder`, that is why some methods are not implemented.
 
-Пример конфигурации `Program.cs`.
+The `Program.cs` configuration example.
 
 ```csharp
 public class Program
@@ -307,7 +299,7 @@ public class Program
 }
 ```
 
-### Глобальная обработка исключений
+### The global exception handle
 
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Filters;
@@ -331,26 +323,26 @@ using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Filters;
     }
 ```
 
-Метод ```.AddDefaultExceptionHandlers``` содержит в себе обработчики
+The ```AddDefaultExceptionHandlers()``` method contains such exception handlers:
 - UnauthorizedAccessException (HttpStatusCode.Unauthorized)
 - NotImplementedException (HttpStatusCode.NotImplemented)
 - Exception (Exception.InternalServerError)
 
-Так как метод ```.AddDefaultExceptionHandlers``` содержит обработку ```Exception```, то его следует подключать в конце.
+The ```AddDefaultExceptionHandlers()``` method have to be added in the pipeline end.
 
-### Аутентификация и авторизация
+### Authentication and authorization
 
-#### Политики авторизации
+#### Authorization policy
 
-Данное расширение выполняет подключение стандартного набора политик безопасности. Политики проверяют наличие scoup в access_token.
+The extension adds a standard set of the security policies. The policies check for the presence of scoup in the access_token.
 
-В версии 3.1.1 включает в себя:
+Version 6.0.0 includes:
 
 - [Authorize("Authenticated")]
 - [Authorize("read")]
 - [Authorize("write")]
 
-Подключение производится в файле `Program.cs`.
+Set up the authorization policy in the `Program.cs`.
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
@@ -372,11 +364,11 @@ public static IHostBuilder __CreateHostBuilder(string[] args) =>
         });
 ```
 
-#### Аутентификация API сервисов
+#### API services authentication
 
-Расширение предоставляет стандартизированный метод подключения аутентификации с помощью resource-owner flow для ASP.NET Core MVC.
+The extension provides a standardized resource-owner flow authentication connection method for ASP.NET Core MVC.
 
-Подключение производится в файле `Startup.cs`.
+Set up the API services authentication in the `Startup.cs`.
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
@@ -395,7 +387,7 @@ public void Configure(IApplicationBuilder app)
 }
 ```
 
-Конфигурация должна при этом содержать такой JSON:
+The example of the configuration in JSON format:
 
 ```json
 {
@@ -405,9 +397,74 @@ public void Configure(IApplicationBuilder app)
       "Login": "service-api",
       "Password": "RIHY1vsevEO7WEVC"
     },
-    "RequireHttpsMetadata": false, // не обязательно. По умолчанию false.
-	"EnableCaching": true          // не обязательно. По умолчанию true.
+    "RequireHttpsMetadata": false,
+	"EnableCaching": true
   }
 ```
+#### RequireHttpsMetadata
+Optional. By default is false.
 
-Длительность кэширования данных: 5 мин.
+#### EnableCaching
+Optional. By default is true.
+
+Data cache duration: 5 minutes.
+
+### Metrics sending
+
+The extension adds the ability to send message queue metrics, tasks metrics, system load metrics and garbage collector metrics.
+
+Set up the metrics sending in the `Program.cs`.
+```csharp
+using Monq.Core.BasicDotNetMicroservice.Extensions;
+```
+
+```csharp
+var consoleApplication = ConsoleHost
+            .CreateDefaultBuilder(args)
+            .ConfigureServices((hostContext, services) =>
+            {
+                ...
+                services.AddConsoleMetrics(hostContext);
+                ...
+            })
+            .ConfigureServices(StartMessageHandlers)
+            .Build() as IConsoleApplication;
+```
+
+The configuration must contain the following JSON:
+
+```json
+{
+  "Metrics": {
+    "ReportingInfluxDb": {
+      "FlushInterval": "00:00:10",
+      "InfluxDb": {
+        "Consistenency": "",
+        "Endpoint": "",
+        "BaseUri": "http://influxdb:8888",
+        "Database": "",
+        "Password": "",
+        "RetensionPolicy": "",
+        "UserName": ""
+      }
+    },
+    "ReportingOverHttp": {
+      "FlushInterval": "00:00:10",
+      "HttpSettings": {
+        "RequestUri": "http://localhost:9091/metrics"
+      }
+    },
+    "AddSystemMetrics": true
+  }
+}
+```
+
+#### ReportingInfluxDb
+Options for InfluxDB reporting. Optional.
+
+#### ReportingOverHttp
+Options of HTTP reporting. Optional. 
+For sending metrics to the Prometheus Pushgateway it is nessesary for the RequestUri ended up with "/metrics".
+
+#### AddSystemMetrics
+Options for collect system usage and gc event metrics. Optional.
