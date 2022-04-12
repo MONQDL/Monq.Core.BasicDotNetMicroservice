@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Filters;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
 using Monq.Core.BasicDotNetMicroservice.Models;
@@ -154,20 +155,20 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                 .ConfigureMetricsWithDefaults((builderContext, metricsBuilder) =>
                 {
                     metricsBuilder.OutputMetrics.AsPrometheusPlainText();
-                    if (!string.IsNullOrEmpty(builderContext.Configuration[$"{MicroserviceConstants.MetricsConfiguration.ConfigSection}:InfluxDb:BaseUri"]))
+
+                    var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
+                    var metricsOptions = new MetricsConfigurationOptions();
+                    metricsConfig.Bind(metricsOptions);
+
+                    if (metricsOptions.ReportingInfluxDb.InfluxDb.BaseUri != null)
+                        metricsBuilder.Report.ToInfluxDb(metricsOptions.ReportingInfluxDb);
+
+                    if (metricsOptions.AddSystemMetrics)
                     {
-                        var configuration = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.ConfigSection);
-
-                        var config = new MetricsReportingInfluxDbOptions();
-                        configuration.Bind(config);
-
-                        void MetricsConfig(MetricsReportingInfluxDbOptions conf)
+                        var services = hostBuilder.ConfigureServices(services =>
                         {
-                            conf.FlushInterval = config.FlushInterval;
-                            conf.InfluxDb = config.InfluxDb;
-                        }
-
-                        metricsBuilder.Report.ToInfluxDb(MetricsConfig); // TODO: allow load from config
+                            services.AddAppMetricsCollectors();
+                        });
                     }
                 })
                 .UseMetricsWebTracking()
