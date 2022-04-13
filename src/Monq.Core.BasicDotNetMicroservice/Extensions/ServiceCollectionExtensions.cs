@@ -84,6 +84,24 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         }
 
         /// <summary>
+        /// Configures adding GC metrics, CPU metrics and memory metrics.
+        /// </summary>
+        /// <param name="services">IServiceCollection to add the services to.</param>
+        /// <param name="configuration">The configuration being bound.</param>
+        /// <returns></returns>
+        public static IServiceCollection AddSystemMetrics(this IServiceCollection services, IConfiguration configuration)
+        {
+            var metricsConfig = configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
+            var metricsOptions = new MetricsConfigurationOptions();
+            metricsConfig.Bind(metricsOptions);
+
+            if (metricsOptions.AddSystemMetrics)
+                services.AddAppMetricsCollectors();
+
+            return services;
+        }
+
+        /// <summary>
         /// Adds InfluxDB reporting.
         /// </summary>
         /// <param name="metricsBuilder">IMetricBuilder to add InfluxDB reporting to.</param>

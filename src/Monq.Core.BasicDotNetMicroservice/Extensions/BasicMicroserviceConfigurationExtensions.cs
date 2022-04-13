@@ -162,9 +162,6 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
 
                     if (metricsOptions.ReportingInfluxDb.InfluxDb.BaseUri != null)
                         metricsBuilder.Report.ToInfluxDb(metricsOptions.ReportingInfluxDb);
-
-                    if (metricsOptions.AddSystemMetrics)
-                        hostBuilder.ConfigureServices(services => services.AddAppMetricsCollectors());
                 })
                 .UseMetricsWebTracking()
                 .UseMetrics(options =>
