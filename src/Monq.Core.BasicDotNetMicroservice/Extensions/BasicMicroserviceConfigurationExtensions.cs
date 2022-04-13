@@ -162,9 +162,6 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
 
                     if (metricsOptions.ReportingInfluxDb.InfluxDb.BaseUri != null)
                         metricsBuilder.Report.ToInfluxDb(metricsOptions.ReportingInfluxDb);
-
-                    if (metricsOptions.AddSystemMetrics)
-                        hostBuilder.ConfigureServices(services => services.AddAppMetricsCollectors());
                 })
                 .UseMetricsWebTracking()
                 .UseMetrics(options =>
@@ -174,7 +171,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                         endpointsOptions.MetricsTextEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
                         endpointsOptions.MetricsEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
                     };
-                });
+                })
+                .UseSystemMetrics();
 
             return hostBuilder;
         }
@@ -294,6 +292,27 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                 x.WaitTime = consulClientConfiguration.WaitTime;
             };
             options.ReloadOnChange = false;
+        }
+
+        /// <summary>
+        /// Add GC metrics, CPU metrics and memory usage metrics.
+        /// </summary>
+        /// <param name="hostBuilder">The host builder.</param>
+        /// <returns></returns>
+        static IWebHostBuilder UseSystemMetrics(this IWebHostBuilder hostBuilder)
+        {
+            hostBuilder
+                .ConfigureServices((builderContext, services) =>
+                {
+                    var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
+                    var metricsOptions = new MetricsConfigurationOptions();
+                    metricsConfig.Bind(metricsOptions);
+
+                    if (metricsOptions.AddSystemMetrics)
+                        services.AddAppMetricsCollectors();
+                });
+
+            return hostBuilder;
         }
     }
 }
