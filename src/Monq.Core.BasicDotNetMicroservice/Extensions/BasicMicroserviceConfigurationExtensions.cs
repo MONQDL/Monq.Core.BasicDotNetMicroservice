@@ -172,15 +172,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                         endpointsOptions.MetricsEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
                     };
                 })
-                .ConfigureServices((builderContext, services) =>
-                {
-                    var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
-                    var metricsOptions = new MetricsConfigurationOptions();
-                    metricsConfig.Bind(metricsOptions);
-
-                    if (metricsOptions.AddSystemMetrics)
-                        services.AddAppMetricsCollectors();
-                });
+                .AddSystemMetrics();
 
             return hostBuilder;
         }
@@ -300,6 +292,27 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                 x.WaitTime = consulClientConfiguration.WaitTime;
             };
             options.ReloadOnChange = false;
+        }
+
+        /// <summary>
+        /// Add GC metrics, CPU metrics and memory usage metrics.
+        /// </summary>
+        /// <param name="hostBuilder">The host builder.</param>
+        /// <returns></returns>
+        static IWebHostBuilder AddSystemMetrics(this IWebHostBuilder hostBuilder)
+        {
+            hostBuilder
+                .ConfigureServices((builderContext, services) =>
+                {
+                    var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
+                    var metricsOptions = new MetricsConfigurationOptions();
+                    metricsConfig.Bind(metricsOptions);
+
+                    if (metricsOptions.AddSystemMetrics)
+                        services.AddAppMetricsCollectors();
+                });
+
+            return hostBuilder;
         }
     }
 }
