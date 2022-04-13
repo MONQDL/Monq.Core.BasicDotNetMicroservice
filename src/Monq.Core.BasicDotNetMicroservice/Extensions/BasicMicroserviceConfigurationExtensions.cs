@@ -171,6 +171,15 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                         endpointsOptions.MetricsTextEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
                         endpointsOptions.MetricsEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
                     };
+                })
+                .ConfigureServices((builderContext, services) =>
+                {
+                    var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
+                    var metricsOptions = new MetricsConfigurationOptions();
+                    metricsConfig.Bind(metricsOptions);
+
+                    if (metricsOptions.AddSystemMetrics)
+                        services.AddAppMetricsCollectors();
                 });
 
             return hostBuilder;
