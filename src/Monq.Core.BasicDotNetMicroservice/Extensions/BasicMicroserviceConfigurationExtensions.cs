@@ -172,7 +172,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                         endpointsOptions.MetricsEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
                     };
                 })
-                .AddSystemMetrics();
+                .UseSystemMetrics();
 
             return hostBuilder;
         }
@@ -299,7 +299,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// </summary>
         /// <param name="hostBuilder">The host builder.</param>
         /// <returns></returns>
-        static IWebHostBuilder AddSystemMetrics(this IWebHostBuilder hostBuilder)
+        static IWebHostBuilder UseSystemMetrics(this IWebHostBuilder hostBuilder)
         {
             hostBuilder
                 .ConfigureServices((builderContext, services) =>
