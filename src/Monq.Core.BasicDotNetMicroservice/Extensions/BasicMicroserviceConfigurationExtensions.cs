@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Filters;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
 using Monq.Core.BasicDotNetMicroservice.Models;
@@ -154,21 +155,13 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                 .ConfigureMetricsWithDefaults((builderContext, metricsBuilder) =>
                 {
                     metricsBuilder.OutputMetrics.AsPrometheusPlainText();
-                    if (!string.IsNullOrEmpty(builderContext.Configuration[$"{MicroserviceConstants.MetricsConfiguration.ConfigSection}:InfluxDb:BaseUri"]))
-                    {
-                        var configuration = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.ConfigSection);
 
-                        var config = new MetricsReportingInfluxDbOptions();
-                        configuration.Bind(config);
+                    var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
+                    var metricsOptions = new MetricsConfigurationOptions();
+                    metricsConfig.Bind(metricsOptions);
 
-                        void MetricsConfig(MetricsReportingInfluxDbOptions conf)
-                        {
-                            conf.FlushInterval = config.FlushInterval;
-                            conf.InfluxDb = config.InfluxDb;
-                        }
-
-                        metricsBuilder.Report.ToInfluxDb(MetricsConfig); // TODO: allow load from config
-                    }
+                    if (metricsOptions.ReportingInfluxDb.InfluxDb.BaseUri != null)
+                        metricsBuilder.Report.ToInfluxDb(metricsOptions.ReportingInfluxDb);
                 })
                 .UseMetricsWebTracking()
                 .UseMetrics(options =>
@@ -178,7 +171,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                         endpointsOptions.MetricsTextEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
                         endpointsOptions.MetricsEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
                     };
-                });
+                })
+                .UseSystemMetrics();
 
             return hostBuilder;
         }
@@ -298,6 +292,27 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                 x.WaitTime = consulClientConfiguration.WaitTime;
             };
             options.ReloadOnChange = false;
+        }
+
+        /// <summary>
+        /// Add GC metrics, CPU metrics and memory usage metrics.
+        /// </summary>
+        /// <param name="hostBuilder">The host builder.</param>
+        /// <returns></returns>
+        static IWebHostBuilder UseSystemMetrics(this IWebHostBuilder hostBuilder)
+        {
+            hostBuilder
+                .ConfigureServices((builderContext, services) =>
+                {
+                    var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
+                    var metricsOptions = new MetricsConfigurationOptions();
+                    metricsConfig.Bind(metricsOptions);
+
+                    if (metricsOptions.AddSystemMetrics)
+                        services.AddAppMetricsCollectors();
+                });
+
+            return hostBuilder;
         }
     }
 }
