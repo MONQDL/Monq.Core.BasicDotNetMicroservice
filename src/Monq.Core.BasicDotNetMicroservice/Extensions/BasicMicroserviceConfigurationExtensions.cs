@@ -1,7 +1,6 @@
 ﻿using App.Metrics;
 using App.Metrics.AspNetCore;
 using App.Metrics.Formatters.Prometheus;
-using App.Metrics.Reporting.InfluxDB;
 using Consul;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;

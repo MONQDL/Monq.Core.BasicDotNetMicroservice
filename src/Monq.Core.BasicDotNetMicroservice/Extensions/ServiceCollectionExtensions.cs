@@ -77,7 +77,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             services.AddSingleton(metrics);
             services.AddMetricsReporter(metricsOptions);
 
-            if (metricsOptions.AddSystemMetrics) 
+            if (metricsOptions.AddSystemMetrics)
                 services.AddAppMetricsCollectors();
 
             return services;

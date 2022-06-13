@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Hosting.Internal;
@@ -47,7 +46,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Host
         public IHost Build()
         {
             if (_webHostBuilt)
-                throw new InvalidOperationException("Построение можно вызвать только 1 раз.");
+                throw new InvalidOperationException("Build can be called only once.");
 
             _webHostBuilt = true;
 
