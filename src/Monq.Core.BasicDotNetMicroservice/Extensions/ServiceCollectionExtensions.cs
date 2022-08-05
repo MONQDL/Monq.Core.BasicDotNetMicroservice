@@ -3,12 +3,15 @@ using App.Metrics.Formatters.Prometheus;
 using App.Metrics.Reporting.Http;
 using App.Metrics.Reporting.InfluxDB;
 using IdentityServer4.AccessTokenValidation;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Services.Implementation;
 using System;
+using System.Net;
+using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions
 {
@@ -120,11 +123,47 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <param name="services">IServiceCollection to add the services to.</param>
         /// <param name="metricsOptions">Metrics configuration options.</param>
         /// <returns></returns>
-        static void AddMetricsReporter(this IServiceCollection services, MetricsConfigurationOptions metricsOptions)
+        static IServiceCollection AddMetricsReporter(this IServiceCollection services, MetricsConfigurationOptions metricsOptions)
         {
             var metricsReporterOptions = new MetricsReporterOptions(metricsOptions);
             services.AddSingleton(metricsReporterOptions);
             services.AddHostedService<MetricsReporterService>();
+
+            return services;
+        }
+
+        /// <summary>
+        /// Add preconfigred Grpc service with configured Address and CallCredentials.
+        /// </summary>
+        /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
+        /// a transient service.</typeparam>
+        /// <param name="services">The <see cref="IServiceCollection"/>.</param>
+        /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
+        /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+        public static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(this IServiceCollection services, IConfiguration configuration)
+            where TClient : class
+        {
+            var builder = services.AddGrpcClient<TClient>(o =>
+            {
+                o.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)));
+            })
+            .ConfigureChannel(o =>
+            {
+                o.UnsafeUseInsecureChannelCallCredentials = true;
+            })
+            .AddCallCredentials((context, metadata, provider) =>
+            {
+                var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
+                if (httpContext.HttpContext.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) && !string.IsNullOrEmpty(token))
+                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token);
+
+                if (httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId)
+                    && !string.IsNullOrEmpty(userspaceId))
+                    metadata.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
+
+                return Task.CompletedTask;
+            });
+            return builder;
         }
     }
 }
