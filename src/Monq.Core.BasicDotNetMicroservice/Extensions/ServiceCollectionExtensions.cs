@@ -2,6 +2,8 @@
 using App.Metrics.Formatters.Prometheus;
 using App.Metrics.Reporting.Http;
 using App.Metrics.Reporting.InfluxDB;
+using Grpc.Core;
+using Grpc.Core.Interceptors;
 using IdentityServer4.AccessTokenValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -9,8 +11,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Services.Implementation;
+using Monq.Core.HttpClientExtensions;
 using System;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions
@@ -162,6 +166,43 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                     metadata.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
 
                 return Task.CompletedTask;
+            });
+            return builder;
+        }
+
+        /// <summary>
+        /// Add preconfigred Grpc service with configured Address and CallCredentials for console application with static authentication.
+        /// </summary>
+        /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
+        /// a transient service.</typeparam>
+        /// <param name="services">The <see cref="IServiceCollection"/>.</param>
+        /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
+        /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+        public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(this IServiceCollection services, IConfiguration configuration)
+            where TClient : class
+        {
+            // REM: для получения токена в .AddCallCredentials().
+            services.AddHttpClient<RestHttpClient>();
+
+            var builder = services.AddGrpcClient<TClient>(o =>
+            {
+                o.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)));
+            })
+            .ConfigureChannel(o =>
+            {
+                o.UnsafeUseInsecureChannelCallCredentials = true;
+            })
+            .AddCallCredentials(async (context, metadata, provider) =>
+            {
+                // HACK: временное решение. Проработать вынос получения токена авторизации в отдельном классе.
+                var client = provider.GetRequiredService<RestHttpClient>();
+                
+                var tokenResponse = await client.GetAccessToken(false);
+                if (tokenResponse is null)
+                    return;
+                const string scheme = "Bearer";
+                var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
+                metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
             });
             return builder;
         }
