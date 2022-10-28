@@ -51,6 +51,21 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             return @struct;
         }
 
+        /// <summary>
+        /// Convert <see cref="JsonArray"/> to Grpc <see cref="ListValue"/>.
+        /// </summary>
+        /// <param name="jsonArray">Json <see cref="JsonArray"/> array.</param>
+        /// <returns></returns>
+        public static ListValue ToProtoArray(this JsonArray jsonArray)
+        {
+            var listValue = new ListValue();
+            foreach (var item in jsonArray)
+            {
+                listValue.Values.Add(GetProtoValue(item));
+            }
+            return listValue;
+        }
+
         static JsonNode? GetJsonValue(Value value)
         {
             switch (value.KindCase)
