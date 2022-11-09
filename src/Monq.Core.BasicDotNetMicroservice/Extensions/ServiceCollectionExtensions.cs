@@ -165,6 +165,10 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                     && !string.IsNullOrEmpty(userspaceId))
                     metadata.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
 
+                if (httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.CultureHeader, out var culture)
+                    && !string.IsNullOrEmpty(culture))
+                    metadata.Add(MicroserviceConstants.CultureHeader, culture);
+
                 return Task.CompletedTask;
             });
             return builder;
