@@ -66,6 +66,14 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             return listValue;
         }
 
+        /// <summary>
+        /// Convert <see cref="JsonNode"/> to Grpc <see cref="Value"/>.
+        /// </summary>
+        /// <param name="jsonNode">Json <see cref="JsonNode"/>.</param>
+        /// <returns></returns>
+        public static Value ToProtoValue(this JsonNode jsonNode) => 
+            GetProtoValue(jsonNode);
+
         static JsonNode? GetJsonValue(Value value)
         {
             switch (value.KindCase)
