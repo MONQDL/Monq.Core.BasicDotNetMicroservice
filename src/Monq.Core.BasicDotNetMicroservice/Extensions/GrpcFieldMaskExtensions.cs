@@ -2,6 +2,8 @@
 using Google.Protobuf.WellKnownTypes;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using static Google.Protobuf.WellKnownTypes.FieldMask;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions
@@ -61,10 +63,10 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// </summary>
         /// <typeparam name="TSource"></typeparam>
         /// <typeparam name="TResult"></typeparam>
-        /// <param name="values">Коллекция.</param>
+        /// <param name="values">Collection.</param>
         /// <param name="fieldMask"><see cref="FieldMask"/>.</param>
-        /// <param name="options">Настройки слияния.</param>
-        /// <param name="convert">Функция конвертации.</param>
+        /// <param name="options">Merge options.</param>
+        /// <param name="convert">Convert function.</param>
         /// <returns></returns>
         public static IEnumerable<TResult> ApplyFieldMask<TSource, TResult>(this IEnumerable<TSource> values,
             FieldMask? fieldMask, Func<TSource, TResult> convert, MergeOptions? options = null)
@@ -85,6 +87,41 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <returns></returns>
         public static bool ShouldIncludeField(this FieldMask? fieldMask, string fieldName) =>
             fieldMask == null || fieldMask?.Paths?.Contains(fieldName) == true;
+
+        /// <summary>
+        /// Get gRPC field mask for an object.
+        /// </summary>
+        /// <param name="obj">Object.</param>
+        /// <returns></returns>
+        public static FieldMask GetFieldMask<T>(this T obj) where T : class
+        {
+            var props = GetNotNullPropertiesNames(obj);
+            return FromString(string.Join(",", props));
+        }
+
+        /// <summary>
+        /// Get gRPC field mask for an object type.
+        /// </summary>
+        /// <param name="type">Type.</param>
+        /// <returns></returns>
+        public static FieldMask GetFieldMask(this System.Type type)
+        {
+            var props = type
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Select(x => x.Name)
+                .ToList();
+            return FromString(string.Join(",", props));
+        }
+
+        static IEnumerable<string> GetNotNullPropertiesNames(object obj)
+        {
+            var props = obj.GetType().GetProperties();
+            var result = props
+                .Where(x => x.GetValue(obj) != null)
+                .Select(x => x.Name);
+
+            return result;
+        }
 
         static IEnumerable<TResult> ConvertWithoutFieldMask<TSource, TResult>(
             IEnumerable<TSource> values, Func<TSource, TResult> convert)
