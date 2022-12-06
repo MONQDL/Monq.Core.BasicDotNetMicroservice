@@ -2,8 +2,7 @@
 using App.Metrics.Formatters.Prometheus;
 using App.Metrics.Reporting.Http;
 using App.Metrics.Reporting.InfluxDB;
-using Grpc.Core;
-using Grpc.Core.Interceptors;
+using Grpc.Net.ClientFactory;
 using IdentityServer4.AccessTokenValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -136,6 +135,11 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             return services;
         }
 
+        static readonly Action<GrpcClientFactoryOptions, IConfiguration> _configureClient = (o, configuration) =>
+        {
+            o.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)));
+        };
+
         /// <summary>
         /// Add preconfigred Grpc service with configured Address and CallCredentials.
         /// </summary>
@@ -143,35 +147,38 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// a transient service.</typeparam>
         /// <param name="services">The <see cref="IServiceCollection"/>.</param>
         /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
+        /// <param name="name">The logical name of the HTTP client to configure.</param>
         /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-        public static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(this IServiceCollection services, IConfiguration configuration)
+        public static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(this IServiceCollection services, IConfiguration configuration, string? name = null)
             where TClient : class
         {
-            var builder = services.AddGrpcClient<TClient>(o =>
-            {
-                o.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)));
-            })
-            .ConfigureChannel(o =>
-            {
-                o.UnsafeUseInsecureChannelCallCredentials = true;
-            })
-            .AddCallCredentials((context, metadata, provider) =>
-            {
-                var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
-                if (httpContext.HttpContext.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) && !string.IsNullOrEmpty(token))
-                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token);
+            IHttpClientBuilder builder;
+            if (string.IsNullOrWhiteSpace(name))
+                builder = services.AddGrpcClient<TClient>(o => _configureClient(o, configuration));
+            else
+                builder = services.AddGrpcClient<TClient>(name, o => _configureClient(o, configuration));
 
-                if (httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId)
-                    && !string.IsNullOrEmpty(userspaceId))
-                    metadata.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
+            return builder
+                .ConfigureChannel(o =>
+                {
+                    o.UnsafeUseInsecureChannelCallCredentials = true;
+                })
+                .AddCallCredentials((context, metadata, provider) =>
+                {
+                    var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
+                    if (httpContext.HttpContext.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) && !string.IsNullOrEmpty(token))
+                        metadata.Add(HttpRequestHeader.Authorization.ToString(), token);
 
-                if (httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.CultureHeader, out var culture)
-                    && !string.IsNullOrEmpty(culture))
-                    metadata.Add(MicroserviceConstants.CultureHeader, culture);
+                    if (httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId)
+                        && !string.IsNullOrEmpty(userspaceId))
+                        metadata.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
 
-                return Task.CompletedTask;
-            });
-            return builder;
+                    if (httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.CultureHeader, out var culture)
+                        && !string.IsNullOrEmpty(culture))
+                        metadata.Add(MicroserviceConstants.CultureHeader, culture);
+
+                    return Task.CompletedTask;
+                });
         }
 
         /// <summary>
@@ -181,34 +188,37 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// a transient service.</typeparam>
         /// <param name="services">The <see cref="IServiceCollection"/>.</param>
         /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
+        /// <param name="name">The logical name of the HTTP client to configure.</param>
         /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-        public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(this IServiceCollection services, IConfiguration configuration)
+        public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(this IServiceCollection services, IConfiguration configuration, string? name = null)
             where TClient : class
         {
             // REM: для получения токена в .AddCallCredentials().
             services.AddHttpClient<RestHttpClient>();
 
-            var builder = services.AddGrpcClient<TClient>(o =>
-            {
-                o.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)));
-            })
-            .ConfigureChannel(o =>
-            {
-                o.UnsafeUseInsecureChannelCallCredentials = true;
-            })
-            .AddCallCredentials(async (context, metadata, provider) =>
-            {
-                // HACK: временное решение. Проработать вынос получения токена авторизации в отдельном классе.
-                var client = provider.GetRequiredService<RestHttpClient>();
-                
-                var tokenResponse = await client.GetAccessToken(false);
-                if (tokenResponse is null)
-                    return;
-                const string scheme = "Bearer";
-                var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
-                metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
-            });
-            return builder;
+            IHttpClientBuilder builder;
+            if (string.IsNullOrWhiteSpace(name))
+                builder = services.AddGrpcClient<TClient>(o => _configureClient(o, configuration));
+            else
+                builder = services.AddGrpcClient<TClient>(name, o => _configureClient(o, configuration));
+
+            return builder
+                .ConfigureChannel(o =>
+                {
+                    o.UnsafeUseInsecureChannelCallCredentials = true;
+                })
+                .AddCallCredentials(async (context, metadata, provider) =>
+                {
+                    // HACK: временное решение. Проработать вынос получения токена авторизации в отдельном классе.
+                    var client = provider.GetRequiredService<RestHttpClient>();
+
+                    var tokenResponse = await client.GetAccessToken(false);
+                    if (tokenResponse is null)
+                        return;
+                    const string scheme = "Bearer";
+                    var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
+                    metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
+                });
         }
     }
 }
