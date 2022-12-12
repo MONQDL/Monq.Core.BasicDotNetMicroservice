@@ -2,6 +2,7 @@
 using App.Metrics.Formatters.Prometheus;
 using App.Metrics.Reporting.Http;
 using App.Metrics.Reporting.InfluxDB;
+using Grpc.Net.Client;
 using Grpc.Net.ClientFactory;
 using IdentityServer4.AccessTokenValidation;
 using Microsoft.AspNetCore.Http;
@@ -139,6 +140,10 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         {
             o.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)));
         };
+        static readonly Action<GrpcChannelOptions> _configureChannel = (o) =>
+        {
+            o.UnsafeUseInsecureChannelCallCredentials = true;
+        };
 
         /// <summary>
         /// Add preconfigred Grpc service with configured Address and CallCredentials.
@@ -148,8 +153,13 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <param name="services">The <see cref="IServiceCollection"/>.</param>
         /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
         /// <param name="name">The logical name of the HTTP client to configure.</param>
+        /// <param name="configureChannel">A delegate that is used to configure a <see cref="GrpcChannelOptions"/>.</param>
         /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-        public static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(this IServiceCollection services, IConfiguration configuration, string? name = null)
+        public static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(
+            this IServiceCollection services,
+            IConfiguration configuration,
+            string? name = null,
+            Action<GrpcChannelOptions>? configureChannel = null)
             where TClient : class
         {
             IHttpClientBuilder builder;
@@ -159,10 +169,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                 builder = services.AddGrpcClient<TClient>(name, o => _configureClient(o, configuration));
 
             return builder
-                .ConfigureChannel(o =>
-                {
-                    o.UnsafeUseInsecureChannelCallCredentials = true;
-                })
+                .ConfigureChannel(configureChannel ?? _configureChannel)
                 .AddCallCredentials((context, metadata, provider) =>
                 {
                     var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
@@ -189,8 +196,13 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <param name="services">The <see cref="IServiceCollection"/>.</param>
         /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
         /// <param name="name">The logical name of the HTTP client to configure.</param>
+        /// <param name="configureChannel">A delegate that is used to configure a <see cref="GrpcChannelOptions"/>.</param>
         /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-        public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(this IServiceCollection services, IConfiguration configuration, string? name = null)
+        public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(
+            this IServiceCollection services,
+            IConfiguration configuration,
+            string? name = null,
+            Action<GrpcChannelOptions>? configureChannel = null)
             where TClient : class
         {
             // REM: для получения токена в .AddCallCredentials().
@@ -203,10 +215,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                 builder = services.AddGrpcClient<TClient>(name, o => _configureClient(o, configuration));
 
             return builder
-                .ConfigureChannel(o =>
-                {
-                    o.UnsafeUseInsecureChannelCallCredentials = true;
-                })
+                .ConfigureChannel(configureChannel ?? _configureChannel)
                 .AddCallCredentials(async (context, metadata, provider) =>
                 {
                     // HACK: временное решение. Проработать вынос получения токена авторизации в отдельном классе.
