@@ -143,6 +143,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         static readonly Action<GrpcChannelOptions> _configureChannel = (o) =>
         {
             o.UnsafeUseInsecureChannelCallCredentials = true;
+            o.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 Mb.
         };
 
         /// <summary>
