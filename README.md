@@ -59,7 +59,7 @@ Logging to the ElasticSearch can be added. To achive that, add the properties fr
 
 ### Configures Consul
 
-The extension adds the configuration management with Consule. 
+The extension adds the configuration management with Consul. 
 
 Set up the Consul configuring in the `Program.cs`.
 ```csharp
@@ -146,7 +146,7 @@ public void Configure(IApplicationBuilder app)
 }
 ```
 
-The `app.UseTraceEventId()` call have to be added stricly after the `UseRouting()` call in the pipeline.
+The `app.UseTraceEventId()` call have to be added strictly after the `UseRouting()` call in the pipeline.
 
 ### The logging user basic information
 
@@ -168,7 +168,7 @@ public void Configure(IApplicationBuilder app)
 }
 ```
 
-The `app.UseLogUser()` call have to be added stricly after the `UseAuthentication()` call in the pipeline.
+The `app.UseLogUser()` call have to be added strictly after the `UseAuthentication()` call in the pipeline.
 
 ### ConfigureBasicMicroservice
 
@@ -329,6 +329,24 @@ The ```AddDefaultExceptionHandlers()``` method contains such exception handlers:
 - Exception (Exception.InternalServerError)
 
 The ```AddDefaultExceptionHandlers()``` method have to be added in the pipeline end.
+
+### The global gRPC exception handle
+
+```csharp
+    builder.Services.AddGrpc(options =>
+    {
+        options.EnableGrpcGlobalExceptionHandling()
+            .AddGrpcExceptionHandler<YourCustomException>((ex) =>
+             {
+                 throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+             });
+    });
+```
+
+The ```EnableGrpcGlobalExceptionHandling()``` method add gRPC global exception handler interceptor.
+The ```AddGrpcExceptionHandler<T>``` method add gRPC exception handler for the custom exception.
+If custom exception catched, corresponding RpcException will be thrown.
+Unmapped exception will be convert to RpcException with StatusCode Unknown.
 
 ### Authentication and authorization
 

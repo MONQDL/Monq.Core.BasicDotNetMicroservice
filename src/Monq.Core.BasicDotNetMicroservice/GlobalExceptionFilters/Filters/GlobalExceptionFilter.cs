@@ -21,6 +21,7 @@ namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Filters
             _logger = logger.CreateLogger<GlobalExceptionFilter>();
         }
 
+        /// <inheritdoc/>
         public void OnException(ExceptionContext context)
         {
             var result = _globalExceptionResult.Execute(context.Exception);
