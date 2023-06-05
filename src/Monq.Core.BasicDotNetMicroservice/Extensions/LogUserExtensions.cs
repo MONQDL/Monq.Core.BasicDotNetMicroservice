@@ -10,7 +10,7 @@ namespace Microsoft.Extensions.DependencyInjection
         /// Размещать стоит после app.UseAuthentication().
         /// </summary>
         /// <param name="builder">The builder.</param>
-        public static IApplicationBuilder UseLogUser(this IApplicationBuilder builder) => 
+        public static IApplicationBuilder UseLogUser(this IApplicationBuilder builder) =>
             builder.UseMiddleware<LogUserMiddleware>();
     }
 }
