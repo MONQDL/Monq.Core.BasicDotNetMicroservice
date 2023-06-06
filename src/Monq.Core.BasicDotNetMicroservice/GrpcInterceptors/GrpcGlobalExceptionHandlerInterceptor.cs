@@ -2,7 +2,9 @@
 using Grpc.Core.Interceptors;
 using Microsoft.Extensions.Logging;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
+using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Models;
 using System;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.GrpcInterceptors
@@ -46,7 +48,12 @@ namespace Monq.Core.BasicDotNetMicroservice.GrpcInterceptors
 
                 _storage.Execute(e);
 
-                throw new RpcException(new Status(StatusCode.Unknown, e.Message));
+                var message = new ErrorResponse
+                {
+                    Message = e.Message,
+                    StackTrace = e.StackTrace
+                };
+                throw new RpcException(new Status(StatusCode.Unknown, JsonSerializer.Serialize(message)));
             }
         }
     }
