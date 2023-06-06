@@ -30,11 +30,7 @@ namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInj
 
         static IActionResult ReturnDefaultExceptionResponse(Exception exception)
         {
-            var response = new ErrorResponse()
-            {
-                Message = exception.Message,
-                StackTrace = exception.StackTrace
-            };
+            var response = new ErrorResponse(exception);
 
             return new ObjectResult(response)
             {

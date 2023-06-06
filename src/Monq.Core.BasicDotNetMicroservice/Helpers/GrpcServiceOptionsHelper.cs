@@ -1,4 +1,5 @@
 ﻿using Grpc.AspNetCore.Server;
+using Grpc.Core;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
 using Monq.Core.BasicDotNetMicroservice.GrpcInterceptors;
 using System;
@@ -22,10 +23,10 @@ namespace Monq.Core.BasicDotNetMicroservice.Helpers
         /// <summary>
         /// Add gRPC exception handler for the custom exception.
         /// </summary>
-        public static GrpcServiceOptions AddGrpcExceptionHandler<T>(this GrpcServiceOptions options, Action<Exception> action) where T : Exception
+        public static GrpcServiceOptions AddGrpcExceptionHandler<T>(this GrpcServiceOptions options, Func<T, RpcException> action) where T : Exception
         {
             var storage = GlobalGrpcExceptionBuilderStorage.GetInstance();
-            storage.AddAction<T>(action);
+            storage.AddAction(action);
 
             return options;
         }

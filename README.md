@@ -342,7 +342,7 @@ builder.Services.AddGrpc(options =>
     options.EnableGrpcGlobalExceptionHandling()
         .AddGrpcExceptionHandler<YourCustomException>((ex) =>
         {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+            return new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
         });
 });
 ```
@@ -350,7 +350,14 @@ builder.Services.AddGrpc(options =>
 The ```EnableGrpcGlobalExceptionHandling()``` method adds gRPC global exception handler interceptor.
 The ```AddGrpcExceptionHandler<T>``` method adds gRPC exception handler for custom exceptions.
 If custom exception catched, corresponding `RpcException` will be thrown.
-Unmapped exception will be convert to `RpcException` with `StatusCode.Unknown`.
+Unmapped exception will be converted to `RpcException` with `StatusCode.Unknown` and detail message containing serialized json (see `Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Models.ErrorResponse`):
+
+```json
+{
+  "Message": "exceptionMessage",
+  "StackTrace": "exceptionStackTrace" // can be null
+}
+```
 
 ### Authentication and authorization
 
@@ -511,7 +518,7 @@ builder.Services.AddGrpcRequestValidation();
 It works alongside with inline validator registration. More info: <https://github.com/AnthonyGiretti/grpc-aspnetcore-validator#add-inline-custom-validator>.
 
 ```csharp
-builder.Services..AddInlineValidator<MyRequest>(rules =>
+builder.Services..AddInlineValidator<YourRequest>(rules =>
 {
     rules.RuleFor(x => x.Id)
         .InclusiveBetween(1, long.MaxValue)

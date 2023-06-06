@@ -2,9 +2,7 @@
 using Grpc.Core.Interceptors;
 using Microsoft.Extensions.Logging;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
-using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Models;
 using System;
-using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.GrpcInterceptors
@@ -37,23 +35,16 @@ namespace Monq.Core.BasicDotNetMicroservice.GrpcInterceptors
             {
                 return await base.UnaryServerHandler(request, context, continuation);
             }
-            catch (RpcException re)
+            catch (RpcException e)
             {
-                _logger.LogError(re, re.Message);
+                _logger.LogError(e, e.Message);
                 throw;
             }
             catch (Exception e)
             {
                 _logger.LogError(e, e.Message);
-
-                _storage.Execute(e);
-
-                var message = new ErrorResponse
-                {
-                    Message = e.Message,
-                    StackTrace = e.StackTrace
-                };
-                throw new RpcException(new Status(StatusCode.Unknown, JsonSerializer.Serialize(message)));
+                var rpcException = _storage.Execute(e);
+                throw rpcException;
             }
         }
     }

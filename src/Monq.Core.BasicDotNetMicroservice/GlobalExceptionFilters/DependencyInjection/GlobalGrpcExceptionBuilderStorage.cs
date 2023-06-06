@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Grpc.Core;
+using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Models;
+using System;
 using System.Collections.Generic;
 
 namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection
@@ -12,7 +14,7 @@ namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInj
 
         static readonly object _syncRoot = new();
 
-        readonly Dictionary<Type, Action<Exception>> _actionMap = new();
+        readonly Dictionary<Type, Delegate> _delegateMap = new();
 
         /// <summary>
         /// Get builder instance.
@@ -34,22 +36,20 @@ namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInj
         /// Execute.
         /// </summary>
         /// <param name="exception"></param>
-        public void Execute(Exception exception)
+        public RpcException Execute(Exception exception)
         {
-            foreach (KeyValuePair<Type, Action<Exception>> item in _actionMap)
-            {
-                item.Deconstruct(out var type, out var action);
-                if (type == exception.GetType() && action is not null)
-                {
-                    action.Invoke(exception);
-                }
-            }
+            foreach (var (exceptionType, action) in _delegateMap)
+                if (action is not null && exceptionType == exception.GetType())
+                    return (RpcException)action.DynamicInvoke(exception)!;
+
+            var message = new ErrorResponse(exception);
+            return new RpcException(new(StatusCode.Unknown, message.ToString()));
         }
 
-        internal void AddAction<T>(Action<Exception> action) where T : Exception
+        internal void AddAction<T>(Func<T, RpcException> action) where T : Exception
         {
-            if (!_actionMap.ContainsKey(typeof(T)))
-                _actionMap.Add(typeof(T), action);
+            if (!_delegateMap.ContainsKey(typeof(T)))
+                _delegateMap.Add(typeof(T), action);
         }
     }
 }
