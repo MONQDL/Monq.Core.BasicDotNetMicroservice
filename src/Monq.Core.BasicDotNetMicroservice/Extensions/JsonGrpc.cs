@@ -71,7 +71,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// </summary>
         /// <param name="jsonNode">Json <see cref="JsonNode"/>.</param>
         /// <returns></returns>
-        public static Value ToProtoValue(this JsonNode jsonNode) => 
+        public static Value ToProtoValue(this JsonNode jsonNode) =>
             GetProtoValue(jsonNode);
 
         static JsonNode? GetJsonValue(Value value)

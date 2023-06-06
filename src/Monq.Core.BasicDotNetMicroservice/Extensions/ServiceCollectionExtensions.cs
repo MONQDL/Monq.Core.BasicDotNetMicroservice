@@ -2,6 +2,7 @@
 using App.Metrics.Formatters.Prometheus;
 using App.Metrics.Reporting.Http;
 using App.Metrics.Reporting.InfluxDB;
+using Calzolari.Grpc.AspNetCore.Validation;
 using Grpc.Net.Client;
 using Grpc.Net.ClientFactory;
 using IdentityServer4.AccessTokenValidation;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Services.Implementation;
+using Monq.Core.BasicDotNetMicroservice.Validation;
 using Monq.Core.HttpClientExtensions;
 using System;
 using System.Net;
@@ -24,10 +26,9 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <summary>
         /// Configures authentication.
         /// </summary>
-        /// <param name="services">IServiceCollection to add the services to.</param>
+        /// <param name="services"><see cref="IServiceCollection"/> to add the services to.</param>
         /// <param name="configuration">The configuration being bound.</param>
-        /// <returns>The Microsoft.Extensions.DependencyInjection.IServiceCollection so that additional
-        /// calls can be chained.</returns>
+        /// <returns><see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
         public static IServiceCollection ConfigureSMAuthentication(this IServiceCollection services, IConfiguration configuration)
         {
             var authConfig = configuration.GetSection("Authentication");
@@ -58,8 +59,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// </summary>
         /// <param name="services">IServiceCollection to add the services to.</param>
         /// <param name="hostContext">Context containing the common services on the IHost.</param>
-        /// <returns>The Microsoft.Extensions.DependencyInjection.IServiceCollection so that additional
-        /// calls can be chained.</returns>
+        /// <returns><see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
         public static IServiceCollection AddConsoleMetrics(this IServiceCollection services, HostBuilderContext hostContext)
         {
             var metricsBuilder = AppMetrics.CreateDefaultBuilder()
@@ -229,6 +229,24 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                     var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
                     metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
                 });
+        }
+
+        /// <summary>
+        /// Add gRPC request validation.
+        /// </summary>
+        /// <param name="services"><see cref="IServiceCollection"/> to add the services to.</param>
+        /// <returns><see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
+        public static IServiceCollection AddGrpcRequestValidation(this IServiceCollection services)
+        {
+            services.AddGrpc(options =>
+            {
+                options.EnableMessageValidation();
+            });
+
+            services.AddSingleton<IValidatorErrorMessageHandler>(new DefaultValidatorMessageHandler());
+            services.AddGrpcValidation();
+
+            return services;
         }
     }
 }

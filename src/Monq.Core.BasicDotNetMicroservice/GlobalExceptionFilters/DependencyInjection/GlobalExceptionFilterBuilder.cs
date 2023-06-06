@@ -49,13 +49,9 @@ namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInj
             return this;
         }
 
-        ObjectResult CreateHttpResponse(string message, string? stackTrace, HttpStatusCode statusCode)
+        static ObjectResult CreateHttpResponse(string message, string? stackTrace, HttpStatusCode statusCode)
         {
-            var response = new ErrorResponse
-            {
-                Message = message,
-                StackTrace = stackTrace
-            };
+            var response = new ErrorResponse(message, stackTrace);
 
             return new ObjectResult(response)
             {

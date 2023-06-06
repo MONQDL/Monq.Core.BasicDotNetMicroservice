@@ -13,6 +13,7 @@ Install-Package Monq.Core.BasicDotNetMicroservice
 The extension configures logging by the Serilog.
 
 Set up the logging extension in the `Program.cs`.
+
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
@@ -36,7 +37,7 @@ public static IHostBuilder CreateHostBuilder(string[] args) =>
 
 By default, logging to the console is used. For adding other logging outputs confugure the appsettings.json configuration file.
 
-Logging to the ElasticSearch can be added. To achive that, add the properties from the rendered JSON format example to the appsettings.json file. 
+Logging to the ElasticSearch can be added. To achive that, add the properties from the rendered JSON format example to the appsettings.json file.
 
 ```json
 {
@@ -59,9 +60,10 @@ Logging to the ElasticSearch can be added. To achive that, add the properties fr
 
 ### Configures Consul
 
-The extension adds the configuration management with Consule. 
+The extension adds the configuration management with Consul.
 
 Set up the Consul configuring in the `Program.cs`.
+
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
@@ -101,11 +103,12 @@ For configuring Consul management the `aspnet_consul_config.json` file need to b
 
 The `aspnet_consul_config.json` file path can be set by the environment variable `ASPNETCORE_CONSUL_CONFIG_FILE`.
 
-### API point with project version.
+### API point with project version
 
 The extension adds the new API point `/api/version`. This API contains the information about the package version of the start point of a program `class Program` is located at.
 
 Set up the Api version point in the `Program.cs`.
+
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
@@ -133,6 +136,7 @@ The EventId is the unique identificator of the query execution in the current se
 The extension adds the EventId to the HTTP header, so that the chain of calls from the first service to the last service can be tracked.
 
 Set up the logging request chain in the `Startup.cs`.
+
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 ```
@@ -146,7 +150,7 @@ public void Configure(IApplicationBuilder app)
 }
 ```
 
-The `app.UseTraceEventId()` call have to be added stricly after the `UseRouting()` call in the pipeline.
+The `app.UseTraceEventId()` call have to be added strictly after the `UseRouting()` call in the pipeline.
 
 ### The logging user basic information
 
@@ -154,6 +158,7 @@ The extension adds the logging user by Id. A user name also adds to the logging 
 So the user action can be tracked by the API.
 
 Set up the user logging in the `Startup.cs`.
+
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 ```
@@ -168,7 +173,7 @@ public void Configure(IApplicationBuilder app)
 }
 ```
 
-The `app.UseLogUser()` call have to be added stricly after the `UseAuthentication()` call in the pipeline.
+The `app.UseLogUser()` call have to be added strictly after the `UseAuthentication()` call in the pipeline.
 
 ### ConfigureBasicMicroservice
 
@@ -194,6 +199,7 @@ hostBuilder.ConfigureServices((context, services) =>
 ```
 
 Set up the basic microservice extension in the `Program.cs`.
+
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
@@ -299,36 +305,59 @@ public class Program
 }
 ```
 
-### The global exception handle
+### The global exception handling
 
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Filters;
 ```
 
 ```csharp
-    public void ConfigureServices(IServiceCollection services)
+builder.Services.AddGlobalExceptionFilter()
+    .AddExceptionHandler<ResponseException>((ex) =>
     {
-        services.AddGlobalExceptionFilter()
-            .AddExceptionHandler<ResponseException>((ex) =>
-            {
-                return new ObjectResult(JsonConvert.DeserializeObject(ex.ResponseData))
-                {
-                    StatusCode = (int)ex.StatusCode
-                };
-            })
-            .AddDefaultExceptionHandlers();
+        return new ObjectResult(JsonConvert.DeserializeObject(ex.ResponseData))
+        {
+            StatusCode = (int)ex.StatusCode
+        };
+    })
+    .AddDefaultExceptionHandlers();
 
-        // Add framework services.
-        services.AddControllers(opt => opt.Filters.Add(typeof(GlobalExceptionFilter)));
-    }
+// Add framework services.
+builder.Services.AddControllers(opt => opt.Filters.Add(typeof(GlobalExceptionFilter)));
 ```
 
 The ```AddDefaultExceptionHandlers()``` method contains such exception handlers:
+
 - UnauthorizedAccessException (HttpStatusCode.Unauthorized)
 - NotImplementedException (HttpStatusCode.NotImplemented)
 - Exception (Exception.InternalServerError)
 
 The ```AddDefaultExceptionHandlers()``` method have to be added in the pipeline end.
+
+### The global gRPC exception handling
+
+```csharp
+builder.Services.AddGrpc(options =>
+{
+    options.EnableGrpcGlobalExceptionHandling()
+        .AddGrpcExceptionHandler<YourCustomException>((ex) =>
+        {
+            return new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+        });
+});
+```
+
+The ```EnableGrpcGlobalExceptionHandling()``` method adds gRPC global exception handler interceptor.
+The ```AddGrpcExceptionHandler<T>``` method adds gRPC exception handler for custom exceptions.
+If custom exception catched, corresponding `RpcException` will be thrown.
+Unmapped exception will be converted to `RpcException` with `StatusCode.Unknown` and detail message containing serialized json (see `Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Models.ErrorResponse`):
+
+```json
+{
+  "Message": "exceptionMessage",
+  "StackTrace": "exceptionStackTrace" // can be null
+}
+```
 
 ### Authentication and authorization
 
@@ -343,6 +372,7 @@ Version 6.0.0 includes:
 - [Authorize("write")]
 
 Set up the authorization policy in the `Program.cs`.
+
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
@@ -369,6 +399,7 @@ public static IHostBuilder __CreateHostBuilder(string[] args) =>
 The extension provides a standardized resource-owner flow authentication connection method for ASP.NET Core MVC.
 
 Set up the API services authentication in the `Startup.cs`.
+
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
@@ -398,13 +429,16 @@ The example of the configuration in JSON format:
       "Password": "RIHY1vsevEO7WEVC"
     },
     "RequireHttpsMetadata": false,
-	"EnableCaching": true
+ "EnableCaching": true
   }
 ```
+
 #### RequireHttpsMetadata
+
 Optional. By default is false.
 
 #### EnableCaching
+
 Optional. By default is true.
 
 Data cache duration: 5 minutes.
@@ -414,21 +448,22 @@ Data cache duration: 5 minutes.
 The extension adds the ability to send message queue metrics, tasks metrics, system load metrics and garbage collector metrics.
 
 Set up the metrics sending in the `Program.cs`.
+
 ```csharp
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
 
 ```csharp
 var consoleApplication = ConsoleHost
-            .CreateDefaultBuilder(args)
-            .ConfigureServices((hostContext, services) =>
-            {
-                ...
-                services.AddConsoleMetrics(hostContext);
-                ...
-            })
-            .ConfigureServices(StartMessageHandlers)
-            .Build() as IConsoleApplication;
+    .CreateDefaultBuilder(args)
+    .ConfigureServices((hostContext, services) =>
+    {
+        ...
+        services.AddConsoleMetrics(hostContext);
+        ...
+    })
+    .ConfigureServices(StartMessageHandlers)
+    .Build() as IConsoleApplication;
 ```
 
 The configuration must contain the following JSON:
@@ -460,11 +495,33 @@ The configuration must contain the following JSON:
 ```
 
 #### ReportingInfluxDb
+
 Options for InfluxDB reporting. Optional.
 
 #### ReportingOverHttp
-Options of HTTP reporting. Optional. 
+
+Options of HTTP reporting. Optional.
 For sending metrics to the Prometheus Pushgateway it is nessesary for the RequestUri ended up with "/metrics".
 
 #### AddSystemMetrics
+
 Options for collect system usage and gc event metrics. Optional.
+
+### gRPC request validation
+
+The extension adds gRPC request messages validation.
+
+```csharp
+builder.Services.AddGrpcRequestValidation();
+```
+
+It works alongside with inline validator registration. More info: <https://github.com/AnthonyGiretti/grpc-aspnetcore-validator#add-inline-custom-validator>.
+
+```csharp
+builder.Services..AddInlineValidator<YourRequest>(rules =>
+{
+    rules.RuleFor(x => x.Id)
+        .InclusiveBetween(1, long.MaxValue)
+        .WithMessage("Wrong id.");
+});
+```

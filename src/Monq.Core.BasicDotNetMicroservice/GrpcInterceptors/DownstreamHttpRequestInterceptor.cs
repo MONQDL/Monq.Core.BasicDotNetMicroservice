@@ -8,10 +8,11 @@ namespace Monq.Core.BasicDotNetMicroservice.GrpcInterceptors
 {
     /// <summary>
     /// The interceptor converts <see cref="Monq.Core.HttpClientExtensions.Exceptions.ResponseException"/> 
-    /// status codes to the RpcExeption with preconfigured status codes.
+    /// status codes to the RpcException with preconfigured status codes.
     /// </summary>
     public class DownstreamHttpRequestInterceptor : Interceptor
     {
+        /// <inheritdoc/>
         public override async Task<TResponse> UnaryServerHandler<TRequest, TResponse>(
             TRequest request,
             ServerCallContext context,
