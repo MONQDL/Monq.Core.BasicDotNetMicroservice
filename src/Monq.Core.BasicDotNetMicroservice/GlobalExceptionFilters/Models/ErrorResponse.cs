@@ -11,12 +11,18 @@ namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Models
         /// <summary>
         /// Exception message.
         /// </summary>
-        public string Message { get; set; }
+        public string Message { get; set; } = default!;
 
         /// <summary>
         /// Exception stack trace.
         /// </summary>
         public string? StackTrace { get; set; }
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        public ErrorResponse()
+        { }
 
         /// <summary>
         /// Constructor.
