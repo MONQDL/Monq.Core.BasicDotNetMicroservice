@@ -138,7 +138,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
 
         static readonly Action<GrpcClientFactoryOptions, IConfiguration> _configureClient = (o, configuration) =>
         {
-            o.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri));
+            o.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)));
         };
         static readonly Action<GrpcChannelOptions> _configureChannel = (o) =>
         {
