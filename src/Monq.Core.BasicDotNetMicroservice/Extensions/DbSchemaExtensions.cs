@@ -1,8 +1,10 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿#if NET5_0 || NET6_0
+using Dapper;
+#endif
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
@@ -15,7 +17,7 @@ namespace Microsoft.Extensions.DependencyInjection
     public static class DbSchemaExtensions
     {
         static readonly JsonSerializerOptions _intendedSerializerOptions =
-            new JsonSerializerOptions { WriteIndented = true };
+            new() { WriteIndented = true };
 
         /// <summary>
         /// Create schema on empty database or validate migrations if schema exists.
@@ -31,37 +33,35 @@ namespace Microsoft.Extensions.DependencyInjection
             int terminationSleepMiliseconds = 10000)
                 where T : DbContext
         {
-            using (var scope = app.ApplicationServices.CreateScope())
+            using var scope = app.ApplicationServices.CreateScope();
+            var services = scope.ServiceProvider;
+            var factory = services.GetRequiredService<ILoggerFactory>();
+            var logger = factory.CreateLogger("DbInitializer");
+            bool exceptionOccured = false;
+            try
             {
-                var services = scope.ServiceProvider;
-                var factory = services.GetRequiredService<ILoggerFactory>();
-                var logger = factory.CreateLogger("DbInitializer");
-                bool exceptionOccured = false;
-                try
-                {
-                    var context = services.GetRequiredService<T>();
+                var context = services.GetRequiredService<T>();
 
-                    if (HasTables(context))
-                        CheckMigrationsHistory(context);
-                    else
-                        InitializeSchema(context);
-                }
-                catch (DbSchemaValidationException e)
-                {
-                    logger.LogCritical(e, "An error occurred during validation the DB schema.");
-                    exceptionOccured = true;
-                }
-                catch (Exception e)
-                {
-                    logger.LogCritical(e, "An error occurred on creating the DB schema.");
-                    exceptionOccured = true;
-                }
-                if (exceptionOccured && terminateOnException)
-                {
-                    if (sleepBeforeTerminate)
-                        Thread.Sleep(terminationSleepMiliseconds);
-                    Environment.Exit(1);
-                }
+                if (HasTables(context))
+                    CheckMigrationsHistory(context);
+                else
+                    InitializeSchema(context);
+            }
+            catch (DbSchemaValidationException e)
+            {
+                logger.LogCritical(e, "An error occurred during validation the DB schema.");
+                exceptionOccured = true;
+            }
+            catch (Exception e)
+            {
+                logger.LogCritical(e, "An error occurred on creating the DB schema.");
+                exceptionOccured = true;
+            }
+            if (exceptionOccured && terminateOnException)
+            {
+                if (sleepBeforeTerminate)
+                    Thread.Sleep(terminationSleepMiliseconds);
+                Environment.Exit(1);
             }
         }
 
@@ -73,8 +73,24 @@ namespace Microsoft.Extensions.DependencyInjection
 
         static bool HasTables(DbContext context)
         {
-            var creatorContext = context.Database.GetService<IRelationalDatabaseCreator>();
-            return creatorContext.HasTables();
+            const string sql = @"
+                SELECT CASE WHEN COUNT(*) = 0 THEN FALSE ELSE TRUE end as ""Value""
+                    FROM information_schema.tables 
+                WHERE table_schema NOT IN ('pg_catalog', 'information_schema') and table_type = 'BASE TABLE'
+                ";
+#if NET7_0_OR_GREATER
+            var creatorContext = context.Database.SqlQueryRaw<bool>(sql);
+            return creatorContext.First<bool>();
+#else
+            var connection = context.Database.GetDbConnection();// Using is not required here.
+                                                                // The connection lifetime is managed by EF.
+            context.Database.OpenConnection();
+
+            return
+                connection
+                    .Query<bool>(sql)
+                    .First();
+#endif
         }
 
         static void CheckMigrationsHistory(DbContext context)
