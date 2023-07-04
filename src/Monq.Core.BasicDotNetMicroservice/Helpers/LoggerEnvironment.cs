@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
 using System;
+using System.Diagnostics;
 using System.Reflection;
 
 namespace Monq.Core.BasicDotNetMicroservice.Helpers
@@ -39,6 +40,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Helpers
                 .Enrich.WithProperty(LoggerFieldNames.AppVersion, MicroserviceInfo.GetEntryPointAssembleVersion())
                 .Enrich.WithProperty(LoggerFieldNames.AppEnvironment, env.EnvironmentName)
                 .WriteTo.Console(outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss zzz} {Level:u3}] {Scope} {Message:lj}{NewLine}{Exception}");
+
             Log.Logger = loggerConfig.CreateLogger();
         }
 
