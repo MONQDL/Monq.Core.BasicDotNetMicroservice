@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Filters;
 using Monq.Core.HttpClientExtensions.Exceptions;
-using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -57,8 +56,8 @@ Serilog.Debugging.SelfLog.Enable(Console.Error);
 
 var app = builder.Build();
 
-app.UseRouting();
 app.UseTraceEventId();
+app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseLogUser();

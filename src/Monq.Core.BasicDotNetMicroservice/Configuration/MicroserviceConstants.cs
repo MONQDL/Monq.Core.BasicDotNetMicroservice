@@ -16,10 +16,13 @@ namespace Monq.Core.BasicDotNetMicroservice
         /// </summary>
         public const string EventIdHeader = "X-Trace-Event-Id";
 
+        public const string EventIdPropertyName = "XTraceEventId";
+
         /// <summary>
         /// Http header containing userspace Id.
         /// </summary>
         public const string UserspaceIdHeader = "X-Smon-Userspace-Id";
+        public const string UserspaceIdPropertyName = "XSmonUserspaceId";
 
         /// <summary>
         /// Http header containing culture info.

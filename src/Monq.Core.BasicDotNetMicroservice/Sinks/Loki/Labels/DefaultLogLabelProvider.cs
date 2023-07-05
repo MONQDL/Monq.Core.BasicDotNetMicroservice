@@ -25,15 +25,15 @@ namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Labels
                 "RequestId",
                 "StatusCode",
                 "RequestPath",
-                "X-Smon-Userspace-Id",
-                "X-Trace-Event-Id"
+                MicroserviceConstants.EventIdPropertyName,
+                MicroserviceConstants.UserspaceIdPropertyName,
             };
             PropertiesToAppend = propertiesToAppend?.ToList() ?? new List<string>();
             FormatterStrategy = formatterStrategy;
         }
 
         public IList<LokiLabel> GetLabels() => _labels;
-        
+
         public IList<string> PropertiesAsLabels { get; }
         public IList<string> PropertiesToAppend { get; }
         public LokiFormatterStrategy FormatterStrategy { get; }

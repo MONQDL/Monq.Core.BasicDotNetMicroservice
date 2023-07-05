@@ -1,9 +1,9 @@
-using System;
+using Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Labels;
+using Serilog;
 using Serilog.Configuration;
 using Serilog.Formatting.Display;
 using Serilog.Sinks.Http;
-using Serilog;
-using Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Labels;
+using System;
 
 namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki
 {
@@ -28,7 +28,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki
                 : new NoAuthCredentials(lokiUrl);
 
             var formatter = new LokiBatchFormatter(logLabelProvider ?? new DefaultLogLabelProvider());
-            
+
             httpClient ??= new DefaultLokiHttpClient();
 
             if (httpClient is LokiHttpClientBase c)

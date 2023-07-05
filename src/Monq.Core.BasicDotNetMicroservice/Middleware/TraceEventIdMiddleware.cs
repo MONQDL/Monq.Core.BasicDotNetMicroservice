@@ -51,8 +51,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Middleware
             if (contentHasUserspaceId && !string.IsNullOrEmpty(userspaceIdStr))
                 int.TryParse(userspaceIdStr, out userspaceId);
 
-            using (LogContext.PushProperty(MicroserviceConstants.EventIdHeader, traceEventId))
-            using (LogContext.PushProperty(MicroserviceConstants.UserspaceIdHeader, userspaceId))
+            using (LogContext.PushProperty(MicroserviceConstants.EventIdPropertyName, traceEventId))
+            using (LogContext.PushProperty(MicroserviceConstants.UserspaceIdPropertyName, userspaceId))
             {
                 await _next(context);
             }

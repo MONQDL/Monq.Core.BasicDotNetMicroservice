@@ -3,7 +3,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki
     public class NoAuthCredentials : LokiCredentialsBase
     {
         public NoAuthCredentials(string url)
-            :base(url) { }
+            : base(url) { }
     }
 
     public class BasicAuthCredentials : LokiCredentialsBase

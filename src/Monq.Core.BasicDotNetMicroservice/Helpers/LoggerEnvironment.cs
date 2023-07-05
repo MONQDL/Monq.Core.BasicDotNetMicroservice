@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Monq.Core.BasicDotNetMicroservice.Enrichers.FromHttpContextHeader;
 using Serilog;
 using Serilog.Events;
 using System;
-using System.Diagnostics;
 using System.Reflection;
 
 namespace Monq.Core.BasicDotNetMicroservice.Helpers
@@ -34,6 +34,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Helpers
                 .MinimumLevel.Debug()
                 .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
                 .Enrich.FromLogContext()
+                .Enrich.FromHttpContextHeader(MicroserviceConstants.EventIdHeader, MicroserviceConstants.EventIdPropertyName)
+                .Enrich.FromHttpContextHeader(MicroserviceConstants.UserspaceIdHeader, MicroserviceConstants.UserspaceIdPropertyName)
                 .ReadFrom.Configuration(configuration)
                 .Enrich.WithProperty(LoggerFieldNames.Application, GetAssemblyName())
                 .Enrich.WithProperty(LoggerFieldNames.Microservice, MicroserviceName)
