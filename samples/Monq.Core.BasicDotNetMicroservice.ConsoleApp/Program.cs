@@ -1,32 +1,30 @@
 ﻿using Monq.Core.BasicDotNetMicroservice.Host;
 using Monq.Core.BasicDotNetMicroservice.Models;
 using Newtonsoft.Json;
-using System;
 using System.Text;
 
-namespace Monq.Core.BasicDotNetMicroservice.ConsoleApp
+namespace Monq.Core.BasicDotNetMicroservice.ConsoleApp;
+
+class Program
 {
-    class Program
+    static IConsoleApplication _consoleApplication;
+
+    static void Main(string[] args)
     {
-        static IConsoleApplication _consoleApplication;
+        Console.OutputEncoding = Encoding.UTF8;
 
-        static void Main(string[] args)
-        {
-            Console.OutputEncoding = Encoding.UTF8;
-
-            _consoleApplication = ConsoleHost
-                .CreateDefaultBuilder(args, new ConsoleHostConfigurationOptions
+        _consoleApplication = ConsoleHost
+            .CreateDefaultBuilder(args, new ConsoleHostConfigurationOptions
+            {
+                ConsulConfigurationOptions = new ConsulConfigurationOptions
                 {
-                    ConsulConfigurationOptions = new ConsulConfigurationOptions
-                    {
-                        AppsettingsFileName = "appsettings-async.json"
-                    }
-                })
-            .Build() as IConsoleApplication;
+                    AppsettingsFileName = "appsettings-async.json"
+                }
+            })
+        .Build() as IConsoleApplication;
 
-            Console.WriteLine(JsonConvert.SerializeObject(_consoleApplication.Configuration));
+        Console.WriteLine(JsonConvert.SerializeObject(_consoleApplication.Configuration));
 
-            Console.ReadKey();
-        }
+        Console.ReadKey();
     }
 }

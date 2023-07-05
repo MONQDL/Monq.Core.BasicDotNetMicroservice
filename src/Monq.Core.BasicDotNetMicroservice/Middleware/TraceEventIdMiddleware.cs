@@ -10,7 +10,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Middleware
     /// </summary>
     public class TraceEventIdMiddleware
     {
-        const sbyte _defaultUserspaceId = 0;
+        const sbyte DefaultUserspaceId = 0;
 
         readonly RequestDelegate _next;
 
@@ -24,32 +24,50 @@ namespace Monq.Core.BasicDotNetMicroservice.Middleware
         /// </summary>
         public async Task Invoke(HttpContext context)
         {
-            string traceEventId;
-            if (ContextHasHeader(context, MicroserviceConstants.EventIdHeader))
-                traceEventId = context.Request.Headers[MicroserviceConstants.EventIdHeader];
-            else
+            // Adding to logger TrackerId.
+            var contentHasEventId = ContextHasHeader(context, MicroserviceConstants.EventIdHeader, out var traceEventId);
+
+            if (!contentHasEventId || string.IsNullOrEmpty(traceEventId))
                 traceEventId = Guid.NewGuid().ToString();
 
-            context.Response.Headers[MicroserviceConstants.EventIdHeader] = traceEventId;
+            context.Response.OnStarting(() =>
+            {
+                if (context.Response.Headers.ContainsKey(MicroserviceConstants.EventIdHeader))
+                {
+                    return Task.CompletedTask;
+                }
 
-            if (!context.Request.Headers.ContainsKey(MicroserviceConstants.EventIdHeader))
-                context.Request.Headers[MicroserviceConstants.EventIdHeader] = traceEventId;
+                context.Response.Headers.Add(MicroserviceConstants.EventIdHeader, traceEventId);
+
+                return Task.CompletedTask;
+            });
 
             context.TraceIdentifier = traceEventId;
 
-            // Если заголовок есть, но невозможно его спарсить, то принимаем значение по умолчанию.
-            int userspaceId = _defaultUserspaceId;
-            if (ContextHasHeader(context, MicroserviceConstants.UserspaceIdHeader))
-                int.TryParse(context.Request.Headers[MicroserviceConstants.UserspaceIdHeader], out userspaceId);
+            // Adding to logger UserspaceId.
+            var contentHasUserspaceId = ContextHasHeader(context, MicroserviceConstants.UserspaceIdHeader, out var userspaceIdStr);
 
-            using (LogContext.PushProperty(MicroserviceConstants.EventIdHeader, traceEventId))
-            using (LogContext.PushProperty(MicroserviceConstants.UserspaceIdHeader, userspaceId))
+            int userspaceId = DefaultUserspaceId;
+            if (contentHasUserspaceId && !string.IsNullOrEmpty(userspaceIdStr))
+                int.TryParse(userspaceIdStr, out userspaceId);
+
+            using (LogContext.PushProperty(MicroserviceConstants.EventIdPropertyName, traceEventId))
+            using (LogContext.PushProperty(MicroserviceConstants.UserspaceIdPropertyName, userspaceId))
             {
                 await _next(context);
             }
         }
 
-        bool ContextHasHeader(HttpContext context, string header) => context.Request.Headers.ContainsKey(header)
-                && !string.IsNullOrWhiteSpace(context.Request.Headers[header]);
+        bool ContextHasHeader(HttpContext context, string header, out string? value)
+        {
+            var result = context.Request.Headers.TryGetValue(header, out var val);
+            if (result)
+            {
+                value = val;
+                return true;
+            }
+            value = null;
+            return false;
+        }
     }
 }

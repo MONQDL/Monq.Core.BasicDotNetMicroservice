@@ -26,18 +26,18 @@ namespace Microsoft.Extensions.DependencyInjection
         /// <param name="app">The <see cref="IApplicationBuilder"/> object.</param>
         /// <param name="terminateOnException">If true when the exeption eccures the application will be terminated.</param>
         /// <param name="sleepBeforeTerminate">If true when <paramref name="terminateOnException"/> the main thread will sleep before terminate.</param>
-        /// <param name="terminationSleepMiliseconds">The sleep interval when <paramref name="terminateOnException"/> is true and <paramref name="sleepBeforeTerminate"/> is true.</param>
+        /// <param name="terminationSleepMilliseconds">The sleep interval when <paramref name="terminateOnException"/> is true and <paramref name="sleepBeforeTerminate"/> is true.</param>
         public static void CreateDbSchemaOnFirstRun<T>(this IApplicationBuilder app,
             bool terminateOnException = true,
             bool sleepBeforeTerminate = true,
-            int terminationSleepMiliseconds = 10000)
+            int terminationSleepMilliseconds = 10000)
                 where T : DbContext
         {
             using var scope = app.ApplicationServices.CreateScope();
             var services = scope.ServiceProvider;
             var factory = services.GetRequiredService<ILoggerFactory>();
             var logger = factory.CreateLogger("DbInitializer");
-            bool exceptionOccured = false;
+            bool exceptionOccurred = false;
             try
             {
                 var context = services.GetRequiredService<T>();
@@ -50,17 +50,17 @@ namespace Microsoft.Extensions.DependencyInjection
             catch (DbSchemaValidationException e)
             {
                 logger.LogCritical(e, "An error occurred during validation the DB schema.");
-                exceptionOccured = true;
+                exceptionOccurred = true;
             }
             catch (Exception e)
             {
                 logger.LogCritical(e, "An error occurred on creating the DB schema.");
-                exceptionOccured = true;
+                exceptionOccurred = true;
             }
-            if (exceptionOccured && terminateOnException)
+            if (exceptionOccurred && terminateOnException)
             {
                 if (sleepBeforeTerminate)
-                    Thread.Sleep(terminationSleepMiliseconds);
+                    Thread.Sleep(terminationSleepMilliseconds);
                 Environment.Exit(1);
             }
         }
