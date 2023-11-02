@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Version>6.8.1</Version>
+    <Version>6.8.2</Version>
     <VersionSuffix>$(VersionSuffix)</VersionSuffix>
     <Version Condition=" '$(VersionSuffix)' != '' ">$(Version)-$(VersionSuffix)</Version>
     <IsPackable>true</IsPackable>
@@ -35,6 +35,7 @@
     <PackageReference Include="Google.Protobuf" Version="3.21.4" />
     <PackageReference Include="IdentityModel.AspNetCore.OAuth2Introspection" Version="6.0.0" />
     <PackageReference Include="IdentityServer4.AccessTokenValidation" Version="3.0.1" />
+    <PackageReference Include="Mapster" Version="7.4.0-pre03" />
     <PackageReference Include="Monq.Core.HttpClientExtensions" Version="5.3.1" />
     <PackageReference Include="Winton.Extensions.Configuration.Consul" Version="3.1.2" />
     <PackageReference Include="Serilog.AspNetCore" Version="7.0.0" />
@@ -59,7 +60,7 @@
     <PackageReference Include="Calzolari.Grpc.AspNetCore.Validation" Version="6.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="6.0.0" />
-		<PackageReference Include="Dapper" Version="2.0.123" />
+    <PackageReference Include="Dapper" Version="2.0.123" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net5.0'">
@@ -67,7 +68,7 @@
     <PackageReference Include="System.Text.Json" Version="6.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="5.0.0" />
-		<PackageReference Include="Dapper" Version="2.0.123" />
+    <PackageReference Include="Dapper" Version="2.0.123" />
   </ItemGroup>
 
 </Project>
