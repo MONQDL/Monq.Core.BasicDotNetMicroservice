@@ -3,6 +3,7 @@ using App.Metrics.Formatters.Prometheus;
 using App.Metrics.Reporting.Http;
 using App.Metrics.Reporting.InfluxDB;
 using Calzolari.Grpc.AspNetCore.Validation;
+using Grpc.AspNetCore.ClientFactory;
 using Grpc.Net.Client;
 using Grpc.Net.ClientFactory;
 using IdentityServer4.AccessTokenValidation;
@@ -145,6 +146,10 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             o.UnsafeUseInsecureChannelCallCredentials = true;
             o.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 Mb.
         };
+        static readonly Action<GrpcContextPropagationOptions> _configureContextPropagation = (o) =>
+        {
+            o.SuppressContextNotFoundErrors = true;
+        };
 
         /// <summary>
         /// Add preconfigred Grpc service with configured Address and CallCredentials.
@@ -155,12 +160,14 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
         /// <param name="name">The logical name of the HTTP client to configure.</param>
         /// <param name="configureChannel">A delegate that is used to configure a <see cref="GrpcChannelOptions"/>.</param>
+        /// <param name="configureContextPropagation">A delegate that is used to configure a <see cref="GrpcContextPropagationOptions"/>.</param>
         /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
         public static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(
             this IServiceCollection services,
             IConfiguration configuration,
             string? name = null,
-            Action<GrpcChannelOptions>? configureChannel = null)
+            Action<GrpcChannelOptions>? configureChannel = null,
+            Action<GrpcContextPropagationOptions>? configureContextPropagation = null)
             where TClient : class
         {
             IHttpClientBuilder builder;
@@ -186,7 +193,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                         metadata.Add(MicroserviceConstants.CultureHeader, culture);
 
                     return Task.CompletedTask;
-                });
+                })
+                .EnableCallContextPropagation(configureContextPropagation ?? _configureContextPropagation);
         }
 
         /// <summary>
@@ -198,12 +206,14 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
         /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
         /// <param name="name">The logical name of the HTTP client to configure.</param>
         /// <param name="configureChannel">A delegate that is used to configure a <see cref="GrpcChannelOptions"/>.</param>
+        /// <param name="configureContextPropagation">A delegate that is used to configure a <see cref="GrpcContextPropagationOptions"/>.</param>
         /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
         public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(
             this IServiceCollection services,
             IConfiguration configuration,
             string? name = null,
-            Action<GrpcChannelOptions>? configureChannel = null)
+            Action<GrpcChannelOptions>? configureChannel = null,
+            Action<GrpcContextPropagationOptions>? configureContextPropagation = null)
             where TClient : class
         {
             // REM: для получения токена в .AddCallCredentials().
@@ -217,6 +227,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
 
             return builder
                 .ConfigureChannel(configureChannel ?? _configureChannel)
+                .EnableCallContextPropagation(configureContextPropagation ?? _configureContextPropagation)
                 .AddCallCredentials(async (context, metadata, provider) =>
                 {
                     // HACK: временное решение. Проработать вынос получения токена авторизации в отдельном классе.
