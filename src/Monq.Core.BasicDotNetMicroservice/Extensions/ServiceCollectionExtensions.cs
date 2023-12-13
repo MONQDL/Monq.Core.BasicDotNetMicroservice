@@ -3,9 +3,6 @@ using App.Metrics.Formatters.Prometheus;
 using App.Metrics.Reporting.Http;
 using App.Metrics.Reporting.InfluxDB;
 using Calzolari.Grpc.AspNetCore.Validation;
-using Grpc.AspNetCore.ClientFactory;
-using Grpc.Net.Client;
-using Grpc.Net.ClientFactory;
 using IdentityServer4.AccessTokenValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -22,6 +19,9 @@ using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions
 {
+    /// <summary>
+    /// <see cref="IServiceCollection"/> extensions.
+    /// </summary>
     public static class ServiceCollectionExtensions
     {
         /// <summary>
@@ -137,111 +137,6 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             return services;
         }
 
-        static readonly Action<GrpcClientFactoryOptions, IConfiguration> _configureClient = (o, configuration) =>
-        {
-            o.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)));
-        };
-        static readonly Action<GrpcChannelOptions> _configureChannel = (o) =>
-        {
-            o.UnsafeUseInsecureChannelCallCredentials = true;
-            o.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 Mb.
-        };
-        static readonly Action<GrpcContextPropagationOptions> _configureContextPropagation = (o) =>
-        {
-            o.SuppressContextNotFoundErrors = true;
-        };
-
-        /// <summary>
-        /// Add preconfigred Grpc service with configured Address and CallCredentials.
-        /// </summary>
-        /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
-        /// a transient service.</typeparam>
-        /// <param name="services">The <see cref="IServiceCollection"/>.</param>
-        /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
-        /// <param name="name">The logical name of the HTTP client to configure.</param>
-        /// <param name="configureChannel">A delegate that is used to configure a <see cref="GrpcChannelOptions"/>.</param>
-        /// <param name="configureContextPropagation">A delegate that is used to configure a <see cref="GrpcContextPropagationOptions"/>.</param>
-        /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-        public static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(
-            this IServiceCollection services,
-            IConfiguration configuration,
-            string? name = null,
-            Action<GrpcChannelOptions>? configureChannel = null,
-            Action<GrpcContextPropagationOptions>? configureContextPropagation = null)
-            where TClient : class
-        {
-            IHttpClientBuilder builder;
-            if (string.IsNullOrWhiteSpace(name))
-                builder = services.AddGrpcClient<TClient>(o => _configureClient(o, configuration));
-            else
-                builder = services.AddGrpcClient<TClient>(name, o => _configureClient(o, configuration));
-
-            return builder
-                .ConfigureChannel(configureChannel ?? _configureChannel)
-                .AddCallCredentials((context, metadata, provider) =>
-                {
-                    var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
-                    if (httpContext.HttpContext.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) && !string.IsNullOrEmpty(token))
-                        metadata.Add(HttpRequestHeader.Authorization.ToString(), token);
-
-                    if (httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId)
-                        && !string.IsNullOrEmpty(userspaceId))
-                        metadata.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
-
-                    if (httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.CultureHeader, out var culture)
-                        && !string.IsNullOrEmpty(culture))
-                        metadata.Add(MicroserviceConstants.CultureHeader, culture);
-
-                    return Task.CompletedTask;
-                })
-                .EnableCallContextPropagation(configureContextPropagation ?? _configureContextPropagation);
-        }
-
-        /// <summary>
-        /// Add preconfigred Grpc service with configured Address and CallCredentials for console application with static authentication.
-        /// </summary>
-        /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
-        /// a transient service.</typeparam>
-        /// <param name="services">The <see cref="IServiceCollection"/>.</param>
-        /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
-        /// <param name="name">The logical name of the HTTP client to configure.</param>
-        /// <param name="configureChannel">A delegate that is used to configure a <see cref="GrpcChannelOptions"/>.</param>
-        /// <param name="configureContextPropagation">A delegate that is used to configure a <see cref="GrpcContextPropagationOptions"/>.</param>
-        /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-        public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(
-            this IServiceCollection services,
-            IConfiguration configuration,
-            string? name = null,
-            Action<GrpcChannelOptions>? configureChannel = null,
-            Action<GrpcContextPropagationOptions>? configureContextPropagation = null)
-            where TClient : class
-        {
-            // REM: для получения токена в .AddCallCredentials().
-            services.AddHttpClient<RestHttpClient>();
-
-            IHttpClientBuilder builder;
-            if (string.IsNullOrWhiteSpace(name))
-                builder = services.AddGrpcClient<TClient>(o => _configureClient(o, configuration));
-            else
-                builder = services.AddGrpcClient<TClient>(name, o => _configureClient(o, configuration));
-
-            return builder
-                .ConfigureChannel(configureChannel ?? _configureChannel)
-                .EnableCallContextPropagation(configureContextPropagation ?? _configureContextPropagation)
-                .AddCallCredentials(async (context, metadata, provider) =>
-                {
-                    // HACK: временное решение. Проработать вынос получения токена авторизации в отдельном классе.
-                    var client = provider.GetRequiredService<RestHttpClient>();
-
-                    var tokenResponse = await client.GetAccessToken(false);
-                    if (tokenResponse is null)
-                        return;
-                    const string scheme = "Bearer";
-                    var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
-                    metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
-                });
-        }
-
         /// <summary>
         /// Add gRPC request validation.
         /// </summary>
@@ -258,6 +153,167 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
             services.AddGrpcValidation();
 
             return services;
+        }
+
+        static readonly Action<GrpcClientOptions, IConfiguration> _configureGrpcClient = (o, configuration) =>
+        {
+            o.ClientOptionsAction = (clientOptions) =>
+            {
+                clientOptions.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)) ?? "http://localhost");
+            };
+            o.ChannelOptionsAction = (channelOptions) =>
+            {
+                channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
+                channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 Mb.
+            };
+            o.ContextPropagationOptionsAction = (propagationOptions) =>
+            {
+                propagationOptions.SuppressContextNotFoundErrors = true;
+            };
+        };
+
+        /// <summary>
+        /// Add preconfigured gRPC client with configured address, channel options, call credentials and context propagation.
+        /// </summary>
+        /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
+        /// a transient service.</typeparam>
+        /// <param name="services">The <see cref="IServiceCollection"/>.</param>
+        /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
+        /// <param name="configureOptions">A delegate that is used to configure a <see cref="GrpcClientOptions"/>.</param>
+        /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+        public static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(
+            this IServiceCollection services,
+            IConfiguration configuration,
+            Action<GrpcClientOptions>? configureOptions = null)
+            where TClient : class
+        {
+            var options = new GrpcClientOptions();
+            _configureGrpcClient(options, configuration);
+            configureOptions?.Invoke(options);
+
+            return services.AddGrpcPreConfiguredClient<TClient>(options);
+        }
+
+        /// <summary>
+        /// Add preconfigured gRPC client with configured address, channel options, call credentials and context propagation for console application with static authentication.
+        /// </summary>
+        /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
+        /// a transient service.</typeparam>
+        /// <param name="services">The <see cref="IServiceCollection"/>.</param>
+        /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
+        /// <param name="configureOptions">A delegate that is used to configure a <see cref="GrpcClientOptions"/>.</param>
+        /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+        public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(
+            this IServiceCollection services,
+            IConfiguration configuration,
+            Action<GrpcClientOptions>? configureOptions = null)
+            where TClient : class
+        {
+            var options = new GrpcClientOptions();
+            _configureGrpcClient(options, configuration);
+            configureOptions?.Invoke(options);
+
+            return services.AddGrpcPreConfiguredConsoleClient<TClient>(options);
+        }
+
+        /// <summary>
+        /// Add preconfigured gRPC client with configured call credentials.
+        /// </summary>
+        /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
+        /// a transient service.</typeparam>
+        /// <param name="services">The <see cref="IServiceCollection"/>.</param>
+        /// <param name="options">The <see cref="GrpcClientOptions"/>.</param>
+        /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+        static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(
+            this IServiceCollection services,
+            GrpcClientOptions? options = null)
+            where TClient : class
+        {
+            return services
+                .AddGrpcClient<TClient>(options)
+                .AddCallCredentials((context, metadata, provider) =>
+                {
+                    var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
+                    if (httpContext.HttpContext.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token)
+                        && !string.IsNullOrEmpty(token))
+                        metadata.Add(HttpRequestHeader.Authorization.ToString(), token);
+
+                    if (httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId)
+                        && !string.IsNullOrEmpty(userspaceId))
+                        metadata.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
+
+                    if (httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.CultureHeader, out var culture)
+                        && !string.IsNullOrEmpty(culture))
+                        metadata.Add(MicroserviceConstants.CultureHeader, culture);
+
+                    return Task.CompletedTask;
+                });
+        }
+
+        /// <summary>
+        /// Add preconfigured gRPC client with configured call credentials for console application with static authentication.
+        /// </summary>
+        /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
+        /// a transient service.</typeparam>
+        /// <param name="services">The <see cref="IServiceCollection"/>.</param>
+        /// <param name="options">The <see cref="GrpcClientOptions"/>.</param>
+        /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+        static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(
+            this IServiceCollection services,
+            GrpcClientOptions? options = null)
+            where TClient : class
+        {
+            // REM: for getting an auth token in .AddCallCredentials().
+            services.AddHttpClient<RestHttpClient>();
+
+            return services
+                .AddGrpcClient<TClient>(options)
+                .AddCallCredentials(async (context, metadata, provider) =>
+                {
+                    // HACK: temporary solution. Consider getting an auth token in a special service.
+                    var client = provider.GetRequiredService<RestHttpClient>();
+
+                    var tokenResponse = await client.GetAccessToken(false);
+                    if (tokenResponse is null)
+                        return;
+                    const string scheme = "Bearer";
+                    var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
+                    metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
+                });
+        }
+
+        /// <summary>
+        /// Add gRPC client.
+        /// </summary>
+        /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
+        /// a transient service.</typeparam>
+        /// <param name="services">The <see cref="IServiceCollection"/>.</param>
+        /// <param name="options">The <see cref="GrpcClientOptions"/>.</param>
+        /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+        static IHttpClientBuilder AddGrpcClient<TClient>(
+            this IServiceCollection services,
+            GrpcClientOptions? options = null)
+            where TClient : class
+        {
+            IHttpClientBuilder builder;
+            if (string.IsNullOrWhiteSpace(options?.Name))
+                builder = services.AddGrpcClient<TClient>(o =>
+                {
+                    options?.ClientOptionsAction?.Invoke(o);
+                });
+            else
+                builder = services.AddGrpcClient<TClient>(options.Name, o =>
+                {
+                    options?.ClientOptionsAction?.Invoke(o);
+                });
+
+            if (options?.ChannelOptionsAction != null)
+                builder = builder.ConfigureChannel(options.ChannelOptionsAction);
+
+            if (options?.ContextPropagationOptionsAction != null)
+                builder.EnableCallContextPropagation(options.ContextPropagationOptionsAction);
+
+            return builder;
         }
     }
 }

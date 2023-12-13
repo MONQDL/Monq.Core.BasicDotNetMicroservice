@@ -334,6 +334,45 @@ The ```AddDefaultExceptionHandlers()``` method contains such exception handlers:
 
 The ```AddDefaultExceptionHandlers()``` method have to be added in the pipeline end.
 
+### gRPC client configuration
+
+```csharp
+builder.Services.AddGrpcPreConfiguredClient(builder.Configuration, opt =>
+{
+    opt.Name = "clientName";
+    opt.ClientOptionsAction = o => o.Address = new Uri("http://localhost");
+});
+
+builder.Services.AddGrpcPreConfiguredConsoleClient(builder.Configuration, opt =>
+{
+    opt.Name = "clientName";
+    opt.ClientOptionsAction = o => o.Address = new Uri("http://localhost");
+});
+```
+
+The library provides extensions for configuring `Grpc.AspNetCore` clients both for web API applications and for console applications with static authentication.
+
+Configuration options are defined in `GrpcClientOptions` class. Default options are:
+
+```csharp
+static readonly Action<GrpcClientOptions, IConfiguration> _configureGrpcClient = (o, configuration) =>
+{
+    o.ClientOptionsAction = (clientOptions) =>
+    {
+        clientOptions.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)) ?? "http://localhost");
+    };
+    o.ChannelOptionsAction = (channelOptions) =>
+    {
+        channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
+        channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 Mb.
+    };
+    o.ContextPropagationOptionsAction = (propagationOptions) =>
+    {
+        propagationOptions.SuppressContextNotFoundErrors = true;
+    };
+};
+```
+
 ### The global gRPC exception handling
 
 ```csharp
@@ -357,6 +396,25 @@ Unmapped exception will be converted to `RpcException` with `StatusCode.Unknown`
   "Message": "exceptionMessage",
   "StackTrace": "exceptionStackTrace" // can be null
 }
+```
+
+### gRPC request validation
+
+The extension adds gRPC request messages validation.
+
+```csharp
+builder.Services.AddGrpcRequestValidation();
+```
+
+It works alongside with inline validator registration. More info: <https://github.com/AnthonyGiretti/grpc-aspnetcore-validator#add-inline-custom-validator>.
+
+```csharp
+builder.Services..AddInlineValidator<YourRequest>(rules =>
+{
+    rules.RuleFor(x => x.Id)
+        .InclusiveBetween(1, long.MaxValue)
+        .WithMessage("Wrong id.");
+});
 ```
 
 ### Authentication and authorization
@@ -506,22 +564,3 @@ For sending metrics to the Prometheus Pushgateway it is nessesary for the Reques
 #### AddSystemMetrics
 
 Options for collect system usage and gc event metrics. Optional.
-
-### gRPC request validation
-
-The extension adds gRPC request messages validation.
-
-```csharp
-builder.Services.AddGrpcRequestValidation();
-```
-
-It works alongside with inline validator registration. More info: <https://github.com/AnthonyGiretti/grpc-aspnetcore-validator#add-inline-custom-validator>.
-
-```csharp
-builder.Services..AddInlineValidator<YourRequest>(rules =>
-{
-    rules.RuleFor(x => x.Id)
-        .InclusiveBetween(1, long.MaxValue)
-        .WithMessage("Wrong id.");
-});
-```

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Version>6.8.2</Version>
+    <Version>6.9.0</Version>
     <VersionSuffix>$(VersionSuffix)</VersionSuffix>
     <Version Condition=" '$(VersionSuffix)' != '' ">$(Version)-$(VersionSuffix)</Version>
     <IsPackable>true</IsPackable>
@@ -22,10 +22,6 @@
     <Nullable>enable</Nullable>
     <LangVersion>9.0</LangVersion>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Remove="Sinks\Loki\IDefaultLokiHttpClient.cs" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="App.Metrics.Prometheus" Version="4.3.0" />
