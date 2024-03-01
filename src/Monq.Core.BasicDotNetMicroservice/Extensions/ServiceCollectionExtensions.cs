@@ -270,15 +270,32 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions
                 .AddGrpcClient<TClient>(options)
                 .AddCallCredentials(async (context, metadata, provider) =>
                 {
-                    // HACK: temporary solution. Consider getting an auth token in a special service.
-                    var client = provider.GetRequiredService<RestHttpClient>();
+                    var httpContextAccessor = provider.GetService<IHttpContextAccessor>();
+                    if (httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) == true
+                        && !string.IsNullOrEmpty(token))
+                    {
+                        metadata.Add(HttpRequestHeader.Authorization.ToString(), token);
+                    }
+                    else
+                    {
+                        // HACK: temporary solution. Consider getting an auth token in a special service.
+                        var client = provider.GetRequiredService<RestHttpClient>();
 
-                    var tokenResponse = await client.GetAccessToken(false);
-                    if (tokenResponse is null)
-                        return;
-                    const string scheme = "Bearer";
-                    var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
-                    metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
+                        var tokenResponse = await client.GetAccessToken(false);
+                        if (tokenResponse is null)
+                            return;
+                        const string scheme = "Bearer";
+                        var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
+                        metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
+                    }
+
+                    if (httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId) == true
+                        && !string.IsNullOrEmpty(userspaceId))
+                        metadata.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
+
+                    if (httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.CultureHeader, out var culture) == true
+                        && !string.IsNullOrEmpty(culture))
+                        metadata.Add(MicroserviceConstants.CultureHeader, culture);
                 });
         }
 
