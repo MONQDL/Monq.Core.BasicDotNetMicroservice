@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using Serilog.Sinks.Http;
 using System;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki
@@ -36,6 +38,6 @@ namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki
         static string Base64Encode(string plainText) =>
             Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(plainText));
 
-        public abstract Task<HttpResponseMessage> PostAsync(string requestUri, HttpContent content);
+        public abstract Task<HttpResponseMessage> PostAsync(string requestUri, Stream contentStream, CancellationToken cancellationToken);
     }
 }

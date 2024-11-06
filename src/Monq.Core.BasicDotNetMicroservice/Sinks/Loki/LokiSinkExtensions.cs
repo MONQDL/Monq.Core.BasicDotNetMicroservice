@@ -24,12 +24,12 @@ namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki
         /// <param name="logLabelProvider"></param>
         /// <param name="outputTemplate"></param>
         /// <param name="period">The time to wait between checking for event batches. Default value is 2 seconds.</param>
-        /// <param name="batchPostingLimit">
+        /// <param name="logEventsInBatchLimit">
         /// The maximum number of events to post in a single batch. Default value is 1000.
         /// </param>
-        /// <param name="queueLimit">
-        /// The maximum number of events stored in the queue in memory, waiting to be posted over
-        /// the network. Default value is infinitely.
+        /// <param name="queueLimitBytes">
+        /// The maximum size, in bytes, of events stored in memory, waiting to be sent over the
+        /// network. Specify <see langword="null"/> for no limit.
         /// </param>
         /// <returns></returns>
         public static LoggerConfiguration LokiHttp(this LoggerSinkConfiguration serilogConfig,
@@ -41,8 +41,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki
             ILogLabelProvider? logLabelProvider = default,
             string outputTemplate = DefaultTemplate,
             TimeSpan? period = default,
-            int batchPostingLimit = 1000,
-            int? queueLimit = null
+            int logEventsInBatchLimit = 1000,
+            long? queueLimitBytes = default
             )
         {
             period ??= TimeSpan.FromSeconds(2);
@@ -59,12 +59,12 @@ namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki
                 c.SetAuthCredentials(credentials);
 
             return serilogConfig.Http(LokiRouteBuilder.BuildPostUri(credentials.Url),
+                queueLimitBytes: queueLimitBytes,
                 batchFormatter: formatter,
                 textFormatter: new MessageTemplateTextFormatter(outputTemplate, formatProvider),
                 httpClient: httpClient,
                 period: period,
-                batchPostingLimit: batchPostingLimit,
-                queueLimit: queueLimit);
+                logEventsInBatchLimit: logEventsInBatchLimit);
         }
     }
 }

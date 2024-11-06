@@ -1,11 +1,11 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Version>6.9.1</Version>
+    <Version>7.0.0</Version>
     <VersionSuffix>$(VersionSuffix)</VersionSuffix>
     <Version Condition=" '$(VersionSuffix)' != '' ">$(Version)-$(VersionSuffix)</Version>
     <IsPackable>true</IsPackable>
-    <TargetFrameworks>net5.0;net6.0;net7.0</TargetFrameworks>
+    <TargetFrameworks>net7.0;net8.0</TargetFrameworks>
     <Authors>Sergey Pismennyi, Evgeniy Cherniayev</Authors>
     <Company>MONQ Digital lab</Company>
     <Title>Monq.Core.BasicDotNetMicroservice</Title>
@@ -20,51 +20,45 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Nullable>enable</Nullable>
-    <LangVersion>9.0</LangVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="App.Metrics.Prometheus" Version="4.3.0" />
     <PackageReference Include="App.Metrics.Reporting.Http" Version="4.3.0" />
-    <PackageReference Include="Grpc.AspNetCore.Server" Version="2.52.0" />
-    <PackageReference Include="Grpc.Net.ClientFactory" Version="2.47.0" />
-    <PackageReference Include="Google.Protobuf" Version="3.21.4" />
-    <PackageReference Include="IdentityModel.AspNetCore.OAuth2Introspection" Version="6.0.0" />
-    <PackageReference Include="IdentityServer4.AccessTokenValidation" Version="3.0.1" />
-    <PackageReference Include="Mapster" Version="7.4.0-pre03" />
-    <PackageReference Include="Monq.Core.HttpClientExtensions" Version="5.3.1" />
+    <PackageReference Include="Grpc.AspNetCore.Server" Version="2.66.0" />
+    <PackageReference Include="Grpc.AspNetCore.Server.ClientFactory" Version="2.66.0" />
+    <PackageReference Include="Grpc.Net.ClientFactory" Version="2.66.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.28.3" />
+    <PackageReference Include="IdentityModel.AspNetCore.OAuth2Introspection" Version="6.2.0" />
+    <PackageReference Include="Mapster" Version="7.4.0" />
+    <PackageReference Include="Monq.Core.HttpClientExtensions" Version="6.0.0-rev-11682706722" />
     <PackageReference Include="Winton.Extensions.Configuration.Consul" Version="3.1.2" />
-    <PackageReference Include="Serilog.AspNetCore" Version="7.0.0" />
-    <PackageReference Include="Serilog.Settings.Configuration" Version="7.0.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="4.1.1-dev-00910" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.Elasticsearch" Version="9.0.3" />
-    <PackageReference Include="Serilog.Sinks.Http" Version="7.2.0" />
+    <PackageReference Include="Serilog.Sinks.Http" Version="9.0.0" />
     <PackageReference Include="App.Metrics.AspNetCore.All" Version="4.3.0" />
     <PackageReference Include="App.Metrics.Reporting.InfluxDB" Version="4.3.0" />
     <PackageReference Include="App.Metrics.AspNetCore.Health" Version="3.2.0" />
     <PackageReference Include="App.Metrics.AspNetCore.Health.Hosting" Version="3.2.0" />
-    <PackageReference Include="System.Text.Json" Version="7.0.0" />
+    
   </ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.0" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="7.0.0" />
+    <PackageReference Include="Calzolari.Grpc.AspNetCore.Validation" Version="8.1.0" />
+	</ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net7.0'">
-    <PackageReference Include="Calzolari.Grpc.AspNetCore.Validation" Version="6.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="7.0.0" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
-    <PackageReference Include="Calzolari.Grpc.AspNetCore.Validation" Version="6.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="6.0.0" />
-    <PackageReference Include="Dapper" Version="2.0.123" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(TargetFramework)' == 'net5.0'">
-    <PackageReference Include="Calzolari.Grpc.AspNetCore.Validation" Version="5.0.0" />
-    <PackageReference Include="System.Text.Json" Version="6.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="5.0.0" />
-    <PackageReference Include="Dapper" Version="2.0.123" />
+    <PackageReference Include="Calzolari.Grpc.AspNetCore.Validation" Version="6.3.0" />
   </ItemGroup>
 
 </Project>

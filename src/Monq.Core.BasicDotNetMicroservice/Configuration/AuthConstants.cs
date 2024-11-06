@@ -1,7 +1,9 @@
-﻿namespace Monq.Core.BasicDotNetMicroservice
+namespace Monq.Core.BasicDotNetMicroservice
 {
     public static class AuthConstants
     {
+        internal const string AuthenticationScheme = "Bearer";
+
         internal static class AuthenticationConfiguration
         {
             public const string Authority = "AuthenticationEndpoint";
