@@ -3,32 +3,31 @@ using Microsoft.Extensions.Logging;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
 using System;
 
-namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Filters
+namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Filters;
+
+public class GlobalExceptionFilter : IExceptionFilter
 {
-    public class GlobalExceptionFilter : IExceptionFilter
+    readonly ILogger _logger;
+    readonly GlobalExceptionBuilderStorage _globalExceptionResult;
+
+    public GlobalExceptionFilter(ILoggerFactory? logger, GlobalExceptionBuilderStorage globalExceptionResult)
     {
-        readonly ILogger _logger;
-        readonly GlobalExceptionBuilderStorage _globalExceptionResult;
-
-        public GlobalExceptionFilter(ILoggerFactory? logger, GlobalExceptionBuilderStorage globalExceptionResult)
+        _globalExceptionResult = globalExceptionResult;
+        if (logger is null)
         {
-            _globalExceptionResult = globalExceptionResult;
-            if (logger is null)
-            {
-                throw new ArgumentNullException(nameof(logger));
-            }
-
-            _logger = logger.CreateLogger<GlobalExceptionFilter>();
+            throw new ArgumentNullException(nameof(logger));
         }
 
-        /// <inheritdoc/>
-        public void OnException(ExceptionContext context)
-        {
-            var result = _globalExceptionResult.Execute(context.Exception);
+        _logger = logger.CreateLogger<GlobalExceptionFilter>();
+    }
 
-            context.Result = result;
+    /// <inheritdoc/>
+    public void OnException(ExceptionContext context)
+    {
+        var result = _globalExceptionResult.Execute(context.Exception);
 
-            _logger.LogError(new EventId(), context.Exception, "GlobalExceptionFilter");
-        }
+        context.Result = result;
+
+        _logger.LogError(new EventId(), context.Exception, "GlobalExceptionFilter");
     }
 }

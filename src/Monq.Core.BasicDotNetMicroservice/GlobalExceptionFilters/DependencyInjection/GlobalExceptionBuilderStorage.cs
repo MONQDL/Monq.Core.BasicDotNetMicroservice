@@ -4,45 +4,44 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 
-namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection
+namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
+
+public class GlobalExceptionBuilderStorage
 {
-    public class GlobalExceptionBuilderStorage
+    readonly Dictionary<Type, Delegate> _delegateMap = new Dictionary<Type, Delegate>();
+
+    /// <summary>
+    /// Список обработчиков исключений.
+    /// </summary>
+    public IDictionary<Type, Delegate> ExceptionHandlers => _delegateMap;
+
+    public IActionResult? Execute(Exception exception)
     {
-        readonly Dictionary<Type, Delegate> _delegateMap = new Dictionary<Type, Delegate>();
-
-        /// <summary>
-        /// Список обработчиков исключений.
-        /// </summary>
-        public IDictionary<Type, Delegate> ExceptionHandlers => _delegateMap;
-
-        public IActionResult? Execute(Exception exception)
+        foreach (var (exceptionType, action) in _delegateMap)
         {
-            foreach (var (exceptionType, action) in _delegateMap)
+            if (action is not null && exception.GetType() == exceptionType)
             {
-                if (action is not null && exception.GetType() == exceptionType)
-                {
-                    return (IActionResult?)action.DynamicInvoke(exception);
-                }
+                return (IActionResult?)action.DynamicInvoke(exception);
             }
-
-            return ReturnDefaultExceptionResponse(exception);
         }
 
-        static IActionResult ReturnDefaultExceptionResponse(Exception exception)
+        return ReturnDefaultExceptionResponse(exception);
+    }
+
+    static IActionResult ReturnDefaultExceptionResponse(Exception exception)
+    {
+        var response = new ErrorResponse(exception);
+
+        return new ObjectResult(response)
         {
-            var response = new ErrorResponse(exception);
+            StatusCode = (int)HttpStatusCode.InternalServerError,
+            DeclaredType = typeof(ErrorResponse)
+        };
+    }
 
-            return new ObjectResult(response)
-            {
-                StatusCode = (int)HttpStatusCode.InternalServerError,
-                DeclaredType = typeof(ErrorResponse)
-            };
-        }
-
-        internal void AddAction<T>(Func<T, IActionResult> action) where T : Exception
-        {
-            if (!_delegateMap.ContainsKey(typeof(T)))
-                _delegateMap.Add(typeof(T), action);
-        }
+    internal void AddAction<T>(Func<T, IActionResult> action) where T : Exception
+    {
+        if (!_delegateMap.ContainsKey(typeof(T)))
+            _delegateMap.Add(typeof(T), action);
     }
 }

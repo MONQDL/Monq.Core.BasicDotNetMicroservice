@@ -1,15 +1,14 @@
-namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Labels
+namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Labels;
+
+public class LokiLabel
 {
-    public class LokiLabel
+    public LokiLabel(string key, string value)
     {
-        public LokiLabel(string key, string value)
-        {
-            Key = key;
-            Value = value;
-        }
-
-        public string Key { get; }
-
-        public string Value { get; }
+        Key = key;
+        Value = value;
     }
+
+    public string Key { get; }
+
+    public string Value { get; }
 }

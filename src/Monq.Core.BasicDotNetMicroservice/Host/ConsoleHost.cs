@@ -1,4 +1,4 @@
-﻿using App.Metrics;
+using App.Metrics;
 using App.Metrics.Reporting.InfluxDB;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,74 +7,73 @@ using Monq.Core.BasicDotNetMicroservice.Extensions;
 using Monq.Core.HttpClientExtensions;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Monq.Core.BasicDotNetMicroservice.Host
+namespace Monq.Core.BasicDotNetMicroservice.Host;
+
+public class ConsoleHost
 {
-    public class ConsoleHost
+    [return: NotNull]
+    public static IHostBuilder CreateDefaultBuilder(string[] args, ConsoleHostConfigurationOptions? options = null)
     {
-        [return: NotNull]
-        public static IHostBuilder CreateDefaultBuilder(string[] args, ConsoleHostConfigurationOptions? options = null)
+        var consoleBuilder = new ConsoleBuilder();
+
+        consoleBuilder.ConfigureAppConfiguration((builderContext, config) =>
         {
-            var consoleBuilder = new ConsoleBuilder();
+            var env = builderContext.HostingEnvironment;
+            config.AddJsonFile("appsettings.json", optional: true)
+                  .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true);
+        });
 
-            consoleBuilder.ConfigureAppConfiguration((builderContext, config) =>
-            {
-                var env = builderContext.HostingEnvironment;
-                config.AddJsonFile("appsettings.json", optional: true)
-                      .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true);
-            });
+        consoleBuilder.ConfigureCustomCertificates();
 
-            consoleBuilder.ConfigureCustomCertificates();
-
-            consoleBuilder.ConfigureConsul(options?.ConsulConfigurationOptions);
-            consoleBuilder.ConfigureSerilogLogging();
-            consoleBuilder.ConfigBasicHttpService(opts =>
-            {
-                var headerOptions = new RestHttpClientHeaderOptions();
-                headerOptions.AddForwardedHeader(MicroserviceConstants.EventIdHeader);
-                headerOptions.AddForwardedHeader(MicroserviceConstants.UserspaceIdHeader);
-                headerOptions.AddForwardedHeader(MicroserviceConstants.CultureHeader);
-
-                opts.ConfigHeaders(headerOptions);
-            });
-
-            consoleBuilder.ConfigureServices((context, services) =>
-            {
-                services.AddOptions();
-                services.Configure<AppConfiguration>(context.Configuration);
-                services.AddLogging();
-                ConfigureMetrics(context, services);
-            });
-
-            return consoleBuilder;
-        }
-
-        static void ConfigureMetrics(HostBuilderContext context, IServiceCollection services)
+        consoleBuilder.ConfigureConsul(options?.ConsulConfigurationOptions);
+        consoleBuilder.ConfigureSerilogLogging();
+        consoleBuilder.ConfigBasicHttpService(opts =>
         {
-            var metricsBuilder = AppMetrics.CreateDefaultBuilder()
-                .Configuration.Configure(
-                    options =>
-                    {
-                        options.Enabled = true;
-                        options.ReportingEnabled = true;
-                    });
+            var headerOptions = new RestHttpClientHeaderOptions();
+            headerOptions.AddForwardedHeader(MicroserviceConstants.EventIdHeader);
+            headerOptions.AddForwardedHeader(MicroserviceConstants.UserspaceIdHeader);
+            headerOptions.AddForwardedHeader(MicroserviceConstants.CultureHeader);
 
-            // TODO: Перенести в basic-microservice.
-            const string metricsSection = MicroserviceConstants.MetricsConfiguration.ConfigSection;
-            if (!string.IsNullOrEmpty(context.Configuration[$"{metricsSection}:InfluxDb:BaseUri"]))
-            {
-                var configuration = context.Configuration.GetSection(metricsSection);
+            opts.ConfigHeaders(headerOptions);
+        });
 
-                var config = new MetricsReportingInfluxDbOptions();
-                configuration.Bind(config);
+        consoleBuilder.ConfigureServices((context, services) =>
+        {
+            services.AddOptions();
+            services.Configure<AppConfiguration>(context.Configuration);
+            services.AddLogging();
+            ConfigureMetrics(context, services);
+        });
 
-                void MetricsConfig(MetricsReportingInfluxDbOptions conf)
+        return consoleBuilder;
+    }
+
+    static void ConfigureMetrics(HostBuilderContext context, IServiceCollection services)
+    {
+        var metricsBuilder = AppMetrics.CreateDefaultBuilder()
+            .Configuration.Configure(
+                options =>
                 {
-                    conf.FlushInterval = config.FlushInterval;
-                    conf.InfluxDb = config.InfluxDb;
-                }
-                metricsBuilder.Report.ToInfluxDb(MetricsConfig);
+                    options.Enabled = true;
+                    options.ReportingEnabled = true;
+                });
+
+        // TODO: Перенести в basic-microservice.
+        const string metricsSection = MicroserviceConstants.MetricsConfiguration.ConfigSection;
+        if (!string.IsNullOrEmpty(context.Configuration[$"{metricsSection}:InfluxDb:BaseUri"]))
+        {
+            var configuration = context.Configuration.GetSection(metricsSection);
+
+            var config = new MetricsReportingInfluxDbOptions();
+            configuration.Bind(config);
+
+            void MetricsConfig(MetricsReportingInfluxDbOptions conf)
+            {
+                conf.FlushInterval = config.FlushInterval;
+                conf.InfluxDb = config.InfluxDb;
             }
-            services.AddSingleton(metricsBuilder.Build());
+            metricsBuilder.Report.ToInfluxDb(MetricsConfig);
         }
+        services.AddSingleton(metricsBuilder.Build());
     }
 }

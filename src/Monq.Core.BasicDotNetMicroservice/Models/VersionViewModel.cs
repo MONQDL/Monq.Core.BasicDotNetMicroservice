@@ -1,10 +1,9 @@
-﻿namespace Monq.Core.BasicDotNetMicroservice.Models
+﻿namespace Monq.Core.BasicDotNetMicroservice.Models;
+
+public class VersionViewModel
 {
-    public class VersionViewModel
-    {
-        /// <summary>
-        /// Версия микросервиса.
-        /// </summary>
-        public string Version { get; set; } = default!;
-    }
+    /// <summary>
+    /// Версия микросервиса.
+    /// </summary>
+    public string Version { get; set; } = default!;
 }

@@ -1,12 +1,11 @@
 using System.Collections.Generic;
 
-namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Labels
+namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Labels;
+
+public interface ILogLabelProvider
 {
-    public interface ILogLabelProvider
-    {
-        IList<LokiLabel> GetLabels();
-        IList<string> PropertiesAsLabels { get; }
-        IList<string> PropertiesToAppend { get; }
-        LokiFormatterStrategy FormatterStrategy { get; }
-    }
+    IList<LokiLabel> GetLabels();
+    IList<string> PropertiesAsLabels { get; }
+    IList<string> PropertiesToAppend { get; }
+    LokiFormatterStrategy FormatterStrategy { get; }
 }
