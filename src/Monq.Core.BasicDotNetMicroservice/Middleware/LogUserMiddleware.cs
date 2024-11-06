@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
 using Serilog.Context;
 using System;
@@ -13,12 +13,12 @@ namespace Monq.Core.BasicDotNetMicroservice.Middleware;
 /// </summary>
 public class LogUserMiddleware
 {
-    const sbyte _systemUserId = -1;
-    const sbyte _defaultUserId = 0;
+    const sbyte SystemUserId = -1;
+    const sbyte DefaultUserId = 0;
 
-    const string _subjectClaim = "sub";
-    const string _clientIdClaim = "client_id";
-    const string _clientIdValue = "smon-res-owner";
+    const string SubjectClaim = "sub";
+    const string ClientIdClaim = "client_id";
+    const string ClientIdValue = "smon-res-owner";
 
     readonly RequestDelegate _next;
 
@@ -42,17 +42,17 @@ public class LogUserMiddleware
     long GetSubject(ClaimsPrincipal? user)
     {
         if (user == null)
-            return _defaultUserId;
+            return DefaultUserId;
 
-        var userSub = user.Claims.FirstOrDefault(x => x.Type == _subjectClaim)?.Value;
+        var userSub = user.Claims.FirstOrDefault(x => x.Type == SubjectClaim)?.Value;
 
         if (string.IsNullOrWhiteSpace(userSub))
         {
             var isSystemUser = IsSystemUser(user);
-            return isSystemUser ? _systemUserId : _defaultUserId;
+            return isSystemUser ? SystemUserId : DefaultUserId;
         }
 
-        return !long.TryParse(userSub, out var userId) ? _defaultUserId : userId;
+        return !long.TryParse(userSub, out var userId) ? DefaultUserId : userId;
     }
 
     bool IsSystemUser(ClaimsPrincipal? user)
@@ -60,11 +60,11 @@ public class LogUserMiddleware
         if (user == null)
             return false;
 
-        var userClientId = user.Claims.FirstOrDefault(x => x.Type == _clientIdClaim)?.Value;
+        var userClientId = user.Claims.FirstOrDefault(x => x.Type == ClientIdClaim)?.Value;
 
         if (string.IsNullOrWhiteSpace(userClientId))
             return false;
 
-        return string.Equals(userClientId, _clientIdValue, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(userClientId, ClientIdValue, StringComparison.OrdinalIgnoreCase);
     }
 }

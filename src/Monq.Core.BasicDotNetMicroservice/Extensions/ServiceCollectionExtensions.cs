@@ -110,9 +110,15 @@ public static class ServiceCollectionExtensions
     /// <param name="httpOptions">Configuration options of HTTP reporting. </param>
     static void AddOverHttp(this IMetricsBuilder metricsBuilder, IHostEnvironment hostEnvironment, MetricsReportingHttpOptions httpOptions)
     {
-        if (httpOptions.HttpSettings.RequestUri == null) return;
+        if (httpOptions.HttpSettings.RequestUri == null)
+            return;
 
-        var jobName = hostEnvironment.ApplicationName.Replace('/', '.');
+        string jobName;
+        var hostName = Environment.GetEnvironmentVariable("HOSTNAME");
+        if (!string.IsNullOrEmpty(hostName))
+            jobName = hostName.Replace('/', '.');
+        else
+            jobName = hostEnvironment.ApplicationName.Replace('/', '.');
         var requestUrl = $"{httpOptions.HttpSettings.RequestUri.AbsoluteUri.TrimEnd('/')}/job/{jobName}";
 
         httpOptions.HttpSettings.RequestUri = new Uri(requestUrl);

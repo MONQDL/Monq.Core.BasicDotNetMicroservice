@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Enrichers.FromHttpContextHeader;
 using Serilog;
@@ -14,6 +14,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Helpers;
 public static class LoggerEnvironment
 {
     static string? MicroserviceName { get; set; }
+
+    const string PodName = "HOSTNAME";
 
     /// <summary>
     /// Выполнить конфигурацию системы логирования для микросервиса.
@@ -41,6 +43,7 @@ public static class LoggerEnvironment
             .Enrich.WithProperty(LoggerFieldNames.Microservice, MicroserviceName)
             .Enrich.WithProperty(LoggerFieldNames.AppVersion, MicroserviceInfo.GetEntryPointAssembleVersion())
             .Enrich.WithProperty(LoggerFieldNames.AppEnvironment, env.EnvironmentName)
+            .Enrich.WithProperty(LoggerFieldNames.HostName, Environment.GetEnvironmentVariable(PodName))
             .WriteTo.Console(outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss zzz} {Level:u3}] {Scope} {Message:lj}{NewLine}{Exception}");
 
         Log.Logger = loggerConfig.CreateLogger();
@@ -90,5 +93,10 @@ public static class LoggerEnvironment
         /// Имя пользователя в системе, который отправил запрос.
         /// </summary>
         public const string UserName = "UserName";
+
+        /// <summary>
+        /// Kubernetes pod name.
+        /// </summary>
+        public const string HostName = "HostName";
     }
 }

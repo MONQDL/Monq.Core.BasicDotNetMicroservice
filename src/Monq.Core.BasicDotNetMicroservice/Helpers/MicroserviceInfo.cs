@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Reflection;
 
@@ -6,7 +6,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Helpers;
 
 public static class MicroserviceInfo
 {
-    static readonly Version DefaultVersion = new Version();
+    static readonly Version _defaultVersion = new Version();
 
     /// <summary>
     /// Получить версию сборки, которая содержит в себе тип <paramref name="assemblyType"/>.
@@ -23,7 +23,7 @@ public static class MicroserviceInfo
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion;
 
-        return version ?? DefaultVersion.ToString();
+        return version ?? _defaultVersion.ToString();
     }
 
     /// <summary>
@@ -36,7 +36,7 @@ public static class MicroserviceInfo
                                select t).FirstOrDefault();
 
         if (programAssembly is null)
-            return DefaultVersion.ToString();
+            return _defaultVersion.ToString();
 
         return GetVersion(programAssembly);
     }
