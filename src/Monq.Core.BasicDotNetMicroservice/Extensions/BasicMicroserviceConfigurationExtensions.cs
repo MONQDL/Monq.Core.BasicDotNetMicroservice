@@ -55,6 +55,7 @@ public static class BasicMicroserviceConfigurationExtensions
         hostBuilder.ConfigureBasicMicroserviceCore(consulConfigurationOptions);
         hostBuilder.ConfigureServices((hostContext, services) =>
             services.AddConsoleMetrics(hostContext));
+        hostBuilder.UseConsoleLifetime();
         return hostBuilder;
     }
 

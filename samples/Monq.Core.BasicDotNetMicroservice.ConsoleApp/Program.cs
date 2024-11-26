@@ -13,7 +13,6 @@ using var host = Host.CreateDefaultBuilder(args)
     {
         AppsettingsFileName = "appsettings-async.json"
     })
-    .UseConsoleLifetime()
     .Build();
 
 Console.WriteLine(JsonConvert.SerializeObject(host.Services.GetRequiredService<IConfiguration>()));
