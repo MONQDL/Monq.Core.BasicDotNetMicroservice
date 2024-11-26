@@ -50,7 +50,11 @@ public static class BasicMicroserviceConfigurationExtensions
         this IHostBuilder hostBuilder,
         ConsulConfigurationOptions? consulConfigurationOptions = null)
     {
+        hostBuilder.ConfigureHostConfiguration(config =>
+            config.AddEnvironmentVariables(prefix: "ASPNETCORE_"));
         hostBuilder.ConfigureBasicMicroserviceCore(consulConfigurationOptions);
+        hostBuilder.ConfigureServices((hostContext, services) =>
+            services.AddConsoleMetrics(hostContext));
         return hostBuilder;
     }
 
@@ -63,9 +67,8 @@ public static class BasicMicroserviceConfigurationExtensions
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
     public static IHostBuilder ConfigureConsul(this IHostBuilder hostBuilder, ConsulConfigurationOptions? configOptions = null)
     {
-        hostBuilder
-            .ConfigureAppConfiguration((builderContext, config)
-                => ConfigureConsul(builderContext.Configuration, config, configOptions, builderContext.HostingEnvironment));
+        hostBuilder.ConfigureAppConfiguration((hostContext, config) =>
+            ConfigureConsul(hostContext.Configuration, config, configOptions, hostContext.HostingEnvironment));
         return hostBuilder;
     }
 
@@ -97,7 +100,6 @@ public static class BasicMicroserviceConfigurationExtensions
     }
 
     /// <summary>
-    /// Выполнить конфигурацию точки доступа с информацией по версии микросервиса /api/version.
     /// Configure the access point to the microservice version info /api/version.
     /// </summary>
     /// <param name="hostBuilder">The host builder.</param>

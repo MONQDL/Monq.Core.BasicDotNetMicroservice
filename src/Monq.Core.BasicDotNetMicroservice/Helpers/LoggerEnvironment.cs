@@ -30,6 +30,8 @@ public static class LoggerEnvironment
         if (logging == null)
             throw new ArgumentNullException(nameof(logging), $"{nameof(logging)} is null.");
 
+        logging.ClearProviders();
+
         var configuration = hostContext.Configuration;
         var env = hostContext.HostingEnvironment;
 

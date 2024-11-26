@@ -1,4 +1,4 @@
-﻿using App.Metrics;
+using App.Metrics;
 using App.Metrics.Counter;
 using App.Metrics.Meter;
 using App.Metrics.ReservoirSampling.Uniform;
@@ -38,7 +38,6 @@ public class MicroserviceConstants
     /// Default certificates directory that will be used if ENV CERTS_DIR is not set.
     /// </summary>
     public const string CertsDirDefault = "/certs";
-
 
     internal static class HostConfiguration
     {
