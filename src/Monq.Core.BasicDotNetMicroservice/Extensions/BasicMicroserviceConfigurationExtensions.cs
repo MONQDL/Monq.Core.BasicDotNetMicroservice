@@ -11,7 +11,6 @@ using Monq.Core.BasicDotNetMicroservice.Filters;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
 using Monq.Core.BasicDotNetMicroservice.Models;
 using Monq.Core.HttpClientExtensions;
-using Serilog;
 using System;
 using System.IO;
 using System.Linq;
@@ -21,15 +20,186 @@ using static Monq.Core.BasicDotNetMicroservice.MicroserviceConstants.HostConfigu
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
+/// <summary>
+/// Extension methods to configure basic microservices.
+/// </summary>
 public static class BasicMicroserviceConfigurationExtensions
 {
     /// <summary>
-    /// Выполнить конфигурацию базового микросервиса, которая включает в себя конфигурацию Consul,
-    /// а так же конфигурацию логирования.
+    /// Configure basic microservice.
     /// </summary>
     /// <param name="hostBuilder">The host builder.</param>
     /// <param name="consulConfigurationOptions">The configuration options.</param>
+    /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
     public static IHostBuilder ConfigureBasicMicroservice(
+        this IHostBuilder hostBuilder,
+        ConsulConfigurationOptions? consulConfigurationOptions = null)
+    {
+        hostBuilder.ConfigureBasicMicroserviceCore(consulConfigurationOptions);
+        hostBuilder.ConfigureAuthorizationPolicies();
+        return hostBuilder;
+    }
+
+    /// <summary>
+    /// Configure basic console microservice.
+    /// </summary>
+    /// <param name="hostBuilder">The host builder.</param>
+    /// <param name="consulConfigurationOptions">The configuration options.</param>
+    /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
+    public static IHostBuilder ConfigureBasicConsoleMicroservice(
+        this IHostBuilder hostBuilder,
+        ConsulConfigurationOptions? consulConfigurationOptions = null)
+    {
+        hostBuilder.ConfigureBasicMicroserviceCore(consulConfigurationOptions);
+        return hostBuilder;
+    }
+
+    /// <summary>
+    /// Configure microservice using a configuration from Consul.
+    /// File <c>appsettings.Development.json</c> is allowed.
+    /// </summary>
+    /// <param name="hostBuilder">The host builder.</param>
+    /// <param name="configOptions">The configuration options.</param>
+    /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
+    public static IHostBuilder ConfigureConsul(this IHostBuilder hostBuilder, ConsulConfigurationOptions? configOptions = null)
+    {
+        hostBuilder
+            .ConfigureAppConfiguration((builderContext, config)
+                => ConfigureConsul(builderContext.Configuration, config, configOptions, builderContext.HostingEnvironment));
+        return hostBuilder;
+    }
+
+    /// <summary>
+    /// Load configuration from Consul.
+    /// </summary>
+    /// <param name="configBuilder">The configuration builder.</param>
+    /// <param name="environment">The environment.</param>
+    /// <param name="configOptions">The configuration options.</param>
+    /// <returns>The same <see cref="IConfigurationBuilder"/> for chaining.</returns>
+    public static IConfigurationBuilder ConfigureConsul(
+        this IConfigurationBuilder configBuilder,
+        IHostEnvironment environment,
+        ConsulConfigurationOptions? configOptions = null)
+    {
+        ConfigureConsul(configBuilder.Build(), configBuilder, configOptions, environment);
+        return configBuilder;
+    }
+
+    /// <summary>
+    /// Configure Serilog logging.
+    /// </summary>
+    /// <param name="hostBuilder">The host builder.</param>
+    /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
+    public static IHostBuilder ConfigureSerilogLogging(this IHostBuilder hostBuilder)
+    {
+        hostBuilder.ConfigureLogging(LoggerEnvironment.Configure);
+        return hostBuilder;
+    }
+
+    /// <summary>
+    /// Выполнить конфигурацию точки доступа с информацией по версии микросервиса /api/version.
+    /// Configure the access point to the microservice version info /api/version.
+    /// </summary>
+    /// <param name="hostBuilder">The host builder.</param>
+    /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
+    public static IHostBuilder UseVersionApiPoint(this IHostBuilder hostBuilder)
+    {
+        hostBuilder.ConfigureServices(services => services.AddSingleton<IStartupFilter, VersionPointStartupFilter>());
+        return hostBuilder;
+    }
+
+    /// <summary>
+    /// Configure authorization policies.
+    /// </summary>
+    /// <param name="hostBuilder">The host builder.</param>
+    /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
+    public static IHostBuilder ConfigureAuthorizationPolicies(this IHostBuilder hostBuilder)
+    {
+        hostBuilder
+            .ConfigureServices(services
+                => services.AddAuthorizationBuilder()
+                    .AddPolicy("Authenticated", policy => policy.RequireAuthenticatedUser())
+                    .AddPolicy(AuthConstants.AuthorizationScopes.Read, policyAdmin => policyAdmin.RequireScope("read", "write"))
+                    .AddPolicy(AuthConstants.AuthorizationScopes.Write, policyAdmin => policyAdmin.RequireScope("write"))
+                    .AddPolicy(AuthConstants.AuthorizationScopes.SmonAdmin, policyAdmin => policyAdmin.RequireScope("smon-admin"))
+                    .AddPolicy(AuthConstants.AuthorizationScopes.CloudAdmin, policyAdmin => policyAdmin.RequireScope("cloud-admin")));
+        return hostBuilder;
+    }
+
+    /// <summary>
+    /// Configure the metrics and health checks.
+    /// </summary>
+    /// <param name="hostBuilder">The host builder.</param>
+    /// <returns>The same <see cref="IWebHostBuilder"/> for chaining.</returns>
+    public static IWebHostBuilder ConfigureMetricsAndHealth(this IWebHostBuilder hostBuilder)
+    {
+        hostBuilder
+            .ConfigureHealthWithDefaults(builder => { })
+            .ConfigureMetricsWithDefaults((builderContext, metricsBuilder) =>
+            {
+                metricsBuilder.OutputMetrics.AsPrometheusPlainText();
+
+                var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
+                var metricsOptions = new MetricsConfigurationOptions();
+                metricsConfig.Bind(metricsOptions);
+
+                if (metricsOptions.ReportingInfluxDb.InfluxDb.BaseUri != null)
+                    metricsBuilder.Report.ToInfluxDb(metricsOptions.ReportingInfluxDb);
+            })
+            .UseMetricsWebTracking()
+            .UseMetrics(options
+                => options.EndpointOptions = endpointsOptions =>
+                {
+                    endpointsOptions.MetricsTextEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
+                    endpointsOptions.MetricsEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
+                })
+            .UseSystemMetrics();
+
+        return hostBuilder;
+    }
+
+    /// <summary>
+    /// Load custom certificates.
+    /// </summary>
+    /// <param name="hostBuilder">The host builder.</param>
+    /// <param name="certsDir">Certificates directory that will be used to load custom certificates. 
+    /// This option has highest priority on the ENV variable.</param>
+    /// <returns></returns>
+    public static IHostBuilder ConfigureCustomCertificates(this IHostBuilder hostBuilder, string? certsDir = null)
+    {
+        if (string.IsNullOrEmpty(certsDir))
+            certsDir = Environment.GetEnvironmentVariable(MicroserviceConstants.CertsDirEnv);
+        if (string.IsNullOrEmpty(certsDir))
+            certsDir = MicroserviceConstants.CertsDirDefault;
+
+        if (!Directory.Exists(certsDir))
+            return hostBuilder;
+
+        var certsCount = Directory.EnumerateFiles(certsDir).Count();
+        Console.WriteLine($"Installing {certsCount} certificates from {certsDir} ...");
+
+        using (var store = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
+        {
+            foreach (var cerFileName in Directory.EnumerateFiles(certsDir))
+            {
+                store.Open(OpenFlags.ReadWrite);
+                try
+                {
+                    var certificate = new X509Certificate2(cerFileName);
+                    store.Add(certificate); //where cert is an X509Certificate object
+                    Console.WriteLine($"Successfully installed {cerFileName}");
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Error while installing {cerFileName}. Details: {e.Message}");
+                }
+            }
+        }
+
+        return hostBuilder;
+    }
+
+    static IHostBuilder ConfigureBasicMicroserviceCore(
         this IHostBuilder hostBuilder,
         ConsulConfigurationOptions? consulConfigurationOptions = null)
     {
@@ -37,7 +207,6 @@ public static class BasicMicroserviceConfigurationExtensions
         hostBuilder.ConfigureConsul(consulConfigurationOptions);
         hostBuilder.ConfigureSerilogLogging();
         hostBuilder.UseVersionApiPoint();
-        hostBuilder.ConfigureAuthorizationPolicies();
         hostBuilder.ConfigBasicHttpService(opts =>
         {
             var headerOptions = new RestHttpClientHeaderOptions();
@@ -55,163 +224,6 @@ public static class BasicMicroserviceConfigurationExtensions
             services.AddDistributedMemoryCache();
             services.Configure<AppConfiguration>(context.Configuration);
         });
-
-        return hostBuilder;
-    }
-
-    /// <summary>
-    /// Выполнить конфигурацию сервиса, используя файл конфигурации из Consul.
-    /// Позволяется использовать файл appsettings.Development.json
-    /// </summary>
-    /// <param name="hostBuilder">The host builder.</param>
-    /// <param name="configOptions">The configuration options.</param>
-    public static IHostBuilder ConfigureConsul(this IHostBuilder hostBuilder, ConsulConfigurationOptions? configOptions = null)
-    {
-        hostBuilder
-            .ConfigureAppConfiguration((builderContext, config) =>
-                ConfigureConsul(builderContext.Configuration, config, configOptions, builderContext.HostingEnvironment));
-        return hostBuilder;
-    }
-
-    /// <summary>
-    /// Загрузить конфигурацию из Consul.
-    /// </summary>
-    /// <param name="configBuilder">The configuration builder.</param>
-    /// <param name="environment">The environment.</param>
-    /// <param name="configOptions">The configuration options.</param>
-    /// <returns></returns>
-    public static IConfigurationBuilder ConfigureConsul(
-        this IConfigurationBuilder configBuilder,
-        IHostEnvironment environment,
-        ConsulConfigurationOptions? configOptions = null)
-    {
-        ConfigureConsul(configBuilder.Build(), configBuilder, configOptions, environment);
-
-        return configBuilder;
-    }
-
-    /// <summary>
-    /// Configures the serilog logging.
-    /// </summary>
-    /// <param name="hostBuilder">The host builder.</param>
-    public static IHostBuilder ConfigureSerilogLogging(this IHostBuilder hostBuilder)
-    {
-        hostBuilder
-            .ConfigureAppConfiguration((builderContext, config) =>
-            {
-                var env = builderContext.HostingEnvironment;
-                var configuration = config.Build();
-                LoggerEnvironment.Configure(env, configuration);
-            });
-        hostBuilder.UseSerilog();
-
-        return hostBuilder;
-    }
-
-    /// <summary>
-    /// Выполнить конфигурацию точки доступа с информацией по версии микросервиса /api/version.
-    /// </summary>
-    /// <param name="hostBuilder">The host builder.</param>
-    public static IHostBuilder UseVersionApiPoint(this IHostBuilder hostBuilder)
-    {
-        hostBuilder.ConfigureServices(services => services.AddSingleton<IStartupFilter, VersionPointStartupFilter>());
-
-        return hostBuilder;
-    }
-
-    /// <summary>
-    /// Выполнить конфигурацию политик авторизации СМ.
-    /// </summary>
-    /// <param name="hostBuilder">The host builder.</param>
-    /// <returns></returns>
-    public static IHostBuilder ConfigureAuthorizationPolicies(this IHostBuilder hostBuilder)
-    {
-        hostBuilder
-            .ConfigureServices(services =>
-            {
-                services.AddAuthorization(options =>
-                {
-                    options.AddPolicy("Authenticated", policy => policy.RequireAuthenticatedUser());
-                    options.AddPolicy(AuthConstants.AuthorizationScopes.Read, policyAdmin => policyAdmin.RequireScope("read", "write"));
-                    options.AddPolicy(AuthConstants.AuthorizationScopes.Write, policyAdmin => policyAdmin.RequireScope("write"));
-                    options.AddPolicy(AuthConstants.AuthorizationScopes.SmonAdmin, policyAdmin => policyAdmin.RequireScope("smon-admin"));
-                    options.AddPolicy(AuthConstants.AuthorizationScopes.CloudAdmin, policyAdmin => policyAdmin.RequireScope("cloud-admin"));
-                });
-            });
-
-        return hostBuilder;
-    }
-
-    /// <summary>
-    /// Configures the metrics and health checks.
-    /// </summary>
-    /// <param name="hostBuilder">The host builder.</param>
-    public static IWebHostBuilder ConfigureMetricsAndHealth(this IWebHostBuilder hostBuilder)
-    {
-        hostBuilder
-            .ConfigureHealthWithDefaults(builder => { })
-            .ConfigureMetricsWithDefaults((builderContext, metricsBuilder) =>
-            {
-                metricsBuilder.OutputMetrics.AsPrometheusPlainText();
-
-                var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
-                var metricsOptions = new MetricsConfigurationOptions();
-                metricsConfig.Bind(metricsOptions);
-
-                if (metricsOptions.ReportingInfluxDb.InfluxDb.BaseUri != null)
-                    metricsBuilder.Report.ToInfluxDb(metricsOptions.ReportingInfluxDb);
-            })
-            .UseMetricsWebTracking()
-            .UseMetrics(options =>
-            {
-                options.EndpointOptions = endpointsOptions =>
-                {
-                    endpointsOptions.MetricsTextEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
-                    endpointsOptions.MetricsEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
-                };
-            })
-            .UseSystemMetrics();
-
-        return hostBuilder;
-    }
-
-    /// <summary>
-    /// Load custom certificates from the 
-    /// </summary>
-    /// <param name="hostBuilder"></param>
-    /// <param name="certsDir">Certificates directory that will be used to load custom certificates. 
-    /// This option has highest priority on the ENV variable.</param>
-    /// <returns></returns>
-    public static IHostBuilder ConfigureCustomCertificates(this IHostBuilder hostBuilder, string? certsDir = null)
-    {
-        if (string.IsNullOrEmpty(certsDir))
-            certsDir = Environment.GetEnvironmentVariable(MicroserviceConstants.CertsDirEnv);
-        if (string.IsNullOrEmpty(certsDir))
-            certsDir = MicroserviceConstants.CertsDirDefault;
-
-        if (!Directory.Exists(certsDir))
-            return hostBuilder;
-
-        var certsCount = Directory.EnumerateFiles(certsDir).Count();
-        Console.WriteLine($"Installing {certsCount} certificates from {certsDir} ...");
-
-        using (X509Store store = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
-        {
-            foreach (var cerFileName in Directory.EnumerateFiles(certsDir))
-            {
-                store.Open(OpenFlags.ReadWrite);
-                try
-                {
-                    X509Certificate2 certificate = new X509Certificate2(cerFileName);
-                    store.Add(certificate); //where cert is an X509Certificate object
-                    Console.WriteLine($"Successfully installed {cerFileName}");
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine($"Error while installing {cerFileName}. Details: {e.Message}");
-                }
-            }
-        }
 
         return hostBuilder;
     }

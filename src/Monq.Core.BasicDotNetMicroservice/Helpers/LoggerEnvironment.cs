@@ -1,5 +1,5 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Monq.Core.BasicDotNetMicroservice.Enrichers.FromHttpContextHeader;
 using Serilog;
 using Serilog.Events;
@@ -9,7 +9,7 @@ using System.Reflection;
 namespace Monq.Core.BasicDotNetMicroservice.Helpers;
 
 /// <summary>
-/// Хелпер для настройки логгирования в Serilog.
+/// Helper class to work with logging.
 /// </summary>
 public static class LoggerEnvironment
 {
@@ -18,21 +18,24 @@ public static class LoggerEnvironment
     const string PodName = "HOSTNAME";
 
     /// <summary>
-    /// Выполнить конфигурацию системы логирования для микросервиса.
+    /// Configure logging.
     /// </summary>
-    /// <param name="env">Конфигурация окружения, в котором выполняется сборка.</param>
-    /// <param name="configuration">Коллекция ключ-значение типа <see cref="IConfiguration" />.</param>
-    public static void Configure(IHostEnvironment env, IConfiguration configuration)
+    /// <param name="hostContext">The host builder context.</param>
+    /// <param name="logging">The logging builder.</param>
+    public static void Configure(HostBuilderContext hostContext, ILoggingBuilder logging)
     {
-        if (configuration == null)
-            throw new ArgumentNullException(nameof(configuration), $"{nameof(configuration)} is null.");
+        if (hostContext == null)
+            throw new ArgumentNullException(nameof(hostContext), $"{nameof(hostContext)} is null.");
 
-        if (env == null)
-            throw new ArgumentNullException(nameof(env), $"{nameof(env)} is null.");
+        if (logging == null)
+            throw new ArgumentNullException(nameof(logging), $"{nameof(logging)} is null.");
+
+        var configuration = hostContext.Configuration;
+        var env = hostContext.HostingEnvironment;
 
         ReadVariables();
 
-        var loggerConfig = new LoggerConfiguration()
+        var logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
             .Enrich.FromLogContext()
@@ -44,28 +47,26 @@ public static class LoggerEnvironment
             .Enrich.WithProperty(LoggerFieldNames.AppVersion, MicroserviceInfo.GetEntryPointAssembleVersion())
             .Enrich.WithProperty(LoggerFieldNames.AppEnvironment, env.EnvironmentName)
             .Enrich.WithProperty(LoggerFieldNames.HostName, Environment.GetEnvironmentVariable(PodName))
-            .WriteTo.Console(outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss zzz} {Level:u3}] {Scope} {Message:lj}{NewLine}{Exception}");
+            .WriteTo.Console(outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss zzz} {Level:u3}] {Scope} {Message:lj}{NewLine}{Exception}")
+            .CreateLogger();
 
-        Log.Logger = loggerConfig.CreateLogger();
+        logging.AddSerilog(logger);
     }
 
     static string? GetAssemblyName() => Assembly.GetEntryAssembly()?.GetName().Name;
 
-    /// <summary>
-    /// Прочитать значения переменных окружения.
-    /// </summary>
     static void ReadVariables()
     {
         MicroserviceName = Environment.GetEnvironmentVariable("ASPNETCORE_" + MicroserviceConstants.HostConfiguration.ApplicationNameEnv);
     }
 
     /// <summary>
-    /// Названия полей в системе логирования.
+    /// Logger field names.
     /// </summary>
     public static class LoggerFieldNames
     {
         /// <summary>
-        /// Среда исполнения микросервиса.
+        /// Microservice environment.
         /// </summary>
         public const string AppEnvironment = "AppEnvironment";
 
@@ -75,22 +76,22 @@ public static class LoggerEnvironment
         public const string Application = "Application";
 
         /// <summary>
-        /// Версия микросервиса.
+        /// Microservice version.
         /// </summary>
         public const string AppVersion = "AppVersion";
 
         /// <summary>
-        /// Название микросервиса из переменной окружения APPLICATION_NAME.
+        /// Microservice name from the APPLICATION_NAME environment variable.
         /// </summary>
         public const string Microservice = "Microservice";
 
         /// <summary>
-        /// Id пользователя в системе, который отправил запрос.
+        /// The Id of the user who sent the request.
         /// </summary>
         public const string UserId = "UserId";
 
         /// <summary>
-        /// Имя пользователя в системе, который отправил запрос.
+        /// The name of the user who sent the request.
         /// </summary>
         public const string UserName = "UserName";
 
