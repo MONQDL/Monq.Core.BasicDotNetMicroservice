@@ -9,7 +9,7 @@ namespace Monq.Core.BasicDotNetMicroservice;
 /// <summary>
 /// Unified microservice constants.
 /// </summary>
-public class MicroserviceConstants
+public static class MicroserviceConstants
 {
     /// <summary>
     /// Http header containing logging event Id.
@@ -38,6 +38,32 @@ public class MicroserviceConstants
     /// Default certificates directory that will be used if ENV CERTS_DIR is not set.
     /// </summary>
     public const string CertsDirDefault = "/certs";
+
+    /// <summary>
+    /// Configuration constants.
+    /// </summary>
+    public static class ConfigConstants
+    {
+        /// <summary>
+        /// Redis section.
+        /// </summary>
+        public const string Redis = "Redis";
+
+        /// <summary>
+        /// RabbitMQ section.
+        /// </summary>
+        public const string RabbitMq = "RabbitMQ";
+
+        /// <summary>
+        /// ClickHouse connection string.
+        /// </summary>
+        public const string ClickHouseConnectionString = "ClickHouseHttp:DefaultConnection:ConnectionString";
+
+        /// <summary>
+        /// PostgreSQL connection string.
+        /// </summary>
+        public const string PostgresConnectionString = "PostgreSQL:DefaultConnection:ConnectionString";
+    }
 
     internal static class HostConfiguration
     {
