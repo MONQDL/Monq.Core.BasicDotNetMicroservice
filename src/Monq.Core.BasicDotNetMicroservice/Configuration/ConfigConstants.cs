@@ -24,6 +24,4 @@ public static class ConfigConstants
     /// PostgreSQL connection string.
     /// </summary>
     public const string PostgresConnectionString = "PostgreSQL:DefaultConnection:ConnectionString";
-
-    public const string
 }
