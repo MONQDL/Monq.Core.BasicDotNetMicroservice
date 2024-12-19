@@ -1,4 +1,4 @@
-﻿using Google.Protobuf.WellKnownTypes;
+using Google.Protobuf.WellKnownTypes;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -20,6 +20,13 @@ public static class JsonGrpc
         }
         return obj;
     }
+
+    /// <summary>
+    /// Convert Grpc <see cref="Value"/> to <see cref="JsonNode"/>.
+    /// </summary>
+    /// <param name="value">The Grpc <see cref="Value"/> object.</param>
+    /// <returns>JsonNode or null.</returns>
+    public static JsonNode? ToJsonNode(this Value value) => GetJsonValue(value);
 
     /// <summary>
     /// Convert Grpc <see cref="ListValue"/> to <see cref="JsonArray"/>.
