@@ -12,6 +12,7 @@ using Monq.Core.BasicDotNetMicroservice.Services.Implementation;
 using Monq.Core.BasicDotNetMicroservice.Validation;
 using Monq.Core.HttpClientExtensions;
 using System;
+using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
@@ -243,11 +244,13 @@ public static class ServiceCollectionExtensions
                     && !string.IsNullOrEmpty(token))
                     metadata.Add(HttpRequestHeader.Authorization.ToString(), token);
 
-                if (httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId)
+                if (!metadata.Any(x => x.Key == MicroserviceConstants.UserspaceIdHeader) 
+                    && httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId)
                     && !string.IsNullOrEmpty(userspaceId))
                     metadata.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
 
-                if (httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.CultureHeader, out var culture)
+                if (!metadata.Any(x => x.Key == MicroserviceConstants.CultureHeader) 
+                    && httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.CultureHeader, out var culture)
                     && !string.IsNullOrEmpty(culture))
                     metadata.Add(MicroserviceConstants.CultureHeader, culture);
 
@@ -294,11 +297,13 @@ public static class ServiceCollectionExtensions
                     metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
                 }
 
-                if (httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId) == true
+                if (!metadata.Any(x => x.Key == MicroserviceConstants.UserspaceIdHeader) 
+                    && httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId) == true
                     && !string.IsNullOrEmpty(userspaceId))
                     metadata.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
 
-                if (httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.CultureHeader, out var culture) == true
+                if (!metadata.Any(x => x.Key == MicroserviceConstants.CultureHeader) 
+                    && httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.CultureHeader, out var culture) == true
                     && !string.IsNullOrEmpty(culture))
                     metadata.Add(MicroserviceConstants.CultureHeader, culture);
             });
