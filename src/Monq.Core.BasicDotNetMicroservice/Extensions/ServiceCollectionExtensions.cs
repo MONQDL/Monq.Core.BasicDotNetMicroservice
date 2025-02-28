@@ -3,9 +3,12 @@ using App.Metrics.Formatters.Prometheus;
 using App.Metrics.Reporting.Http;
 using App.Metrics.Reporting.InfluxDB;
 using Calzolari.Grpc.AspNetCore.Validation;
+using Grpc.Core;
+using Grpc.Core.Interceptors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Services.Implementation;
@@ -16,6 +19,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
+using static Grpc.Core.Interceptors.Interceptor;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
@@ -235,24 +239,17 @@ public static class ServiceCollectionExtensions
         GrpcClientOptions? options = null)
         where TClient : class
     {
+        services.TryAddTransient<AuthorizationHeaderInterceptor>();
+
         return services
             .AddGrpcClient<TClient>(options)
+            .AddInterceptor<AuthorizationHeaderInterceptor>()
             .AddCallCredentials((context, metadata, provider) =>
             {
                 var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
                 if (httpContext.HttpContext.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token)
                     && !string.IsNullOrEmpty(token))
                     metadata.Add(HttpRequestHeader.Authorization.ToString(), token);
-
-                if (!metadata.Any(x => x.Key == MicroserviceConstants.UserspaceIdHeader) 
-                    && httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId)
-                    && !string.IsNullOrEmpty(userspaceId))
-                    metadata.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
-
-                if (!metadata.Any(x => x.Key == MicroserviceConstants.CultureHeader) 
-                    && httpContext.HttpContext.Request.Headers.TryGetValue(MicroserviceConstants.CultureHeader, out var culture)
-                    && !string.IsNullOrEmpty(culture))
-                    metadata.Add(MicroserviceConstants.CultureHeader, culture);
 
                 return Task.CompletedTask;
             });
@@ -274,8 +271,11 @@ public static class ServiceCollectionExtensions
         // REM: for getting an auth token in .AddCallCredentials().
         services.AddHttpClient<RestHttpClient>();
 
+        services.TryAddTransient<AuthorizationHeaderInterceptor>();
+
         return services
             .AddGrpcClient<TClient>(options)
+            .AddInterceptor<AuthorizationHeaderInterceptor>()
             .AddCallCredentials(async (context, metadata, provider) =>
             {
                 var httpContextAccessor = provider.GetService<IHttpContextAccessor>();
@@ -296,17 +296,48 @@ public static class ServiceCollectionExtensions
                     var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
                     metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
                 }
-
-                if (!metadata.Any(x => x.Key == MicroserviceConstants.UserspaceIdHeader) 
-                    && httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId) == true
-                    && !string.IsNullOrEmpty(userspaceId))
-                    metadata.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
-
-                if (!metadata.Any(x => x.Key == MicroserviceConstants.CultureHeader) 
-                    && httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.CultureHeader, out var culture) == true
-                    && !string.IsNullOrEmpty(culture))
-                    metadata.Add(MicroserviceConstants.CultureHeader, culture);
             });
+    }
+
+    public class AuthorizationHeaderInterceptor : Interceptor
+    {
+        readonly IHttpContextAccessor _httpContextAccessor;
+
+        public AuthorizationHeaderInterceptor(IHttpContextAccessor httpContextAccessor)
+        {
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        public override AsyncUnaryCall<TResponse> AsyncUnaryCall<TRequest, TResponse>(
+            TRequest request,
+            ClientInterceptorContext<TRequest, TResponse> context,
+            AsyncUnaryCallContinuation<TRequest, TResponse> continuation)
+        {
+
+            var headers = new Metadata();
+            if (context.Options.Headers is not null)
+                foreach (var header in context.Options.Headers)
+                    headers.Add(header);
+
+            if (!headers.Any(x => x.Key.ToLowerInvariant() == MicroserviceConstants.UserspaceIdHeader.ToLowerInvariant())
+                    && _httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId) == true
+                    && !string.IsNullOrEmpty(userspaceId))
+                headers.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
+
+            if (!headers.Any(x => x.Key.ToLowerInvariant() == MicroserviceConstants.CultureHeader.ToLowerInvariant())
+                && _httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.CultureHeader, out var culture) == true
+                && !string.IsNullOrEmpty(culture))
+                headers.Add(MicroserviceConstants.CultureHeader, culture);
+
+            var newOptions = context.Options.WithHeaders(headers);
+
+            var newContext = new ClientInterceptorContext<TRequest, TResponse>(
+                context.Method,
+                context.Host,
+                newOptions);
+
+            return base.AsyncUnaryCall(request, newContext, continuation);
+        }
     }
 
     /// <summary>

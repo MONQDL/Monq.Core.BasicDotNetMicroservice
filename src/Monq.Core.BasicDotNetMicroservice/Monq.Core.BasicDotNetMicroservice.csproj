@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <Version>7.0.0</Version>
@@ -35,7 +35,7 @@
     <PackageReference Include="Google.Protobuf" Version="3.28.3" />
     <PackageReference Include="IdentityModel.AspNetCore.OAuth2Introspection" Version="6.2.0" />
     <PackageReference Include="Mapster" Version="7.4.0" />
-    <PackageReference Include="Monq.Core.HttpClientExtensions" Version="6.0.0-rev-11682706722" />
+    <PackageReference Include="Monq.Core.HttpClientExtensions" Version="6.0.0" />
     <PackageReference Include="Winton.Extensions.Configuration.Consul" Version="3.1.2" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
