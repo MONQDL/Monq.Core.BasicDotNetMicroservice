@@ -5,7 +5,7 @@
     <VersionSuffix>$(VersionSuffix)</VersionSuffix>
     <Version Condition=" '$(VersionSuffix)' != '' ">$(Version)-$(VersionSuffix)</Version>
     <IsPackable>true</IsPackable>
-    <TargetFrameworks>net7.0;net8.0</TargetFrameworks>
+    <TargetFrameworks>net6.0;net7.0;net8.0</TargetFrameworks>
     <Authors>Sergey Pismennyi, Evgeniy Cherniayev</Authors>
     <Company>MONQ Digital lab</Company>
     <Title>Monq.Core.BasicDotNetMicroservice</Title>
@@ -59,6 +59,13 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="7.0.0" />
     <PackageReference Include="Calzolari.Grpc.AspNetCore.Validation" Version="6.3.0" />
+  </ItemGroup>
+  
+  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="6.0.0" />
+    <PackageReference Include="Calzolari.Grpc.AspNetCore.Validation" Version="6.3.0" />
+    <PackageReference Include="Dapper" Version="2.1.66" />
   </ItemGroup>
 
 </Project>
