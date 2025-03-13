@@ -213,6 +213,80 @@ using var host = Host.CreateDefaultBuilder(args)
     .Build();
 ```
 
+Big Example of configuring Console host
+
+```csharp
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Monq.Core.BasicDotNetMicroservice;
+using Monq.Core.BasicDotNetMicroservice.Extensions;
+using Monq.Core.BasicDotNetMicroservice.Models;
+using Monq.Core.ClickHouseBuffer;
+using Monq.Core.ClickHouseBuffer.DependencyInjection;
+using Monq.Core.Service.Statistics.Buffer;
+using Serilog;
+using System.Text;
+
+Console.OutputEncoding = Encoding.UTF8;
+
+using IHost host = Host.CreateDefaultBuilder(args)
+    .ConfigureBasicConsoleMicroservice(new ConsulConfigurationOptions { AppsettingsFileName = "appsettings-buffer.json" })
+    .ConfigureServices((builder, services) =>
+    {
+        // Infra
+        services.AddConsoleMetrics(builder);
+        var clickHouseConnectionString = builder.Configuration[MicroserviceConstants.ConfigConstants.ClickHouseConnectionString];
+        services.ConfigureCHBuffer(builder.Configuration.GetSection(Monq.Core.Service.Statistics.Buffer.Configuration.AppConstants.Configuration.BufferEngineOptions), clickHouseConnectionString);
+
+        // Services
+        services.AddTransient<IPersistRepository, ClickHousePersistRepository>();
+        AddRabbitClient(services, builder.Configuration);
+    })
+    .UseConsoleLifetime()
+    .Build();
+
+var logger = host.Services.GetRequiredService<ILogger<Program>>();
+
+var exitCode = 0;
+try
+{
+    host.Services
+        .GetRequiredService<IQueueConsumer>()
+        .Start();
+    await host.RunAsync();
+}
+catch (Exception e)
+{
+    logger.LogCritical(e, e.Message);
+    exitCode = 1;
+}
+finally
+{
+    try
+    {
+        await Log.CloseAndFlushAsync();
+    }
+    catch (Exception e)
+    {
+        logger.LogCritical(e, e.Message);
+    }
+    finally
+    {
+        Environment.Exit(exitCode);
+    }
+}
+
+static void AddRabbitClient(IServiceCollection services, IConfiguration configuration)
+{
+    services
+        .AddRabbitMQCoreClientConsumer(
+            configuration.GetSection(MicroserviceConstants.ConfigConstants.RabbitMq))
+        .AddHandler<Monq.Core.Service.Statistics.Buffer.QueueHandlers.StatisticsUploadMessageHandler>(Monq.Core.Models.Statistics.RoutingKeys.Inbound.StatisticsItemUpload);
+}
+```
+
 ### Global exception handling
 
 ```csharp
