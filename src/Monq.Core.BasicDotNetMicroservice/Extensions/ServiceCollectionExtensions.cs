@@ -330,7 +330,15 @@ public static class ServiceCollectionExtensions
             return base.AsyncUnaryCall(request, newContext, continuation);
         }
 
-        private ClientInterceptorContext<TRequest, TResponse> CreateModifiedIntercaptorContext<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context)
+        /// <inheritdoc />
+        public override TResponse BlockingUnaryCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, BlockingUnaryCallContinuation<TRequest, TResponse> continuation)
+        {
+            var newContext = CreateModifiedIntercaptorContext(context);
+
+            return base.BlockingUnaryCall(request, newContext, continuation);
+        }
+
+        ClientInterceptorContext<TRequest, TResponse> CreateModifiedIntercaptorContext<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context)
             where TRequest : class
             where TResponse : class
         {
