@@ -308,12 +308,32 @@ public static class ServiceCollectionExtensions
             _httpContextAccessor = httpContextAccessor;
         }
 
+        /// <inheritdoc />
+        public override AsyncServerStreamingCall<TResponse> AsyncServerStreamingCall<TRequest, TResponse>(
+            TRequest request, 
+            ClientInterceptorContext<TRequest, TResponse> context, 
+            AsyncServerStreamingCallContinuation<TRequest, TResponse> continuation)
+        {
+            var newContext = CreateModifiedIntercaptorContext(context);
+
+            return base.AsyncServerStreamingCall(request, newContext, continuation);
+        }
+        
+        /// <inheritdoc />
         public override AsyncUnaryCall<TResponse> AsyncUnaryCall<TRequest, TResponse>(
             TRequest request,
             ClientInterceptorContext<TRequest, TResponse> context,
             AsyncUnaryCallContinuation<TRequest, TResponse> continuation)
         {
+            var newContext = CreateModifiedIntercaptorContext(context);
 
+            return base.AsyncUnaryCall(request, newContext, continuation);
+        }
+
+        private ClientInterceptorContext<TRequest, TResponse> CreateModifiedIntercaptorContext<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context)
+            where TRequest : class
+            where TResponse : class
+        {
             var headers = new Metadata();
             if (context.Options.Headers is not null)
                 foreach (var header in context.Options.Headers)
@@ -335,8 +355,7 @@ public static class ServiceCollectionExtensions
                 context.Method,
                 context.Host,
                 newOptions);
-
-            return base.AsyncUnaryCall(request, newContext, continuation);
+            return newContext;
         }
     }
 
