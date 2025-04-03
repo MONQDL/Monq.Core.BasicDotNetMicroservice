@@ -239,11 +239,11 @@ public static class ServiceCollectionExtensions
         GrpcClientOptions? options = null)
         where TClient : class
     {
-        services.TryAddTransient<AuthorizationHeaderInterceptor>();
+        services.TryAddTransient<AdditionalHeadersInterceptor>();
 
         return services
             .AddGrpcClient<TClient>(options)
-            .AddInterceptor<AuthorizationHeaderInterceptor>()
+            .AddInterceptor<AdditionalHeadersInterceptor>()
             .AddCallCredentials((context, metadata, provider) =>
             {
                 var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
@@ -271,11 +271,11 @@ public static class ServiceCollectionExtensions
         // REM: for getting an auth token in .AddCallCredentials().
         services.AddHttpClient<RestHttpClient>();
 
-        services.TryAddTransient<AuthorizationHeaderInterceptor>();
+        services.TryAddTransient<AdditionalHeadersInterceptor>();
 
         return services
             .AddGrpcClient<TClient>(options)
-            .AddInterceptor<AuthorizationHeaderInterceptor>()
+            .AddInterceptor<AdditionalHeadersInterceptor>()
             .AddCallCredentials(async (context, metadata, provider) =>
             {
                 var httpContextAccessor = provider.GetService<IHttpContextAccessor>();
@@ -299,11 +299,11 @@ public static class ServiceCollectionExtensions
             });
     }
 
-    public class AuthorizationHeaderInterceptor : Interceptor
+    public class AdditionalHeadersInterceptor : Interceptor
     {
         readonly IHttpContextAccessor _httpContextAccessor;
 
-        public AuthorizationHeaderInterceptor(IHttpContextAccessor httpContextAccessor)
+        public AdditionalHeadersInterceptor(IHttpContextAccessor httpContextAccessor)
         {
             _httpContextAccessor = httpContextAccessor;
         }
@@ -318,7 +318,27 @@ public static class ServiceCollectionExtensions
 
             return base.AsyncServerStreamingCall(request, newContext, continuation);
         }
-        
+
+        /// <inheritdoc />
+        public override AsyncClientStreamingCall<TRequest, TResponse> AsyncClientStreamingCall<TRequest, TResponse>(
+            ClientInterceptorContext<TRequest, TResponse> context, 
+            AsyncClientStreamingCallContinuation<TRequest, TResponse> continuation)
+        {
+            var newContext = CreateModifiedIntercaptorContext(context);
+
+            return base.AsyncClientStreamingCall(newContext, continuation);
+        }
+
+        /// <inheritdoc />
+        public override AsyncDuplexStreamingCall<TRequest, TResponse> AsyncDuplexStreamingCall<TRequest, TResponse>(
+            ClientInterceptorContext<TRequest, TResponse> context, 
+            AsyncDuplexStreamingCallContinuation<TRequest, TResponse> continuation)
+        {
+            var newContext = CreateModifiedIntercaptorContext(context);
+
+            return base.AsyncDuplexStreamingCall(newContext, continuation);
+        }
+
         /// <inheritdoc />
         public override AsyncUnaryCall<TResponse> AsyncUnaryCall<TRequest, TResponse>(
             TRequest request,
