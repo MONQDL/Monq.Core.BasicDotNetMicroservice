@@ -4,31 +4,30 @@ using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjecti
 using Monq.Core.BasicDotNetMicroservice.GrpcInterceptors;
 using System;
 
-namespace Monq.Core.BasicDotNetMicroservice.Helpers
+namespace Monq.Core.BasicDotNetMicroservice.Helpers;
+
+/// <summary>
+/// Helper class to work with GrpcServiceOptions.
+/// </summary>
+public static class GrpcServiceOptionsHelper
 {
     /// <summary>
-    /// Helper class to work with GrpcServiceOptions.
+    /// Add global gRPC exception handling.
     /// </summary>
-    public static class GrpcServiceOptionsHelper
+    public static GrpcServiceOptions EnableGrpcGlobalExceptionHandling(this GrpcServiceOptions options)
     {
-        /// <summary>
-        /// Add global gRPC exception handling.
-        /// </summary>
-        public static GrpcServiceOptions EnableGrpcGlobalExceptionHandling(this GrpcServiceOptions options)
-        {
-            options.Interceptors.Add<GrpcGlobalExceptionHandlerInterceptor>(Array.Empty<object>());
-            return options;
-        }
+        options.Interceptors.Add<GrpcGlobalExceptionHandlerInterceptor>(Array.Empty<object>());
+        return options;
+    }
 
-        /// <summary>
-        /// Add gRPC exception handler for the custom exception.
-        /// </summary>
-        public static GrpcServiceOptions AddGrpcExceptionHandler<T>(this GrpcServiceOptions options, Func<T, RpcException> action) where T : Exception
-        {
-            var storage = GlobalGrpcExceptionBuilderStorage.GetInstance();
-            storage.AddAction(action);
+    /// <summary>
+    /// Add gRPC exception handler for the custom exception.
+    /// </summary>
+    public static GrpcServiceOptions AddGrpcExceptionHandler<T>(this GrpcServiceOptions options, Func<T, RpcException> action) where T : Exception
+    {
+        var storage = GlobalGrpcExceptionBuilderStorage.GetInstance();
+        storage.AddAction(action);
 
-            return options;
-        }
+        return options;
     }
 }

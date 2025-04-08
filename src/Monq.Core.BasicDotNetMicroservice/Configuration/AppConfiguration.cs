@@ -1,10 +1,9 @@
-﻿namespace Monq.Core.BasicDotNetMicroservice
+﻿namespace Monq.Core.BasicDotNetMicroservice;
+
+public class AppConfiguration
 {
-    public class AppConfiguration
-    {
-        /// <summary>
-        /// Базовый Uri, относительно которого строятся запросы к Api СМ.
-        /// </summary>
-        public string BaseUri { get; set; }
-    }
+    /// <summary>
+    /// Базовый Uri, относительно которого строятся запросы к Api СМ.
+    /// </summary>
+    public string BaseUri { get; set; }
 }

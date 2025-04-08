@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Filters;
@@ -52,7 +52,6 @@ builder.Services
     .AddMetrics();
 
 Serilog.Debugging.SelfLog.Enable(Console.Error);
-
 
 var app = builder.Build();
 
