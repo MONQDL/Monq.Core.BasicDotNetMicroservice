@@ -51,17 +51,20 @@ public static class LokiSinkExtensions
             ? new BasicAuthCredentials(lokiUrl, lokiUsername, lokiPassword)
             : new NoAuthCredentials(lokiUrl);
 
-        var formatter = new LokiBatchFormatter(logLabelProvider ?? new DefaultLogLabelProvider());
+        var labelProvider = logLabelProvider ?? new DefaultLogLabelProvider();
+        var batchFormatter = new LokiBatchFormatter(labelProvider);
+        var textFormatter = new LokiTextFormatter(labelProvider, 
+            new MessageTemplateTextFormatter(outputTemplate, formatProvider));
 
         httpClient ??= new DefaultLokiHttpClient();
 
         if (httpClient is LokiHttpClientBase c)
             c.SetAuthCredentials(credentials);
 
-        return serilogConfig.Http(LokiRouteBuilder.BuildPostUri(credentials.Url),
+        return serilogConfig.Http(credentials.Url,
             queueLimitBytes: queueLimitBytes,
-            batchFormatter: formatter,
-            textFormatter: new MessageTemplateTextFormatter(outputTemplate, formatProvider),
+            batchFormatter: batchFormatter,
+            textFormatter: textFormatter,
             httpClient: httpClient,
             period: period,
             logEventsInBatchLimit: logEventsInBatchLimit);

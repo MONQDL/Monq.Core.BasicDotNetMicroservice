@@ -20,7 +20,13 @@ internal class DefaultLogLabelProvider : ILogLabelProvider
         PropertiesAsLabels = propertiesAsLabels?.ToList() ?? new List<string> {
             "level",
             "AppEnvironment",
-            "Microservice"
+            "Microservice",
+            "Method",
+            "RequestId",
+            "StatusCode",
+            "RequestPath",
+            MicroserviceConstants.EventIdPropertyName,
+            MicroserviceConstants.UserspaceIdPropertyName,
         };
         PropertiesToAppend = propertiesToAppend?.ToList() ?? new List<string>();
         FormatterStrategy = formatterStrategy;

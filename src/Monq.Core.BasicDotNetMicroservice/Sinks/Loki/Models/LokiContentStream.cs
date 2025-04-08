@@ -1,5 +1,3 @@
-using Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Utils;
-using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
@@ -13,9 +11,9 @@ internal class LokiContentStream
     [JsonPropertyName("values")]
     public IList<IList<string>> Entries { get; set; } = new List<IList<string>>();
 
-    public void AddEntry(DateTimeOffset timestamp, string entry)
+    public void AddEntry(LokiTempEntry entry)
     {
-        Entries.Add(new[] { timestamp.ToUnixNanosecondsString(), entry });
+        Entries.Add(new[] { entry.Ts, entry.Line });
     }
 
     public void AddLabel(string key, string value)
