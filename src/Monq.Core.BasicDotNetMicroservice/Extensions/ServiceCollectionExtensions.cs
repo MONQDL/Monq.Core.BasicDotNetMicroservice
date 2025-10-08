@@ -287,14 +287,16 @@ public static class ServiceCollectionExtensions
                 else
                 {
                     // HACK: temporary solution. Consider getting an auth token in a special service.
-                    var client = provider.GetRequiredService<RestHttpClient>();
-
-                    var tokenResponse = await client.GetAccessToken(false);
-                    if (tokenResponse is null)
-                        return;
-                    const string scheme = "Bearer";
-                    var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
-                    metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
+                    var client = provider.GetService<RestHttpClient>();
+                    if (client is not null)
+                    {
+                        var tokenResponse = await client.GetAccessToken(false);
+                        if (tokenResponse is null)
+                            return;
+                        const string scheme = "Bearer";
+                        var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
+                        metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
+                    }
                 }
             });
     }
@@ -310,8 +312,8 @@ public static class ServiceCollectionExtensions
 
         /// <inheritdoc />
         public override AsyncServerStreamingCall<TResponse> AsyncServerStreamingCall<TRequest, TResponse>(
-            TRequest request, 
-            ClientInterceptorContext<TRequest, TResponse> context, 
+            TRequest request,
+            ClientInterceptorContext<TRequest, TResponse> context,
             AsyncServerStreamingCallContinuation<TRequest, TResponse> continuation)
         {
             var newContext = CreateModifiedIntercaptorContext(context);
@@ -321,7 +323,7 @@ public static class ServiceCollectionExtensions
 
         /// <inheritdoc />
         public override AsyncClientStreamingCall<TRequest, TResponse> AsyncClientStreamingCall<TRequest, TResponse>(
-            ClientInterceptorContext<TRequest, TResponse> context, 
+            ClientInterceptorContext<TRequest, TResponse> context,
             AsyncClientStreamingCallContinuation<TRequest, TResponse> continuation)
         {
             var newContext = CreateModifiedIntercaptorContext(context);
@@ -331,7 +333,7 @@ public static class ServiceCollectionExtensions
 
         /// <inheritdoc />
         public override AsyncDuplexStreamingCall<TRequest, TResponse> AsyncDuplexStreamingCall<TRequest, TResponse>(
-            ClientInterceptorContext<TRequest, TResponse> context, 
+            ClientInterceptorContext<TRequest, TResponse> context,
             AsyncDuplexStreamingCallContinuation<TRequest, TResponse> continuation)
         {
             var newContext = CreateModifiedIntercaptorContext(context);
