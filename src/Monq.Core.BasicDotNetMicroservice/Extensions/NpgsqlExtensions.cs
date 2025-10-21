@@ -81,7 +81,7 @@ public static class NpgsqlExtensions
     /// <para>Must <b>strictly</b> correspond to the order in <paramref name="columns"/>.</para>
     /// <para>Must be the same length.</para>
     /// </param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns></returns>
     public static async Task InsertFromUnnest<T>(
         this DbSet<T> dbSet,
