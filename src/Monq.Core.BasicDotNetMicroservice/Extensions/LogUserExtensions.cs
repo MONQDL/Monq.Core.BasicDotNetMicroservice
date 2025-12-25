@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Builder;
 using Monq.Core.BasicDotNetMicroservice.Middleware;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
+/// <summary>
+/// Extension methods to log user data.
+/// </summary>
 public static class LogUserExtensions
 {
     /// <summary>

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Models;
 using System;
 using System.Collections.Generic;
@@ -6,6 +6,9 @@ using System.Net;
 
 namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
 
+/// <summary>
+/// Global exceptions cache.
+/// </summary>
 public class GlobalExceptionBuilderStorage
 {
     readonly Dictionary<Type, Delegate> _delegateMap = new Dictionary<Type, Delegate>();
@@ -15,6 +18,11 @@ public class GlobalExceptionBuilderStorage
     /// </summary>
     public IDictionary<Type, Delegate> ExceptionHandlers => _delegateMap;
 
+    /// <summary>
+    /// Return global exception result.
+    /// </summary>
+    /// <param name="exception">The exception.</param>
+    /// <returns></returns>
     public IActionResult? Execute(Exception exception)
     {
         foreach (var (exceptionType, action) in _delegateMap)
@@ -28,7 +36,7 @@ public class GlobalExceptionBuilderStorage
         return ReturnDefaultExceptionResponse(exception);
     }
 
-    static IActionResult ReturnDefaultExceptionResponse(Exception exception)
+    static ObjectResult ReturnDefaultExceptionResponse(Exception exception)
     {
         var response = new ErrorResponse(exception);
 

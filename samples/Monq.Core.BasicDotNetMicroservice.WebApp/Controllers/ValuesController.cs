@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Monq.Core.BasicDotNetMicroservice.WebApp.ModelsExceptions;
@@ -9,19 +9,20 @@ namespace Monq.Core.BasicDotNetMicroservice.WebApp.Controllers;
 public class ValuesController : Controller
 {
     readonly ILogger<ValuesController> _logger;
-    readonly AppConfiguration? _configurationOptions;
+    readonly AppConfiguration _configurationOptions;
 
-    public ValuesController(ILogger<ValuesController> logger, IOptions<AppConfiguration>? configuratiOptions)
+    public ValuesController(ILogger<ValuesController> logger, IOptions<AppConfiguration> configuratiOptions)
     {
-        _configurationOptions = configuratiOptions?.Value!;
+        _configurationOptions = configuratiOptions.Value;
         _logger = logger;
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public IActionResult Get()
     {
         var model = new { baseUri = _configurationOptions?.BaseUri };
-        _logger.LogInformation("Result {result}", model);
+        _logger.LogInformation("Result {Result}", model);
         return Ok(model);
     }
 

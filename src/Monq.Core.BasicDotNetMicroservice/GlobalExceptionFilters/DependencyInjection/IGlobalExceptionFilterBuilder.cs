@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using System;
 
 namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
 
+/// <summary>
+/// The Global exception result builder.
+/// </summary>
 public interface IGlobalExceptionFilterBuilder
 {
     /// <summary>

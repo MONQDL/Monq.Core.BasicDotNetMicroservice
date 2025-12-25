@@ -17,14 +17,8 @@ builder.WebHost.ConfigureMetricsAndHealth();
 
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
-    serverOptions.Listen(IPAddress.Any, 5005, listenOptions =>
-    {
-        listenOptions.Protocols = HttpProtocols.Http1;
-    });
-    serverOptions.Listen(IPAddress.Any, 5006, listenOptions =>
-    {
-        listenOptions.Protocols = HttpProtocols.Http2;
-    });
+    serverOptions.Listen(IPAddress.Any, 5005, listenOptions => listenOptions.Protocols = HttpProtocols.Http1);
+    serverOptions.Listen(IPAddress.Any, 5006, listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
 });
 
 builder.Services.ConfigureSMAuthentication(builder.Configuration);
@@ -55,6 +49,7 @@ Serilog.Debugging.SelfLog.Enable(Console.Error);
 
 var app = builder.Build();
 
+app.MapApiVersion(typeof(Program));
 app.UseTraceEventId();
 app.UseRouting();
 app.UseAuthentication();

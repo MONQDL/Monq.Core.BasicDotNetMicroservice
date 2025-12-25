@@ -32,10 +32,8 @@ internal class LokiTextFormatter : ITextFormatter
 
     public void Format(LogEvent logEvent, TextWriter output)
     {
-        if (logEvent == null)
-            throw new ArgumentNullException(nameof(logEvent));
-        if (output == null)
-            throw new ArgumentNullException(nameof(output));
+        ArgumentNullException.ThrowIfNull(logEvent);
+        ArgumentNullException.ThrowIfNull(output);
 
         var labels = new List<LokiLabel>();
 
@@ -49,10 +47,8 @@ internal class LokiTextFormatter : ITextFormatter
         }
 
         HandleProperty("level", GetLevel(logEvent.Level), labels, sb);
-        foreach (KeyValuePair<string, LogEventPropertyValue> property in logEvent.Properties)
-        {
+        foreach (var property in logEvent.Properties)
             HandleProperty(property.Key, property.Value.ToString(), labels, sb);
-        }
 
         // Order the labels so they always get the same chunk in loki
         labels = labels.OrderBy(l => l.Key).ToList();
@@ -64,7 +60,7 @@ internal class LokiTextFormatter : ITextFormatter
         output.Write(JsonSerializer.Serialize(lokiTempEntry, LokiTempEntryContext.Default.LokiTempEntry));
     }
 
-    void HandleProperty(string name, string value, ICollection<LokiLabel> labels, StringBuilder sb)
+    void HandleProperty(string name, string value, List<LokiLabel> labels, StringBuilder sb)
     {
         // Some enrichers pass strings with quotes surrounding the values inside the string,
         // which results in redundant quotes after serialization and a "bad request" response.
@@ -102,9 +98,7 @@ internal class LokiTextFormatter : ITextFormatter
         }
     }
 
-    static string GetLevel(LogEventLevel level)
-    {
-        return level switch
+    static string GetLevel(LogEventLevel level) => level switch
         {
             LogEventLevel.Verbose => "trace",
             LogEventLevel.Debug => "debug",
@@ -114,7 +108,6 @@ internal class LokiTextFormatter : ITextFormatter
             LogEventLevel.Fatal => "critical",
             _ => "unknown"
         };
-    }
 
     HandleAction DetermineHandleActionForProperty(string propertyName)
     {

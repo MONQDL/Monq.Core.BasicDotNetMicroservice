@@ -4,6 +4,9 @@ using System.Text.Json.Nodes;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
+/// <summary>
+/// Extension methods for converting Grpc Struct to System.Text.Json and back.
+/// </summary>
 public static class JsonGrpc
 {
     /// <summary>
@@ -104,7 +107,8 @@ public static class JsonGrpc
         {
             JsonObject jO => GetProtoValue(jO),
             JsonArray jA => GetProtoValue(jA),
-            JsonValue jV => GetProtoValue(jV)
+            JsonValue jV => GetProtoValue(jV),
+            _ => new Value()
         };
     }
 

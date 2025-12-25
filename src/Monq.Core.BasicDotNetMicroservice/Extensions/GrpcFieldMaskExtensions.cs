@@ -1,4 +1,4 @@
-﻿using Google.Protobuf;
+using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using System;
 using System.Collections.Generic;
@@ -8,6 +8,9 @@ using static Google.Protobuf.WellKnownTypes.FieldMask;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
+/// <summary>
+/// Extension methods for Grpc FieldMask manipulations.
+/// </summary>
 public static class GrpcFieldMaskExtensions
 {
     static readonly MergeOptions _defaultMergeOptions = new()

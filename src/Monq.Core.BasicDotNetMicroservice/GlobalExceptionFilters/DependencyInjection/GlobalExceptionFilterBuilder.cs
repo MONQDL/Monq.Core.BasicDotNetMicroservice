@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Models;
 using System;
@@ -6,10 +6,19 @@ using System.Net;
 
 namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
 
+/// <summary>
+/// The Global exception result builder.
+/// </summary>
 public class GlobalExceptionFilterBuilder : IGlobalExceptionFilterBuilder
 {
+    /// <summary>
+    /// Global exception result.
+    /// </summary>
     public GlobalExceptionBuilderStorage GlobalExceptionResult { get; }
 
+    /// <summary>
+    /// DI service collection.
+    /// </summary>
     public IServiceCollection Services { get; }
 
     /// <summary>

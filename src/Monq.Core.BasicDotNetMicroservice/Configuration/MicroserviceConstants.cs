@@ -16,12 +16,19 @@ public static class MicroserviceConstants
     /// </summary>
     public const string EventIdHeader = "X-Trace-Event-Id";
 
+    /// <summary>
+    /// LokiTraceEventId name.
+    /// </summary>
     public const string EventIdPropertyName = "XTraceEventId";
 
     /// <summary>
     /// Http header containing userspace Id.
     /// </summary>
     public const string UserspaceIdHeader = "X-Smon-Userspace-Id";
+
+    /// <summary>
+    /// Loki UserspaceId name.
+    /// </summary>
     public const string UserspaceIdPropertyName = "XSmonUserspaceId";
 
     /// <summary>

@@ -30,16 +30,16 @@ public class LogUserMiddleware
     /// <summary>
     /// Вызов Middleware.
     /// </summary>
-    public async Task Invoke(HttpContext? context)
+    public async Task Invoke(HttpContext context)
     {
-        using (LogContext.PushProperty(LoggerEnvironment.LoggerFieldNames.UserId, GetSubject(context?.User)))
-        using (LogContext.PushProperty(LoggerEnvironment.LoggerFieldNames.UserName, context?.User?.Identity?.Name))
+        using (LogContext.PushProperty(LoggerEnvironment.LoggerFieldNames.UserId, GetSubject(context.User)))
+        using (LogContext.PushProperty(LoggerEnvironment.LoggerFieldNames.UserName, context.User?.Identity?.Name))
         {
             await _next(context);
         }
     }
 
-    long GetSubject(ClaimsPrincipal? user)
+    static long GetSubject(ClaimsPrincipal? user)
     {
         if (user == null)
             return DefaultUserId;
@@ -55,7 +55,7 @@ public class LogUserMiddleware
         return !long.TryParse(userSub, out var userId) ? DefaultUserId : userId;
     }
 
-    bool IsSystemUser(ClaimsPrincipal? user)
+    static bool IsSystemUser(ClaimsPrincipal? user)
     {
         if (user == null)
             return false;

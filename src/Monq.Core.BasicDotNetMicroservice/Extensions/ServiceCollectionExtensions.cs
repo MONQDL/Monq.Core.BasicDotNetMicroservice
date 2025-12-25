@@ -153,10 +153,7 @@ public static class ServiceCollectionExtensions
     /// <returns><see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
     public static IServiceCollection AddGrpcRequestValidation(this IServiceCollection services)
     {
-        services.AddGrpc(options =>
-        {
-            options.EnableMessageValidation();
-        });
+        services.AddGrpc(options => options.EnableMessageValidation());
 
         services.AddSingleton<IValidatorErrorMessageHandler>(new DefaultValidatorMessageHandler());
         services.AddGrpcValidation();
@@ -166,10 +163,8 @@ public static class ServiceCollectionExtensions
 
     static readonly Action<GrpcClientOptions, IConfiguration> _configureGrpcClient = (o, configuration) =>
     {
-        o.ClientOptionsAction = (clientOptions) =>
-        {
-            clientOptions.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)) ?? "http://localhost");
-        };
+        o.ClientOptionsAction = (clientOptions) => clientOptions.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
+                ?? throw new Exception("Grpc BaseUri not found at configuration."));
         o.ChannelOptionsAction = (channelOptions) =>
         {
             channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
@@ -246,9 +241,9 @@ public static class ServiceCollectionExtensions
             .AddCallCredentials((context, metadata, provider) =>
             {
                 var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
-                if (httpContext.HttpContext.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token)
+                if (httpContext.HttpContext?.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) == true
                     && !string.IsNullOrEmpty(token))
-                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token);
+                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token!);
 
                 return Task.CompletedTask;
             });
@@ -278,10 +273,10 @@ public static class ServiceCollectionExtensions
             .AddCallCredentials(async (context, metadata, provider) =>
             {
                 var httpContextAccessor = provider.GetService<IHttpContextAccessor>();
-                if (httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) == true
+                if (httpContextAccessor?.HttpContext?.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) == true
                     && !string.IsNullOrEmpty(token))
                 {
-                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token);
+                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token!);
                 }
                 else
                 {
@@ -300,10 +295,17 @@ public static class ServiceCollectionExtensions
             });
     }
 
+    /// <summary>
+    /// Grpc interceptor that adds additional metadata from http headers.
+    /// </summary>
     public class AdditionalHeadersInterceptor : Interceptor
     {
         readonly IHttpContextAccessor _httpContextAccessor;
 
+        /// <summary>
+        /// Creates new object of <see cref="AdditionalHeadersInterceptor"/>.
+        /// </summary>
+        /// <param name="httpContextAccessor">HttpContextAccessor</param>
         public AdditionalHeadersInterceptor(IHttpContextAccessor httpContextAccessor)
         {
             _httpContextAccessor = httpContextAccessor;
@@ -315,7 +317,7 @@ public static class ServiceCollectionExtensions
             ClientInterceptorContext<TRequest, TResponse> context,
             AsyncServerStreamingCallContinuation<TRequest, TResponse> continuation)
         {
-            var newContext = CreateModifiedIntercaptorContext(context);
+            var newContext = CreateModifiedInterceptorContext(context);
 
             return base.AsyncServerStreamingCall(request, newContext, continuation);
         }
@@ -325,7 +327,7 @@ public static class ServiceCollectionExtensions
             ClientInterceptorContext<TRequest, TResponse> context,
             AsyncClientStreamingCallContinuation<TRequest, TResponse> continuation)
         {
-            var newContext = CreateModifiedIntercaptorContext(context);
+            var newContext = CreateModifiedInterceptorContext(context);
 
             return base.AsyncClientStreamingCall(newContext, continuation);
         }
@@ -335,7 +337,7 @@ public static class ServiceCollectionExtensions
             ClientInterceptorContext<TRequest, TResponse> context,
             AsyncDuplexStreamingCallContinuation<TRequest, TResponse> continuation)
         {
-            var newContext = CreateModifiedIntercaptorContext(context);
+            var newContext = CreateModifiedInterceptorContext(context);
 
             return base.AsyncDuplexStreamingCall(newContext, continuation);
         }
@@ -346,7 +348,7 @@ public static class ServiceCollectionExtensions
             ClientInterceptorContext<TRequest, TResponse> context,
             AsyncUnaryCallContinuation<TRequest, TResponse> continuation)
         {
-            var newContext = CreateModifiedIntercaptorContext(context);
+            var newContext = CreateModifiedInterceptorContext(context);
 
             return base.AsyncUnaryCall(request, newContext, continuation);
         }
@@ -354,12 +356,12 @@ public static class ServiceCollectionExtensions
         /// <inheritdoc />
         public override TResponse BlockingUnaryCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, BlockingUnaryCallContinuation<TRequest, TResponse> continuation)
         {
-            var newContext = CreateModifiedIntercaptorContext(context);
+            var newContext = CreateModifiedInterceptorContext(context);
 
             return base.BlockingUnaryCall(request, newContext, continuation);
         }
 
-        ClientInterceptorContext<TRequest, TResponse> CreateModifiedIntercaptorContext<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context)
+        ClientInterceptorContext<TRequest, TResponse> CreateModifiedInterceptorContext<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context)
             where TRequest : class
             where TResponse : class
         {
@@ -368,15 +370,15 @@ public static class ServiceCollectionExtensions
                 foreach (var header in context.Options.Headers)
                     headers.Add(header);
 
-            if (!headers.Any(x => x.Key.ToLowerInvariant() == MicroserviceConstants.UserspaceIdHeader.ToLowerInvariant())
+            if (!headers.Any(x => x.Key.Equals(MicroserviceConstants.UserspaceIdHeader, StringComparison.OrdinalIgnoreCase))
                     && _httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId) == true
                     && !string.IsNullOrEmpty(userspaceId))
-                headers.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
+                headers.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId!);
 
-            if (!headers.Any(x => x.Key.ToLowerInvariant() == MicroserviceConstants.CultureHeader.ToLowerInvariant())
+            if (!headers.Any(x => x.Key.Equals(MicroserviceConstants.CultureHeader, StringComparison.OrdinalIgnoreCase))
                 && _httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.CultureHeader, out var culture) == true
                 && !string.IsNullOrEmpty(culture))
-                headers.Add(MicroserviceConstants.CultureHeader, culture);
+                headers.Add(MicroserviceConstants.CultureHeader, culture!);
 
             var newOptions = context.Options.WithHeaders(headers);
 
@@ -403,15 +405,9 @@ public static class ServiceCollectionExtensions
     {
         IHttpClientBuilder builder;
         if (string.IsNullOrWhiteSpace(options?.Name))
-            builder = services.AddGrpcClient<TClient>(o =>
-            {
-                options?.ClientOptionsAction?.Invoke(o);
-            });
+            builder = services.AddGrpcClient<TClient>(o => options?.ClientOptionsAction?.Invoke(o));
         else
-            builder = services.AddGrpcClient<TClient>(options.Name, o =>
-            {
-                options?.ClientOptionsAction?.Invoke(o);
-            });
+            builder = services.AddGrpcClient<TClient>(options.Name, o => options?.ClientOptionsAction?.Invoke(o));
 
         if (options?.ChannelOptionsAction != null)
             builder = builder.ConfigureChannel(options.ChannelOptionsAction);

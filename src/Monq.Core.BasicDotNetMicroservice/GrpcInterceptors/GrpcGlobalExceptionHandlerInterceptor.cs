@@ -1,4 +1,4 @@
-﻿using Grpc.Core;
+using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Microsoft.Extensions.Logging;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
@@ -37,12 +37,12 @@ public class GrpcGlobalExceptionHandlerInterceptor : Interceptor
         }
         catch (RpcException e)
         {
-            _logger.LogError(e, e.Message);
+            _logger.LogError(e, "Grpc call exception. Error: {ErrorMessage}", e.Message);
             throw;
         }
         catch (Exception e)
         {
-            _logger.LogError(e, e.Message);
+            _logger.LogError(e, "Grpc call exception. Error: {ErrorMessage}", e.Message);
             var rpcException = _storage.Execute(e);
             throw rpcException;
         }

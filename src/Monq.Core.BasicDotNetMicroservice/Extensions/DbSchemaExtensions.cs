@@ -11,6 +11,9 @@ using System.Threading;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
+/// <summary>
+/// Extension methods for Db Schema manipulations.
+/// </summary>
 public static class DbSchemaExtensions
 {
     static readonly JsonSerializerOptions _intendedSerializerOptions =
@@ -34,7 +37,7 @@ public static class DbSchemaExtensions
         var services = scope.ServiceProvider;
         var factory = services.GetRequiredService<ILoggerFactory>();
         var logger = factory.CreateLogger("DbInitializer");
-        bool exceptionOccurred = false;
+        var exceptionOccurred = false;
         try
         {
             var context = services.GetRequiredService<T>();
@@ -93,6 +96,9 @@ public static class DbSchemaExtensions
                 $"Difference: {JsonSerializer.Serialize(diffMigrations, _intendedSerializerOptions)}");
     }
 
+    /// <summary>
+    /// Exception throws on Database schema validation error.
+    /// </summary>
     public class DbSchemaValidationException : Exception
     {
         /// <summary>Initializes a new instance of the <see cref="DbSchemaValidationException" /> class with a specified error message.</summary>

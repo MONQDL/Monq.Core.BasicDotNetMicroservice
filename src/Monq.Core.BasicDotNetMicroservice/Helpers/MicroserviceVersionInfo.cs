@@ -4,8 +4,12 @@ using System.Reflection;
 
 namespace Monq.Core.BasicDotNetMicroservice.Helpers;
 
-public static class MicroserviceInfo
+/// <summary>
+/// Microservice version information.
+/// </summary>
+public static class MicroserviceVersionInfo
 {
+    static string? _version;
     static readonly Version _defaultVersion = new Version();
 
     /// <summary>
@@ -14,16 +18,16 @@ public static class MicroserviceInfo
     /// <param name="assemblyType">Любой тип, который содержится в сборке, для которой требуется определить версию.</param>
     public static string GetVersion(Type assemblyType)
     {
-        if (assemblyType == null)
-            throw new ArgumentNullException(nameof(assemblyType), $"{nameof(assemblyType)} is null.");
+        if (_version != null)
+            return _version;
 
-        var version = assemblyType
-            .GetTypeInfo()
-            .Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-            .InformationalVersion;
+        ArgumentNullException.ThrowIfNull(assemblyType);
 
-        return version ?? _defaultVersion.ToString();
+        var asmName = assemblyType.Assembly.GetName();
+        // InformationalVersion хранится в метаданных и доступен без атрибутов
+        var version = asmName.Version?.ToString() ?? "<unknown>";
+        _version = version;
+        return _version;
     }
 
     /// <summary>

@@ -94,10 +94,11 @@ using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
 
 ```csharp
-Console.OutputEncoding = Encoding.UTF8;
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Host.UseVersionApiPoint();
+var app = builder.Build();
+
+app.MapApiVersion(typeof(Program));// You can add it firs.
 ```
 
 ### TraceEventId logging request chain

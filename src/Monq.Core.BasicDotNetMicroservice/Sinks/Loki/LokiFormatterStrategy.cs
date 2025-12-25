@@ -1,5 +1,8 @@
 namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki;
 
+/// <summary>
+/// Loki Formatter Strategy list.
+/// </summary>
 public enum LokiFormatterStrategy
 {
     /// All Serilog Event properties will be sent as labels

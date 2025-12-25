@@ -1,6 +1,6 @@
-﻿using static Monq.Core.BasicDotNetMicroservice.MicroserviceConstants.HostConfiguration;
+using static Monq.Core.BasicDotNetMicroservice.MicroserviceConstants.HostConfiguration;
 
-namespace Monq.Core.BasicDotNetMicroservice.Models;
+namespace Monq.Core.BasicDotNetMicroservice.Configuration;
 
 /// <summary>
 /// Конфигурация для работы с Consul.

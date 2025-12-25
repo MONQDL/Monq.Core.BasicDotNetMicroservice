@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki;
 
+#pragma warning disable CS1591 // Отсутствует комментарий XML для открытого видимого типа или члена
 public abstract class LokiHttpClientBase : IHttpClient
 {
     protected readonly HttpClient HttpClient;
