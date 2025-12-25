@@ -118,7 +118,6 @@ public static class BasicMicroserviceConfigurationExtensions
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
     public static IHostBuilder ConfigureAuthorizationPolicies(this IHostBuilder hostBuilder)
     {
-#if NET7_0_OR_GREATER
         hostBuilder
             .ConfigureServices(services
                 => services.AddAuthorizationBuilder()
@@ -128,21 +127,6 @@ public static class BasicMicroserviceConfigurationExtensions
                     .AddPolicy(AuthConstants.AuthorizationScopes.SmonAdmin, policyAdmin => policyAdmin.RequireScope("smon-admin"))
                     .AddPolicy(AuthConstants.AuthorizationScopes.CloudAdmin, policyAdmin => policyAdmin.RequireScope("cloud-admin")));
         return hostBuilder;
-#else
-            hostBuilder
-                .ConfigureServices(services =>
-                {
-                    services.AddAuthorization(options =>
-                    {
-                        options.AddPolicy("Authenticated", policy => policy.RequireAuthenticatedUser());
-                        options.AddPolicy(AuthConstants.AuthorizationScopes.Read, policyAdmin => policyAdmin.RequireScope("read", "write"));
-                        options.AddPolicy(AuthConstants.AuthorizationScopes.Write, policyAdmin => policyAdmin.RequireScope("write"));
-                        options.AddPolicy(AuthConstants.AuthorizationScopes.SmonAdmin, policyAdmin => policyAdmin.RequireScope("smon-admin"));
-                        options.AddPolicy(AuthConstants.AuthorizationScopes.CloudAdmin, policyAdmin => policyAdmin.RequireScope("cloud-admin"));
-                    });
-                });
-            return hostBuilder;
-#endif
     }
 
     /// <summary>

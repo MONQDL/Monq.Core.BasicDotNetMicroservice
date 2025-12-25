@@ -1,6 +1,3 @@
-﻿#if NET5_0 || NET6_0
-using Dapper;
-#endif
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -24,7 +21,7 @@ public static class DbSchemaExtensions
     /// </summary>
     /// <typeparam name="T">The concrete database context.</typeparam>
     /// <param name="app">The <see cref="IApplicationBuilder"/> object.</param>
-    /// <param name="terminateOnException">If true when the exeption eccures the application will be terminated.</param>
+    /// <param name="terminateOnException">If true when the exception occurs the application will be terminated.</param>
     /// <param name="sleepBeforeTerminate">If true when <paramref name="terminateOnException"/> the main thread will sleep before terminate.</param>
     /// <param name="terminationSleepMilliseconds">The sleep interval when <paramref name="terminateOnException"/> is true and <paramref name="sleepBeforeTerminate"/> is true.</param>
     public static void CreateDbSchemaOnFirstRun<T>(this IApplicationBuilder app,
@@ -78,19 +75,8 @@ public static class DbSchemaExtensions
                     FROM information_schema.tables 
                 WHERE table_schema NOT IN ('pg_catalog', 'information_schema') and table_type = 'BASE TABLE'
                 ";
-#if NET7_0_OR_GREATER
         var creatorContext = context.Database.SqlQueryRaw<bool>(sql);
         return creatorContext.First<bool>();
-#else
-        var connection = context.Database.GetDbConnection();// Using is not required here.
-                                                            // The connection lifetime is managed by EF.
-        context.Database.OpenConnection();
-
-        return
-            connection
-                .Query<bool>(sql)
-                .First();
-#endif
     }
 
     static void CheckMigrationsHistory(DbContext context)

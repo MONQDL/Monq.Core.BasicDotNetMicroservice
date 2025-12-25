@@ -19,7 +19,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
-using static Grpc.Core.Interceptors.Interceptor;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 

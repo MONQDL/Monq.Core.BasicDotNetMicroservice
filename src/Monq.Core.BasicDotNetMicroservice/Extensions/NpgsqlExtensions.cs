@@ -104,10 +104,6 @@ public static class NpgsqlExtensions
             ";
         var query = FormattableStringFactory.Create(sql, values);
 
-#if NET7_0_OR_GREATER
         await database.ExecuteSqlAsync(query, cancellationToken);
-#else
-        await database.ExecuteSqlInterpolatedAsync(query, cancellationToken);
-#endif
     }
 }
