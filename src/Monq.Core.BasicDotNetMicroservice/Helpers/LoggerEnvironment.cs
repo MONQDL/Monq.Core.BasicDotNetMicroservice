@@ -46,7 +46,7 @@ public static class LoggerEnvironment
             .ReadFrom.Configuration(configuration)
             .Enrich.WithProperty(LoggerFieldNames.Application, GetAssemblyName())
             .Enrich.WithProperty(LoggerFieldNames.Microservice, MicroserviceName)
-            .Enrich.WithProperty(LoggerFieldNames.AppVersion, MicroserviceVersionInfo.GetEntryPointAssembleVersion())
+            .Enrich.WithProperty(LoggerFieldNames.AppVersion, MicroserviceVersionInfo.GetEntryPointAssemblyVersion())
             .Enrich.WithProperty(LoggerFieldNames.AppEnvironment, env.EnvironmentName)
             .Enrich.WithProperty(LoggerFieldNames.HostName, Environment.GetEnvironmentVariable(PodName))
             .WriteTo.Console(outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss zzz} {Level:u3}] {Scope} {Message:lj}{NewLine}{Exception}")

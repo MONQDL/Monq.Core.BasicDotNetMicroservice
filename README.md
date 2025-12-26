@@ -533,3 +533,50 @@ For sending metrics to the Prometheus Pushgateway it is nessesary for the Reques
 #### AddSystemMetrics
 
 Options for collect system usage and gc event metrics. Optional.
+
+### Database Schema Management
+
+The extension provides methods for automatic database schema creation and validation during application startup.
+
+#### Automatic Schema Creation and Validation
+
+The `CreateDbSchemaOnFirstRun<T>()` method automatically handles database schema initialization and validation:
+
+!NOTE: It applies only to PostgreSQL.
+
+- If the database is empty, it creates the schema by applying all migrations
+- If the database already has tables, it validates that all migrations have been applied
+- If there are unapplied migrations in an existing database, it throws a `DbSchemaValidationException`
+
+**Usage example:**
+
+```csharp
+using Monq.Core.BasicDotNetMicroservice.Extensions;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add DbContext to services
+builder.Services.AddDbContext<MyDbContext>(options =>
+    options.UseNpgsql(connectionString));
+
+var app = builder.Build();
+// Initialize database schema on application startup
+app.CreateDbSchemaOnFirstRun<MyDbContext>();
+
+app.Run();
+```
+
+**Method signature:**
+```csharp
+public static void CreateDbSchemaOnFirstRun<T>(this IApplicationBuilder app,
+    bool terminateOnException = true,
+    bool sleepBeforeTerminate = true,
+    int terminationSleepMilliseconds = 10000)
+    where T : DbContext
+```
+
+**Parameters:**
+- `T` - The concrete database context type
+- `terminateOnException` - If true, the application will terminate when an exception occurs (default: true)
+- `sleepBeforeTerminate` - If true and `terminateOnException` is true, the main thread will sleep before termination (default: true)
+- `terminationSleepMilliseconds` - Sleep interval when `terminateOnException` is true and `sleepBeforeTerminate` is true (default: 10000ms)

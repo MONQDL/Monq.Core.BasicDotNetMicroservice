@@ -15,6 +15,7 @@ using Monq.Core.BasicDotNetMicroservice.Services.Implementation;
 using Monq.Core.BasicDotNetMicroservice.Validation;
 using Monq.Core.HttpClientExtensions;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
@@ -64,6 +65,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services">IServiceCollection to add the services to.</param>
     /// <param name="hostContext">Context containing the common services on the IHost.</param>
     /// <returns><see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
+    [RequiresUnreferencedCode("Calls IConfiguration.Bind is incompatible with trimming.")]
     public static IServiceCollection AddConsoleMetrics(this IServiceCollection services, HostBuilderContext hostContext)
     {
         var metricsBuilder = AppMetrics.CreateDefaultBuilder()
@@ -76,6 +78,7 @@ public static class ServiceCollectionExtensions
 
         var metricsConfig = hostContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
         var metricsOptions = new MetricsConfigurationOptions();
+        // TODO: Use source generator after net7 drop.
         metricsConfig.Bind(metricsOptions);
 
         metricsBuilder.AddInfluxDb(metricsOptions.ReportingInfluxDb);
@@ -161,20 +164,25 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    static readonly Action<GrpcClientOptions, IConfiguration> _configureGrpcClient = (o, configuration) =>
+    [RequiresUnreferencedCode(
+            "Uses IConfiguration.GetValue<T>() which internally relies on reflection is incompatible with trimming.")]
+    static void ConfigureGrpcClient(
+            GrpcClientOptions options,
+            IConfiguration configuration)
     {
-        o.ClientOptionsAction = (clientOptions) => clientOptions.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
+        // Логика из лямбды
+        options.ClientOptionsAction = clientOptions =>
+            clientOptions.Address = new Uri(
+                configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
                 ?? throw new Exception("Grpc BaseUri not found at configuration."));
-        o.ChannelOptionsAction = (channelOptions) =>
+        options.ChannelOptionsAction = channelOptions =>
         {
             channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
-            channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 Mb.
+            channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 Mb
         };
-        o.ContextPropagationOptionsAction = (propagationOptions) =>
-        {
+        options.ContextPropagationOptionsAction = propagationOptions =>
             propagationOptions.SuppressContextNotFoundErrors = true;
-        };
-    };
+    }
 
     /// <summary>
     /// Add preconfigured gRPC client with configured address, channel options, call credentials and context propagation.
@@ -185,6 +193,8 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
     /// <param name="configureOptions">A delegate that is used to configure a <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+    [RequiresUnreferencedCode(
+            "Uses ConfigureGrpcClient which internally relies on reflection is incompatible with trimming.")]
     public static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -192,7 +202,7 @@ public static class ServiceCollectionExtensions
         where TClient : class
     {
         var options = new GrpcClientOptions();
-        _configureGrpcClient(options, configuration);
+        ConfigureGrpcClient(options, configuration);
         configureOptions?.Invoke(options);
 
         return services.AddGrpcPreConfiguredClient<TClient>(options);
@@ -207,6 +217,8 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
     /// <param name="configureOptions">A delegate that is used to configure a <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+    [RequiresUnreferencedCode(
+            "Uses ConfigureGrpcClient which internally relies on reflection is incompatible with trimming.")]
     public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -214,7 +226,7 @@ public static class ServiceCollectionExtensions
         where TClient : class
     {
         var options = new GrpcClientOptions();
-        _configureGrpcClient(options, configuration);
+        ConfigureGrpcClient(options, configuration);
         configureOptions?.Invoke(options);
 
         return services.AddGrpcPreConfiguredConsoleClient<TClient>(options);
@@ -228,7 +240,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The <see cref="IServiceCollection"/>.</param>
     /// <param name="options">The <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(
+    static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         GrpcClientOptions? options = null)
         where TClient : class
@@ -257,7 +269,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The <see cref="IServiceCollection"/>.</param>
     /// <param name="options">The <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(
+    static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         GrpcClientOptions? options = null)
         where TClient : class
@@ -398,7 +410,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The <see cref="IServiceCollection"/>.</param>
     /// <param name="options">The <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    static IHttpClientBuilder AddGrpcClient<TClient>(
+    static IHttpClientBuilder AddGrpcClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         GrpcClientOptions? options = null)
         where TClient : class

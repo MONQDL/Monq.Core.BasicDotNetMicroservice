@@ -2,6 +2,7 @@ using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using static Google.Protobuf.WellKnownTypes.FieldMask;
@@ -78,7 +79,7 @@ public static class GrpcFieldMaskExtensions
         if (fieldMask is null)
             return ConvertWithoutFieldMask(values, convert);
 
-        return MergeCollectionWithConvertion(values, fieldMask, convert, options);
+        return MergeCollectionWithConversion(values, fieldMask, convert, options);
     }
 
     /// <summary>
@@ -96,7 +97,8 @@ public static class GrpcFieldMaskExtensions
     /// </summary>
     /// <param name="obj">Object.</param>
     /// <returns></returns>
-    public static FieldMask GetFieldMask<T>(this T obj) where T : class
+    public static FieldMask GetFieldMask<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>
+        (this T obj) where T : class
     {
         var props = GetNotNullPropertiesNames(obj);
         return FromString(string.Join(",", props));
@@ -107,7 +109,9 @@ public static class GrpcFieldMaskExtensions
     /// </summary>
     /// <param name="type">Type.</param>
     /// <returns></returns>
-    public static FieldMask GetFieldMask(this System.Type type)
+    public static FieldMask GetFieldMask(
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]
+        this System.Type type)
     {
         var props = type
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -116,9 +120,12 @@ public static class GrpcFieldMaskExtensions
         return FromString(string.Join(",", props));
     }
 
-    static IEnumerable<string> GetNotNullPropertiesNames(object obj)
+    static IEnumerable<string> GetNotNullPropertiesNames<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>(
+        T obj)
+        where T : class
     {
-        var props = obj.GetType().GetProperties();
+        var props = typeof(T)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance);
         var result = props
             .Where(x => x.GetValue(obj) != null)
             .Select(x => x.Name);
@@ -148,7 +155,7 @@ public static class GrpcFieldMaskExtensions
         }
     }
 
-    static IEnumerable<TResult> MergeCollectionWithConvertion<TSource, TResult>(IEnumerable<TSource> values,
+    static IEnumerable<TResult> MergeCollectionWithConversion<TSource, TResult>(IEnumerable<TSource> values,
         FieldMask fieldMask,
         Func<TSource, TResult> convert,
         MergeOptions? options = null)

@@ -1,5 +1,5 @@
 using System;
-using System.Linq;
+using System.Collections.Concurrent;
 using System.Reflection;
 
 namespace Monq.Core.BasicDotNetMicroservice.Helpers;
@@ -9,8 +9,11 @@ namespace Monq.Core.BasicDotNetMicroservice.Helpers;
 /// </summary>
 public static class MicroserviceVersionInfo
 {
-    static string? _version;
-    static readonly Version _defaultVersion = new Version();
+    /// <summary>
+    /// Кэш версий сборок. Ключ – сама сборка, значение – строка версии.
+    /// </summary>
+    static readonly ConcurrentDictionary<Assembly, string> _assemblyVersionCache
+        = new ConcurrentDictionary<Assembly, string>();
 
     /// <summary>
     /// Получить версию сборки, которая содержит в себе тип <paramref name="assemblyType"/>.
@@ -18,30 +21,28 @@ public static class MicroserviceVersionInfo
     /// <param name="assemblyType">Любой тип, который содержится в сборке, для которой требуется определить версию.</param>
     public static string GetVersion(Type assemblyType)
     {
-        if (_version != null)
-            return _version;
-
         ArgumentNullException.ThrowIfNull(assemblyType);
 
-        var asmName = assemblyType.Assembly.GetName();
+        var asm = assemblyType.Assembly;
         // InformationalVersion хранится в метаданных и доступен без атрибутов
-        var version = asmName.Version?.ToString() ?? "<unknown>";
-        _version = version;
-        return _version;
+        return _assemblyVersionCache.GetOrAdd(asm, a =>
+        {
+            var name = a.GetName();
+            return name.Version?.ToString() ?? "<unknown>";
+        });
     }
 
     /// <summary>
-    /// Получить версию сборки, которая содержит в себе тип <see name="Program" />.
+    /// Ленивый кэш версии entry‑point (сборки, из которой стартует приложение).
     /// </summary>
-    public static string GetEntryPointAssembleVersion()
+    static readonly Lazy<string> _entryAssemblyVersion = new(() =>
     {
-        var programAssembly = (from t in Assembly.GetEntryAssembly()!.GetTypes() // Can't be called from unmanaged code.
-                               where t.IsClass && t.Name == "Program"
-                               select t).FirstOrDefault();
+        var entryAsm = Assembly.GetEntryAssembly();
+        return entryAsm?.GetName()?.Version?.ToString() ?? "<unknown>";
+    });
 
-        if (programAssembly is null)
-            return _defaultVersion.ToString();
-
-        return GetVersion(programAssembly);
-    }
+    /// <summary>
+    /// Получить версию EntryPoint сборки.
+    /// </summary>
+    public static string GetEntryPointAssemblyVersion() => _entryAssemblyVersion.Value;
 }
