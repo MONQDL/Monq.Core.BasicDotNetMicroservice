@@ -5,9 +5,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Text.Json;
+using System.Text;
 using System.Threading;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -17,8 +18,34 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// </summary>
 public static class DbSchemaExtensions
 {
-    static readonly JsonSerializerOptions _intendedSerializerOptions =
-        new() { WriteIndented = true };
+    /// <summary>
+    /// Formats a collection of migration names as a JSON array string.
+    /// Example output for ["Migration1", "Migration2", "Migration3"]:
+    /// [
+    ///   "Migration1",
+    ///   "Migration2",
+    ///   "Migration3"
+    /// ]
+    /// </summary>
+    /// <param name="migrations">The collection of migration names to format</param>
+    /// <returns>A JSON-formatted string representation of the migrations array</returns>
+    static string FormatMigrationsAsJson(IEnumerable<string> migrations)
+    {
+        var migrationArray = migrations.ToArray();
+        if (migrationArray.Length == 0)
+            return "[]";
+
+        var result = new StringBuilder("[\n");
+        for (int i = 0; i < migrationArray.Length; i++)
+        {
+            result.Append($"  \"{migrationArray[i]}\"");
+            if (i < migrationArray.Length - 1)
+                result.Append(",");
+            result.Append("\n");
+        }
+        result.Append("]");
+        return result.ToString();
+    }
 
     /// <summary>
     /// Create schema on empty database or validate migrations if schema exists.
@@ -94,9 +121,9 @@ public static class DbSchemaExtensions
         if (diffMigrations.Any())
             throw new DbSchemaValidationException("Error during Database schema validation. " +
                 $"There are difference between applied migrations and service migrations.{Environment.NewLine}" +
-                $"Applied migrations: {JsonSerializer.Serialize(appliedMigrations, _intendedSerializerOptions)}{Environment.NewLine}" +
-                $"Service migrations: {JsonSerializer.Serialize(migrations, _intendedSerializerOptions)}{Environment.NewLine}" +
-                $"Difference: {JsonSerializer.Serialize(diffMigrations, _intendedSerializerOptions)}");
+                $"Applied migrations: {FormatMigrationsAsJson(appliedMigrations)}{Environment.NewLine}" +
+                $"Service migrations: {FormatMigrationsAsJson(migrations)}{Environment.NewLine}" +
+                $"Difference: {FormatMigrationsAsJson(diffMigrations)}");
     }
 
     /// <summary>
