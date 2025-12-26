@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -27,6 +28,7 @@ public static class DbSchemaExtensions
     /// <param name="terminateOnException">If true when the exception occurs the application will be terminated.</param>
     /// <param name="sleepBeforeTerminate">If true when <paramref name="terminateOnException"/> the main thread will sleep before terminate.</param>
     /// <param name="terminationSleepMilliseconds">The sleep interval when <paramref name="terminateOnException"/> is true and <paramref name="sleepBeforeTerminate"/> is true.</param>
+    [RequiresUnreferencedCode("Method uses IMigrator.Migrate that is incompatible with trimming.")]
     public static void CreateDbSchemaOnFirstRun<T>(this IApplicationBuilder app,
         bool terminateOnException = true,
         bool sleepBeforeTerminate = true,
@@ -65,6 +67,7 @@ public static class DbSchemaExtensions
         }
     }
 
+    [RequiresUnreferencedCode("IMigrator.Migrate is incompatible with trimming.")]
     static void InitializeSchema(DbContext context)
     {
         var migrator = context.Database.GetService<IMigrator>();
