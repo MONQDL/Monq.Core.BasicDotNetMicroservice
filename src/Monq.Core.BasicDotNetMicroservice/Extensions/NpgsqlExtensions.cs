@@ -5,6 +5,7 @@ using NpgsqlTypes;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -17,6 +18,15 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 /// </summary>
 public static class NpgsqlExtensions
 {
+    internal const DynamicallyAccessedMemberTypes NpgsqlDynamicallyAccessedMemberTypes =
+        DynamicallyAccessedMemberTypes.PublicConstructors
+        | DynamicallyAccessedMemberTypes.NonPublicConstructors
+        | DynamicallyAccessedMemberTypes.PublicProperties
+        | DynamicallyAccessedMemberTypes.PublicFields
+        | DynamicallyAccessedMemberTypes.NonPublicProperties
+        | DynamicallyAccessedMemberTypes.NonPublicFields
+        | DynamicallyAccessedMemberTypes.Interfaces;
+
     /// <summary>
     /// Import data in binary format.
     /// </summary>
@@ -32,7 +42,7 @@ public static class NpgsqlExtensions
     /// </param>
     /// <returns></returns>
     /// <exception cref="NotSupportedException"></exception>
-    public static async Task BinaryImport<T>(
+    public static async Task BinaryImport<[DynamicallyAccessedMembers(NpgsqlDynamicallyAccessedMemberTypes)] T>(
         this DbSet<T> dbSet,
         IEnumerable<T> entities,
         IEnumerable<string> columns,
@@ -83,7 +93,7 @@ public static class NpgsqlExtensions
     /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns></returns>
-    public static async Task InsertFromUnnest<T>(
+    public static async Task InsertFromUnnest<[DynamicallyAccessedMembers(NpgsqlDynamicallyAccessedMemberTypes)] T>(
         this DbSet<T> dbSet,
         IEnumerable<string> columns,
         object[] values,
@@ -104,10 +114,6 @@ public static class NpgsqlExtensions
             ";
         var query = FormattableStringFactory.Create(sql, values);
 
-#if NET7_0_OR_GREATER
         await database.ExecuteSqlAsync(query, cancellationToken);
-#else
-        await database.ExecuteSqlInterpolatedAsync(query, cancellationToken);
-#endif
     }
 }

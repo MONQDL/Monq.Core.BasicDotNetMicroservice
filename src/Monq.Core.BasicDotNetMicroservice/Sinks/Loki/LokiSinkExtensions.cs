@@ -7,6 +7,9 @@ using System;
 
 namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki;
 
+/// <summary>
+/// Serilog Loki extensions.
+/// </summary>
 public static class LokiSinkExtensions
 {
     internal const string DefaultTemplate = "{Message:lj}{NewLine}{Exception}";

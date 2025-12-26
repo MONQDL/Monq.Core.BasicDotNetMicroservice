@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Serilog.Context;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.Middleware;
@@ -37,7 +38,7 @@ public class TraceEventIdMiddleware
                 return Task.CompletedTask;
             }
 
-            context.Response.Headers.Add(MicroserviceConstants.EventIdHeader, traceEventId);
+            context.Response.Headers.TryAdd(MicroserviceConstants.EventIdHeader, traceEventId);
 
             return Task.CompletedTask;
         });
@@ -58,7 +59,7 @@ public class TraceEventIdMiddleware
         }
     }
 
-    bool ContextHasHeader(HttpContext context, string header, out string? value)
+    static bool ContextHasHeader(HttpContext context, string header, out string? value)
     {
         var result = context.Request.Headers.TryGetValue(header, out var val);
         if (result)

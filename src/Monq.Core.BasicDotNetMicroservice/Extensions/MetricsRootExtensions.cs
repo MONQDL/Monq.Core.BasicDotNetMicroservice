@@ -1,4 +1,4 @@
-﻿using App.Metrics;
+using App.Metrics;
 using System;
 using System.Threading.Tasks;
 
@@ -17,7 +17,7 @@ public static class MetricsRootExtensions
     static readonly MetricTags _failedTags = new("Action", "failed");
 
     /// <summary>
-    /// Increments by 1 count of recieved events.
+    /// Increments by 1 count of received events.
     /// </summary>
     /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
     /// <param name="item">Item identifier for a message handler.</param>
@@ -75,7 +75,7 @@ public static class MetricsRootExtensions
     }
 
     /// <summary>
-    /// Increments by 1 count of recieved tasks.
+    /// Increments by 1 count of received tasks.
     /// </summary>
     /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
     /// <param name="item">Item identifier for a message handler.</param>
@@ -134,7 +134,7 @@ public static class MetricsRootExtensions
     }
 
     /// <summary>
-    /// Increments by 1 count of taged events.
+    /// Increments by 1 count of tagged events.
     /// </summary>
     /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
     /// <param name="tags">The runtime tags to set in addition to those defined on the options, this will
@@ -147,7 +147,7 @@ public static class MetricsRootExtensions
     }
 
     /// <summary>
-    /// Increments by 1 count of taged tasks.
+    /// Increments by 1 count of tagged tasks.
     /// </summary>
     /// <param name="metrics">IMetricsRoot to extend the behavior.</param>
     /// <param name="tags">The runtime tags to set in addition to those defined on the options, this will

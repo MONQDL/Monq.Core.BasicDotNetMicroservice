@@ -1,6 +1,3 @@
-﻿#if NET5_0 || NET6_0
-using Dapper;
-#endif
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -8,25 +5,57 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Text.Json;
+using System.Text;
 using System.Threading;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
+/// <summary>
+/// Extension methods for Db Schema manipulations.
+/// </summary>
 public static class DbSchemaExtensions
 {
-    static readonly JsonSerializerOptions _intendedSerializerOptions =
-        new() { WriteIndented = true };
+    /// <summary>
+    /// Formats a collection of migration names as a JSON array string.
+    /// Example output for ["Migration1", "Migration2", "Migration3"]:
+    /// [
+    ///   "Migration1",
+    ///   "Migration2",
+    ///   "Migration3"
+    /// ]
+    /// </summary>
+    /// <param name="migrations">The collection of migration names to format</param>
+    /// <returns>A JSON-formatted string representation of the migrations array</returns>
+    static string FormatMigrationsAsJson(IEnumerable<string> migrations)
+    {
+        var migrationArray = migrations.ToArray();
+        if (migrationArray.Length == 0)
+            return "[]";
+
+        var result = new StringBuilder("[\n");
+        for (int i = 0; i < migrationArray.Length; i++)
+        {
+            result.Append($"  \"{migrationArray[i]}\"");
+            if (i < migrationArray.Length - 1)
+                result.Append(",");
+            result.Append("\n");
+        }
+        result.Append("]");
+        return result.ToString();
+    }
 
     /// <summary>
     /// Create schema on empty database or validate migrations if schema exists.
     /// </summary>
     /// <typeparam name="T">The concrete database context.</typeparam>
     /// <param name="app">The <see cref="IApplicationBuilder"/> object.</param>
-    /// <param name="terminateOnException">If true when the exeption eccures the application will be terminated.</param>
+    /// <param name="terminateOnException">If true when the exception occurs the application will be terminated.</param>
     /// <param name="sleepBeforeTerminate">If true when <paramref name="terminateOnException"/> the main thread will sleep before terminate.</param>
     /// <param name="terminationSleepMilliseconds">The sleep interval when <paramref name="terminateOnException"/> is true and <paramref name="sleepBeforeTerminate"/> is true.</param>
+    [RequiresUnreferencedCode("Method uses IMigrator.Migrate that is incompatible with trimming.")]
     public static void CreateDbSchemaOnFirstRun<T>(this IApplicationBuilder app,
         bool terminateOnException = true,
         bool sleepBeforeTerminate = true,
@@ -37,7 +66,7 @@ public static class DbSchemaExtensions
         var services = scope.ServiceProvider;
         var factory = services.GetRequiredService<ILoggerFactory>();
         var logger = factory.CreateLogger("DbInitializer");
-        bool exceptionOccurred = false;
+        var exceptionOccurred = false;
         try
         {
             var context = services.GetRequiredService<T>();
@@ -65,6 +94,7 @@ public static class DbSchemaExtensions
         }
     }
 
+    [RequiresUnreferencedCode("IMigrator.Migrate is incompatible with trimming.")]
     static void InitializeSchema(DbContext context)
     {
         var migrator = context.Database.GetService<IMigrator>();
@@ -78,19 +108,8 @@ public static class DbSchemaExtensions
                     FROM information_schema.tables 
                 WHERE table_schema NOT IN ('pg_catalog', 'information_schema') and table_type = 'BASE TABLE'
                 ";
-#if NET7_0_OR_GREATER
         var creatorContext = context.Database.SqlQueryRaw<bool>(sql);
         return creatorContext.First<bool>();
-#else
-        var connection = context.Database.GetDbConnection();// Using is not required here.
-                                                            // The connection lifetime is managed by EF.
-        context.Database.OpenConnection();
-
-        return
-            connection
-                .Query<bool>(sql)
-                .First();
-#endif
     }
 
     static void CheckMigrationsHistory(DbContext context)
@@ -102,11 +121,14 @@ public static class DbSchemaExtensions
         if (diffMigrations.Any())
             throw new DbSchemaValidationException("Error during Database schema validation. " +
                 $"There are difference between applied migrations and service migrations.{Environment.NewLine}" +
-                $"Applied migrations: {JsonSerializer.Serialize(appliedMigrations, _intendedSerializerOptions)}{Environment.NewLine}" +
-                $"Service migrations: {JsonSerializer.Serialize(migrations, _intendedSerializerOptions)}{Environment.NewLine}" +
-                $"Difference: {JsonSerializer.Serialize(diffMigrations, _intendedSerializerOptions)}");
+                $"Applied migrations: {FormatMigrationsAsJson(appliedMigrations)}{Environment.NewLine}" +
+                $"Service migrations: {FormatMigrationsAsJson(migrations)}{Environment.NewLine}" +
+                $"Difference: {FormatMigrationsAsJson(diffMigrations)}");
     }
 
+    /// <summary>
+    /// Exception throws on Database schema validation error.
+    /// </summary>
     public class DbSchemaValidationException : Exception
     {
         /// <summary>Initializes a new instance of the <see cref="DbSchemaValidationException" /> class with a specified error message.</summary>

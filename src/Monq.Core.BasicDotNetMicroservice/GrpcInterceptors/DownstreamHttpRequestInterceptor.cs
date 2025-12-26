@@ -1,4 +1,4 @@
-﻿using Grpc.Core;
+using Grpc.Core;
 using Grpc.Core.Interceptors;
 using System.Net;
 using System.Text.Json.Nodes;
@@ -24,7 +24,7 @@ public class DownstreamHttpRequestInterceptor : Interceptor
         }
         catch (Monq.Core.HttpClientExtensions.Exceptions.ResponseException e)
         {
-            StatusCode statusCode = e.StatusCode switch
+            var statusCode = e.StatusCode switch
             {
                 HttpStatusCode.BadRequest => StatusCode.FailedPrecondition,
                 HttpStatusCode.NotFound => StatusCode.NotFound,

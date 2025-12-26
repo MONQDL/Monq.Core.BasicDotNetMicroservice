@@ -1,5 +1,6 @@
 using Mapster;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 
@@ -17,7 +18,11 @@ public static class MapsterExtensions
     /// <typeparam name="TSource">Type of the source object.</typeparam>
     /// <typeparam name="TDestination">Type of the destination object.</typeparam>
     /// <returns></returns>
-    public static TypeAdapterSetter<TSource, TDestination> IgnoreNullStrings<TSource, TDestination>(
+    public static TypeAdapterSetter<TSource, TDestination> IgnoreNullStrings<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]
+    TSource,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]
+    TDestination>(
         this TypeAdapterSetter<TSource, TDestination> setter)
     {
         var destType = typeof(TDestination);

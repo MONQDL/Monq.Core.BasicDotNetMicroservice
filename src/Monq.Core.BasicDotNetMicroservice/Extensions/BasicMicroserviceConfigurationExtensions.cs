@@ -2,16 +2,17 @@ using App.Metrics;
 using App.Metrics.AspNetCore;
 using App.Metrics.Formatters.Prometheus;
 using Consul;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
-using Monq.Core.BasicDotNetMicroservice.Filters;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
-using Monq.Core.BasicDotNetMicroservice.Models;
 using Monq.Core.HttpClientExtensions;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
@@ -31,9 +32,10 @@ public static class BasicMicroserviceConfigurationExtensions
     /// <param name="hostBuilder">The host builder.</param>
     /// <param name="consulConfigurationOptions">The configuration options.</param>
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
+    [RequiresUnreferencedCode("Method uses ConfigureBasicMicroserviceCore which is incompatible with trimming.")]
     public static IHostBuilder ConfigureBasicMicroservice(
         this IHostBuilder hostBuilder,
-        ConsulConfigurationOptions? consulConfigurationOptions = null)
+        Configuration.ConsulConfigurationOptions? consulConfigurationOptions = null)
     {
         hostBuilder.ConfigureBasicMicroserviceCore(consulConfigurationOptions);
         hostBuilder.ConfigureAuthorizationPolicies();
@@ -46,9 +48,10 @@ public static class BasicMicroserviceConfigurationExtensions
     /// <param name="hostBuilder">The host builder.</param>
     /// <param name="consulConfigurationOptions">The configuration options.</param>
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
+    [RequiresUnreferencedCode("Method uses ConfigureBasicMicroserviceCore which is incompatible with trimming.")]
     public static IHostBuilder ConfigureBasicConsoleMicroservice(
         this IHostBuilder hostBuilder,
-        ConsulConfigurationOptions? consulConfigurationOptions = null)
+        Configuration.ConsulConfigurationOptions? consulConfigurationOptions = null)
     {
         hostBuilder.ConfigureHostConfiguration(config =>
             config.AddEnvironmentVariables(prefix: "ASPNETCORE_"));
@@ -66,7 +69,8 @@ public static class BasicMicroserviceConfigurationExtensions
     /// <param name="hostBuilder">The host builder.</param>
     /// <param name="configOptions">The configuration options.</param>
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
-    public static IHostBuilder ConfigureConsul(this IHostBuilder hostBuilder, ConsulConfigurationOptions? configOptions = null)
+    [RequiresUnreferencedCode("Method uses ConfigureConsul which is incompatible with trimming.")]
+    public static IHostBuilder ConfigureConsul(this IHostBuilder hostBuilder, Configuration.ConsulConfigurationOptions? configOptions = null)
     {
         hostBuilder.ConfigureAppConfiguration((hostContext, config) =>
             ConfigureConsul(hostContext.Configuration, config, configOptions, hostContext.HostingEnvironment));
@@ -80,10 +84,11 @@ public static class BasicMicroserviceConfigurationExtensions
     /// <param name="environment">The environment.</param>
     /// <param name="configOptions">The configuration options.</param>
     /// <returns>The same <see cref="IConfigurationBuilder"/> for chaining.</returns>
+    [RequiresUnreferencedCode("Method uses ConfigureConsul which is incompatible with trimming.")]
     public static IConfigurationBuilder ConfigureConsul(
         this IConfigurationBuilder configBuilder,
         IHostEnvironment environment,
-        ConsulConfigurationOptions? configOptions = null)
+        Configuration.ConsulConfigurationOptions? configOptions = null)
     {
         ConfigureConsul(configBuilder.Build(), configBuilder, configOptions, environment);
         return configBuilder;
@@ -103,13 +108,15 @@ public static class BasicMicroserviceConfigurationExtensions
     /// <summary>
     /// Configure the access point to the microservice version info /api/version.
     /// </summary>
-    /// <param name="hostBuilder">The host builder.</param>
-    /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
-    public static IHostBuilder UseVersionApiPoint(this IHostBuilder hostBuilder)
-    {
-        hostBuilder.ConfigureServices(services => services.AddSingleton<IStartupFilter, VersionPointStartupFilter>());
-        return hostBuilder;
-    }
+    /// <param name="app"></param>
+    /// <param name="anyEndpointType">Any type in startup assembly. Example: typeof(Program)</param>
+    [RequiresUnreferencedCode("Method uses minimal api MapGet which is incompatible with trimming.")]
+    public static void MapApiVersion(this WebApplication app, Type anyEndpointType) =>
+        app.MapGet("/api/version", () =>
+        {
+            var version = MicroserviceVersionInfo.GetVersion(anyEndpointType);
+            return Results.Text($$"""{"version": "{{version}}"}""", "application/json");
+        });
 
     /// <summary>
     /// Configure authorization policies.
@@ -118,31 +125,14 @@ public static class BasicMicroserviceConfigurationExtensions
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
     public static IHostBuilder ConfigureAuthorizationPolicies(this IHostBuilder hostBuilder)
     {
-#if NET7_0_OR_GREATER
         hostBuilder
             .ConfigureServices(services
                 => services.AddAuthorizationBuilder()
                     .AddPolicy("Authenticated", policy => policy.RequireAuthenticatedUser())
-                    .AddPolicy(AuthConstants.AuthorizationScopes.Read, policyAdmin => policyAdmin.RequireScope("read", "write"))
-                    .AddPolicy(AuthConstants.AuthorizationScopes.Write, policyAdmin => policyAdmin.RequireScope("write"))
-                    .AddPolicy(AuthConstants.AuthorizationScopes.SmonAdmin, policyAdmin => policyAdmin.RequireScope("smon-admin"))
-                    .AddPolicy(AuthConstants.AuthorizationScopes.CloudAdmin, policyAdmin => policyAdmin.RequireScope("cloud-admin")));
+                    .AddPolicy(AuthConstants.AuthorizationScopes.Read, policyAdmin => policyAdmin.RequireScope(AuthConstants.AuthorizationScopes.Read, AuthConstants.AuthorizationScopes.Write))
+                    .AddPolicy(AuthConstants.AuthorizationScopes.Write, policyAdmin => policyAdmin.RequireScope(AuthConstants.AuthorizationScopes.Write)));
+
         return hostBuilder;
-#else
-            hostBuilder
-                .ConfigureServices(services =>
-                {
-                    services.AddAuthorization(options =>
-                    {
-                        options.AddPolicy("Authenticated", policy => policy.RequireAuthenticatedUser());
-                        options.AddPolicy(AuthConstants.AuthorizationScopes.Read, policyAdmin => policyAdmin.RequireScope("read", "write"));
-                        options.AddPolicy(AuthConstants.AuthorizationScopes.Write, policyAdmin => policyAdmin.RequireScope("write"));
-                        options.AddPolicy(AuthConstants.AuthorizationScopes.SmonAdmin, policyAdmin => policyAdmin.RequireScope("smon-admin"));
-                        options.AddPolicy(AuthConstants.AuthorizationScopes.CloudAdmin, policyAdmin => policyAdmin.RequireScope("cloud-admin"));
-                    });
-                });
-            return hostBuilder;
-#endif
     }
 
     /// <summary>
@@ -150,6 +140,7 @@ public static class BasicMicroserviceConfigurationExtensions
     /// </summary>
     /// <param name="hostBuilder">The host builder.</param>
     /// <returns>The same <see cref="IWebHostBuilder"/> for chaining.</returns>
+    [RequiresUnreferencedCode("Calls IConfiguration.Bind is incompatible with trimming.")]
     public static IWebHostBuilder ConfigureMetricsAndHealth(this IWebHostBuilder hostBuilder)
     {
         hostBuilder
@@ -160,6 +151,7 @@ public static class BasicMicroserviceConfigurationExtensions
 
                 var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
                 var metricsOptions = new MetricsConfigurationOptions();
+                // TODO: Use source generator after net7 drop.
                 metricsConfig.Bind(metricsOptions);
 
                 if (metricsOptions.ReportingInfluxDb.InfluxDb.BaseUri != null)
@@ -204,7 +196,11 @@ public static class BasicMicroserviceConfigurationExtensions
                 store.Open(OpenFlags.ReadWrite);
                 try
                 {
+#if NET9_0_OR_GREATER
+                    var certificate = X509CertificateLoader.LoadCertificateFromFile(cerFileName);
+#else
                     var certificate = new X509Certificate2(cerFileName);
+#endif
                     store.Add(certificate); //where cert is an X509Certificate object
                     Console.WriteLine($"Successfully installed {cerFileName}");
                 }
@@ -218,14 +214,14 @@ public static class BasicMicroserviceConfigurationExtensions
         return hostBuilder;
     }
 
+    [RequiresUnreferencedCode("Calls IConfiguration.Configure is incompatible with trimming.")]
     static IHostBuilder ConfigureBasicMicroserviceCore(
         this IHostBuilder hostBuilder,
-        ConsulConfigurationOptions? consulConfigurationOptions = null)
+        Configuration.ConsulConfigurationOptions? consulConfigurationOptions = null)
     {
         hostBuilder.ConfigureCustomCertificates();
         hostBuilder.ConfigureConsul(consulConfigurationOptions);
         hostBuilder.ConfigureSerilogLogging();
-        hostBuilder.UseVersionApiPoint();
         hostBuilder.ConfigBasicHttpService(opts =>
         {
             var headerOptions = new RestHttpClientHeaderOptions();
@@ -241,16 +237,18 @@ public static class BasicMicroserviceConfigurationExtensions
             services.AddHttpContextAccessor();
             services.AddOptions();
             services.AddDistributedMemoryCache();
+            // TODO: Use source generator after net7 drop.
             services.Configure<AppConfiguration>(context.Configuration);
         });
 
         return hostBuilder;
     }
 
+    [RequiresUnreferencedCode("Calls IConfiguration.Bind is incompatible with trimming.")]
     static void ConfigureConsul(
         this IConfiguration configuration,
         IConfigurationBuilder configBuilder,
-        ConsulConfigurationOptions? configOptions,
+        Configuration.ConsulConfigurationOptions? configOptions,
         IHostEnvironment env)
     {
         // Применяем переменную APPLICATION_NAME из переменных среды,
@@ -259,7 +257,7 @@ public static class BasicMicroserviceConfigurationExtensions
         if (!string.IsNullOrEmpty(configuration[ApplicationNameEnv]))
             applicationName = configuration[ApplicationNameEnv];
 
-        configOptions ??= new ConsulConfigurationOptions();
+        configOptions ??= new Configuration.ConsulConfigurationOptions();
 
         // Если находимся в DEV, то используем appsettings.development.json
         if (env.IsDevelopment())
@@ -270,8 +268,9 @@ public static class BasicMicroserviceConfigurationExtensions
         if (!File.Exists(ConsulConfigFileDefault) && !string.IsNullOrEmpty(configuration[ConsulConfigFileEnv]))
         {
             Console.WriteLine("Consul connection file detected by environment variable.");
-            consulConfigFile = configuration[ConsulConfigFileEnv];
+            consulConfigFile = configuration[ConsulConfigFileEnv] ?? ConsulConfigFileDefault;
         }
+
         configBuilder.AddJsonFile(consulConfigFile, optional: false, reloadOnChange: false);
 
         var consulClientConfiguration = new ConsulClientConfiguration();
@@ -285,9 +284,10 @@ public static class BasicMicroserviceConfigurationExtensions
         if (string.IsNullOrEmpty(consulConfig[ConsulConfigFileSectionName + ":Address"]))
             throw new ConsulConfigurationException($"Failed to load Consul server address from {consulConfigFile}. The wrong data format may have been used.");
 
-        var consulRoot = env.EnvironmentName?.ToLower();
-        if (!string.IsNullOrEmpty(consulConfig[ConsulConfigFileSectionName + ":RootFolder"]))
-            consulRoot = consulConfig[ConsulConfigFileSectionName + ":RootFolder"].ToLower();
+        var consulEnv = env.EnvironmentName?.ToLower();
+        var consulRoot = consulConfig[ConsulConfigFileSectionName + ":RootFolder"];
+        if (!string.IsNullOrEmpty(consulRoot))
+            consulEnv = consulRoot.ToLowerInvariant();
 
         consulConfig
             .GetSection(ConsulConfigFileSectionName)
@@ -300,13 +300,13 @@ public static class BasicMicroserviceConfigurationExtensions
             var commonAppsettingsFileName = string.IsNullOrEmpty(configOptions.CommonAppsettingsFileName) ? CommonAppsettingsFile : configOptions.CommonAppsettingsFileName;
             configBuilder
                 .AddConsul(
-                    $"{consulRoot}/{commonAppsettingsFileName}",
+                    $"{consulEnv}/{commonAppsettingsFileName}",
                     options => ConfigureConsulOptions(options, consulClientConfiguration));
         }
         // Включение конфигурации для микросервиса.
         configBuilder
             .AddConsul(
-                $"{consulRoot}/{applicationName?.ToLower()}/{appsettingsFileName}",
+                $"{consulEnv}/{applicationName?.ToLower()}/{appsettingsFileName}",
                 options => ConfigureConsulOptions(options, consulClientConfiguration));
     }
 
@@ -328,6 +328,7 @@ public static class BasicMicroserviceConfigurationExtensions
     /// </summary>
     /// <param name="hostBuilder">The host builder.</param>
     /// <returns></returns>
+    [RequiresUnreferencedCode("Calls IConfiguration.Bind is incompatible with trimming.")]
     static IWebHostBuilder UseSystemMetrics(this IWebHostBuilder hostBuilder)
     {
         hostBuilder
@@ -335,6 +336,7 @@ public static class BasicMicroserviceConfigurationExtensions
             {
                 var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
                 var metricsOptions = new MetricsConfigurationOptions();
+                // TODO: Use source generator after net7 drop.
                 metricsConfig.Bind(metricsOptions);
 
                 if (metricsOptions.AddSystemMetrics)

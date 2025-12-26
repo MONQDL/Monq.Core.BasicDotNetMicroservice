@@ -15,11 +15,11 @@ using Monq.Core.BasicDotNetMicroservice.Services.Implementation;
 using Monq.Core.BasicDotNetMicroservice.Validation;
 using Monq.Core.HttpClientExtensions;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
-using static Grpc.Core.Interceptors.Interceptor;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
@@ -65,6 +65,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services">IServiceCollection to add the services to.</param>
     /// <param name="hostContext">Context containing the common services on the IHost.</param>
     /// <returns><see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
+    [RequiresUnreferencedCode("Calls IConfiguration.Bind is incompatible with trimming.")]
     public static IServiceCollection AddConsoleMetrics(this IServiceCollection services, HostBuilderContext hostContext)
     {
         var metricsBuilder = AppMetrics.CreateDefaultBuilder()
@@ -77,6 +78,7 @@ public static class ServiceCollectionExtensions
 
         var metricsConfig = hostContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
         var metricsOptions = new MetricsConfigurationOptions();
+        // TODO: Use source generator after net7 drop.
         metricsConfig.Bind(metricsOptions);
 
         metricsBuilder.AddInfluxDb(metricsOptions.ReportingInfluxDb);
@@ -154,10 +156,7 @@ public static class ServiceCollectionExtensions
     /// <returns><see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
     public static IServiceCollection AddGrpcRequestValidation(this IServiceCollection services)
     {
-        services.AddGrpc(options =>
-        {
-            options.EnableMessageValidation();
-        });
+        services.AddGrpc(options => options.EnableMessageValidation());
 
         services.AddSingleton<IValidatorErrorMessageHandler>(new DefaultValidatorMessageHandler());
         services.AddGrpcValidation();
@@ -165,22 +164,25 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    static readonly Action<GrpcClientOptions, IConfiguration> _configureGrpcClient = (o, configuration) =>
+    [RequiresUnreferencedCode(
+            "Uses IConfiguration.GetValue<T>() which internally relies on reflection is incompatible with trimming.")]
+    static void ConfigureGrpcClient(
+            GrpcClientOptions options,
+            IConfiguration configuration)
     {
-        o.ClientOptionsAction = (clientOptions) =>
-        {
-            clientOptions.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)) ?? "http://localhost");
-        };
-        o.ChannelOptionsAction = (channelOptions) =>
+        // Логика из лямбды
+        options.ClientOptionsAction = clientOptions =>
+            clientOptions.Address = new Uri(
+                configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
+                ?? throw new Exception("Grpc BaseUri not found at configuration."));
+        options.ChannelOptionsAction = channelOptions =>
         {
             channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
-            channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 Mb.
+            channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 Mb
         };
-        o.ContextPropagationOptionsAction = (propagationOptions) =>
-        {
+        options.ContextPropagationOptionsAction = propagationOptions =>
             propagationOptions.SuppressContextNotFoundErrors = true;
-        };
-    };
+    }
 
     /// <summary>
     /// Add preconfigured gRPC client with configured address, channel options, call credentials and context propagation.
@@ -191,6 +193,8 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
     /// <param name="configureOptions">A delegate that is used to configure a <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+    [RequiresUnreferencedCode(
+            "Uses ConfigureGrpcClient which internally relies on reflection is incompatible with trimming.")]
     public static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -198,7 +202,7 @@ public static class ServiceCollectionExtensions
         where TClient : class
     {
         var options = new GrpcClientOptions();
-        _configureGrpcClient(options, configuration);
+        ConfigureGrpcClient(options, configuration);
         configureOptions?.Invoke(options);
 
         return services.AddGrpcPreConfiguredClient<TClient>(options);
@@ -213,6 +217,8 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
     /// <param name="configureOptions">A delegate that is used to configure a <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+    [RequiresUnreferencedCode(
+            "Uses ConfigureGrpcClient which internally relies on reflection is incompatible with trimming.")]
     public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -220,7 +226,7 @@ public static class ServiceCollectionExtensions
         where TClient : class
     {
         var options = new GrpcClientOptions();
-        _configureGrpcClient(options, configuration);
+        ConfigureGrpcClient(options, configuration);
         configureOptions?.Invoke(options);
 
         return services.AddGrpcPreConfiguredConsoleClient<TClient>(options);
@@ -234,7 +240,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The <see cref="IServiceCollection"/>.</param>
     /// <param name="options">The <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(
+    static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         GrpcClientOptions? options = null)
         where TClient : class
@@ -247,9 +253,9 @@ public static class ServiceCollectionExtensions
             .AddCallCredentials((context, metadata, provider) =>
             {
                 var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
-                if (httpContext.HttpContext.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token)
+                if (httpContext.HttpContext?.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) == true
                     && !string.IsNullOrEmpty(token))
-                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token);
+                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token!);
 
                 return Task.CompletedTask;
             });
@@ -263,7 +269,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The <see cref="IServiceCollection"/>.</param>
     /// <param name="options">The <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(
+    static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         GrpcClientOptions? options = null)
         where TClient : class
@@ -279,10 +285,10 @@ public static class ServiceCollectionExtensions
             .AddCallCredentials(async (context, metadata, provider) =>
             {
                 var httpContextAccessor = provider.GetService<IHttpContextAccessor>();
-                if (httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) == true
+                if (httpContextAccessor?.HttpContext?.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) == true
                     && !string.IsNullOrEmpty(token))
                 {
-                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token);
+                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token!);
                 }
                 else
                 {
@@ -301,10 +307,17 @@ public static class ServiceCollectionExtensions
             });
     }
 
+    /// <summary>
+    /// Grpc interceptor that adds additional metadata from http headers.
+    /// </summary>
     public class AdditionalHeadersInterceptor : Interceptor
     {
         readonly IHttpContextAccessor _httpContextAccessor;
 
+        /// <summary>
+        /// Creates new object of <see cref="AdditionalHeadersInterceptor"/>.
+        /// </summary>
+        /// <param name="httpContextAccessor">HttpContextAccessor</param>
         public AdditionalHeadersInterceptor(IHttpContextAccessor httpContextAccessor)
         {
             _httpContextAccessor = httpContextAccessor;
@@ -316,7 +329,7 @@ public static class ServiceCollectionExtensions
             ClientInterceptorContext<TRequest, TResponse> context,
             AsyncServerStreamingCallContinuation<TRequest, TResponse> continuation)
         {
-            var newContext = CreateModifiedIntercaptorContext(context);
+            var newContext = CreateModifiedInterceptorContext(context);
 
             return base.AsyncServerStreamingCall(request, newContext, continuation);
         }
@@ -326,7 +339,7 @@ public static class ServiceCollectionExtensions
             ClientInterceptorContext<TRequest, TResponse> context,
             AsyncClientStreamingCallContinuation<TRequest, TResponse> continuation)
         {
-            var newContext = CreateModifiedIntercaptorContext(context);
+            var newContext = CreateModifiedInterceptorContext(context);
 
             return base.AsyncClientStreamingCall(newContext, continuation);
         }
@@ -336,7 +349,7 @@ public static class ServiceCollectionExtensions
             ClientInterceptorContext<TRequest, TResponse> context,
             AsyncDuplexStreamingCallContinuation<TRequest, TResponse> continuation)
         {
-            var newContext = CreateModifiedIntercaptorContext(context);
+            var newContext = CreateModifiedInterceptorContext(context);
 
             return base.AsyncDuplexStreamingCall(newContext, continuation);
         }
@@ -347,7 +360,7 @@ public static class ServiceCollectionExtensions
             ClientInterceptorContext<TRequest, TResponse> context,
             AsyncUnaryCallContinuation<TRequest, TResponse> continuation)
         {
-            var newContext = CreateModifiedIntercaptorContext(context);
+            var newContext = CreateModifiedInterceptorContext(context);
 
             return base.AsyncUnaryCall(request, newContext, continuation);
         }
@@ -355,12 +368,12 @@ public static class ServiceCollectionExtensions
         /// <inheritdoc />
         public override TResponse BlockingUnaryCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, BlockingUnaryCallContinuation<TRequest, TResponse> continuation)
         {
-            var newContext = CreateModifiedIntercaptorContext(context);
+            var newContext = CreateModifiedInterceptorContext(context);
 
             return base.BlockingUnaryCall(request, newContext, continuation);
         }
 
-        ClientInterceptorContext<TRequest, TResponse> CreateModifiedIntercaptorContext<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context)
+        ClientInterceptorContext<TRequest, TResponse> CreateModifiedInterceptorContext<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context)
             where TRequest : class
             where TResponse : class
         {
@@ -369,15 +382,15 @@ public static class ServiceCollectionExtensions
                 foreach (var header in context.Options.Headers)
                     headers.Add(header);
 
-            if (!headers.Any(x => x.Key.ToLowerInvariant() == MicroserviceConstants.UserspaceIdHeader.ToLowerInvariant())
+            if (!headers.Any(x => x.Key.Equals(MicroserviceConstants.UserspaceIdHeader, StringComparison.OrdinalIgnoreCase))
                     && _httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId) == true
                     && !string.IsNullOrEmpty(userspaceId))
-                headers.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId);
+                headers.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId!);
 
-            if (!headers.Any(x => x.Key.ToLowerInvariant() == MicroserviceConstants.CultureHeader.ToLowerInvariant())
+            if (!headers.Any(x => x.Key.Equals(MicroserviceConstants.CultureHeader, StringComparison.OrdinalIgnoreCase))
                 && _httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.CultureHeader, out var culture) == true
                 && !string.IsNullOrEmpty(culture))
-                headers.Add(MicroserviceConstants.CultureHeader, culture);
+                headers.Add(MicroserviceConstants.CultureHeader, culture!);
 
             var newOptions = context.Options.WithHeaders(headers);
 
@@ -397,22 +410,16 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The <see cref="IServiceCollection"/>.</param>
     /// <param name="options">The <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    static IHttpClientBuilder AddGrpcClient<TClient>(
+    static IHttpClientBuilder AddGrpcClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         GrpcClientOptions? options = null)
         where TClient : class
     {
         IHttpClientBuilder builder;
         if (string.IsNullOrWhiteSpace(options?.Name))
-            builder = services.AddGrpcClient<TClient>(o =>
-            {
-                options?.ClientOptionsAction?.Invoke(o);
-            });
+            builder = services.AddGrpcClient<TClient>(o => options?.ClientOptionsAction?.Invoke(o));
         else
-            builder = services.AddGrpcClient<TClient>(options.Name, o =>
-            {
-                options?.ClientOptionsAction?.Invoke(o);
-            });
+            builder = services.AddGrpcClient<TClient>(options.Name, o => options?.ClientOptionsAction?.Invoke(o));
 
         if (options?.ChannelOptionsAction != null)
             builder = builder.ConfigureChannel(options.ChannelOptionsAction);
