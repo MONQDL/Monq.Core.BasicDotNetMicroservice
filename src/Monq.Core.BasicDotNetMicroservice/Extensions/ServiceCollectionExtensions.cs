@@ -250,13 +250,12 @@ public static class ServiceCollectionExtensions
         where TClient : class
         where TImplementation : RestHttpClient, TClient
     {
-        var baseUri = new Uri(
-            configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
-            ?? throw new Exception("BaseUri not found at configuration."));
+        var baseUri = configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
+            ?? throw new Exception("BaseUri not found at configuration.");
         var httpClientBuilder = services.AddHttpClient<TClient, TImplementation>(
             client =>
             {
-                client.BaseAddress = baseUri;
+                client.BaseAddress = new Uri(AddTrailingSlash(baseUri));
 
                 // To reuse the HttpClient instance, we will use the cancellation token to manage timeouts.
                 // To do this, you need to set the main timeout to the maximum value,
@@ -266,6 +265,14 @@ public static class ServiceCollectionExtensions
             });
 
         return httpClientBuilder;
+    }
+
+    static string AddTrailingSlash(string baseUri)
+    {
+        if (baseUri.Last() != '/')
+            return baseUri + "/";
+
+        return baseUri;
     }
 
     /// <summary>
