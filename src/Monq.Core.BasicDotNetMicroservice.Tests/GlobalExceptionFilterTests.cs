@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Logging;
@@ -10,7 +10,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Tests;
 
 public class GlobalExceptionFilterTests
 {
-    GlobalExceptionFilter CreateFilter(GlobalExceptionBuilderStorage storage) => new GlobalExceptionFilter(new LoggerFactory(), storage);
+    static GlobalExceptionFilter CreateFilter(GlobalExceptionBuilderStorage storage)
+        => new(new LoggerFactory(), storage);
 
     [Fact(DisplayName = "Проверка правильности выполнения обработчиков исключений.")]
     public void ShouldProperlyExecuteExceptionHandlers()
@@ -27,7 +28,7 @@ public class GlobalExceptionFilterTests
             RouteData = new Microsoft.AspNetCore.Routing.RouteData(),
             ActionDescriptor = new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor()
         };
-        var exceptionContext = new ExceptionContext(actionContext, new List<IFilterMetadata>() { filter })
+        var exceptionContext = new ExceptionContext(actionContext, [filter])
         {
             Exception = new ArgumentNullException("val", "argument is null")
         };

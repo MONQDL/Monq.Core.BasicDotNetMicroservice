@@ -56,7 +56,7 @@ public static class LokiSinkExtensions
 
         var labelProvider = logLabelProvider ?? new DefaultLogLabelProvider();
         var batchFormatter = new LokiBatchFormatter(labelProvider);
-        var textFormatter = new LokiTextFormatter(labelProvider, 
+        var textFormatter = new LokiTextFormatter(labelProvider,
             new MessageTemplateTextFormatter(outputTemplate, formatProvider));
 
         httpClient ??= new DefaultLokiHttpClient();

@@ -1,12 +1,10 @@
 using Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Labels;
 using Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Models;
-using Serilog.Events;
 using Serilog.Sinks.Http;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 

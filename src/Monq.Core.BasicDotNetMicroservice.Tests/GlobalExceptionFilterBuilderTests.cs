@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
 using Xunit;
@@ -15,7 +15,8 @@ public class GlobalExceptionFilterBuilderTests
         _services.AddSingleton<GlobalExceptionBuilderStorage>();
     }
 
-    GlobalExceptionFilterBuilder CreateBuilder(GlobalExceptionBuilderStorage builder) => new GlobalExceptionFilterBuilder(_services, builder);
+    GlobalExceptionFilterBuilder CreateBuilder(GlobalExceptionBuilderStorage builder)
+        => new(_services, builder);
 
     [Fact(DisplayName = "Проверить правильность добавления обработчиков по умолчанию.")]
     public void ShouldProperlyAddDefaultExceptionFilters()
@@ -23,7 +24,7 @@ public class GlobalExceptionFilterBuilderTests
         var storage = new GlobalExceptionBuilderStorage();
         var builder = CreateBuilder(storage);
 
-        Assert.Equal(0, storage.ExceptionHandlers.Count);
+        Assert.Empty(storage.ExceptionHandlers);
 
         builder.AddDefaultExceptionHandlers();
 
@@ -36,10 +37,10 @@ public class GlobalExceptionFilterBuilderTests
         var storage = new GlobalExceptionBuilderStorage();
         var builder = CreateBuilder(storage);
 
-        Assert.Equal(0, storage.ExceptionHandlers.Count);
+        Assert.Empty(storage.ExceptionHandlers);
 
         builder.AddExceptionHandler<ArgumentNullException>(x => new ObjectResult(x.Message));
 
-        Assert.Equal(1, storage.ExceptionHandlers.Count);
+        Assert.Single(storage.ExceptionHandlers);
     }
 }

@@ -18,6 +18,7 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
 
@@ -34,7 +35,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services"><see cref="IServiceCollection"/> to add the services to.</param>
     /// <param name="configuration">The configuration being bound.</param>
     /// <returns><see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
-    public static IServiceCollection ConfigureSMAuthentication(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection ConfigureMonqAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
         var authConfig = configuration.GetSection("Authentication");
 
@@ -167,14 +168,14 @@ public static class ServiceCollectionExtensions
     [RequiresUnreferencedCode(
             "Uses IConfiguration.GetValue<T>() which internally relies on reflection is incompatible with trimming.")]
     static void ConfigureGrpcClient(
-            GrpcClientOptions options,
-            IConfiguration configuration)
+        GrpcClientOptions options,
+        IConfiguration configuration)
     {
         // Логика из лямбды
         options.ClientOptionsAction = clientOptions =>
             clientOptions.Address = new Uri(
                 configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
-                ?? throw new Exception("Grpc BaseUri not found at configuration."));
+                ?? throw new Exception("BaseUri not found at configuration."));
         options.ChannelOptionsAction = channelOptions =>
         {
             channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
@@ -230,6 +231,43 @@ public static class ServiceCollectionExtensions
         configureOptions?.Invoke(options);
 
         return services.AddGrpcPreConfiguredConsoleClient<TClient>(options);
+    }
+
+    /// <summary>
+    /// Add preconfigured REST HTTP client (<see cref="RestHttpClient"/>) with configured address, timeout, authentication and header forwarding.
+    /// </summary>
+    /// <typeparam name="TClient"> The type of the typed client interface.</typeparam>
+    /// <typeparam name="TImplementation"> The implementation type of the typed client and <see cref="RestHttpClient"/>.</typeparam>
+    /// <param name="services">The <see cref="IServiceCollection"/>.</param>
+    /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
+    /// <param name="configureHttpClient">A delegate that is used to configure underlying <see cref="HttpClient"/>.</param>
+    /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+    [RequiresUnreferencedCode("Uses AddHttpClient which internally relies on reflection is incompatible with trimming.")]
+    public static IHttpClientBuilder AddRestHttpPreConfiguredClient<TClient, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        Action<HttpClient>? configureHttpClient = null)
+        where TClient : class
+        where TImplementation : RestHttpClient, TClient
+    {
+        var baseUri = new Uri(
+            configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
+            ?? throw new Exception("BaseUri not found at configuration."));
+        var httpClientBuilder = services.AddHttpClient<TClient, TImplementation>(
+            client =>
+            {
+                client.BaseAddress = baseUri;
+
+                // To reuse the HttpClient instance, we will use the cancellation token to manage timeouts.
+                // To do this, you need to set the main timeout to the maximum value,
+                // because it will override the value specified in the cancellation token.
+                client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+                configureHttpClient?.Invoke(client);
+
+                client.AddTrailingSlash();
+            });
+
+        return httpClientBuilder;
     }
 
     /// <summary>

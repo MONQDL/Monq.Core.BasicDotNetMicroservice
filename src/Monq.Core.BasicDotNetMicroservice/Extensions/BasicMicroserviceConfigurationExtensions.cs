@@ -35,7 +35,7 @@ public static class BasicMicroserviceConfigurationExtensions
     [RequiresUnreferencedCode("Method uses ConfigureBasicMicroserviceCore which is incompatible with trimming.")]
     public static IHostBuilder ConfigureBasicMicroservice(
         this IHostBuilder hostBuilder,
-        Configuration.ConsulConfigurationOptions? consulConfigurationOptions = null)
+        ConsulConfigurationOptions? consulConfigurationOptions = null)
     {
         hostBuilder.ConfigureBasicMicroserviceCore(consulConfigurationOptions);
         hostBuilder.ConfigureAuthorizationPolicies();
@@ -51,7 +51,7 @@ public static class BasicMicroserviceConfigurationExtensions
     [RequiresUnreferencedCode("Method uses ConfigureBasicMicroserviceCore which is incompatible with trimming.")]
     public static IHostBuilder ConfigureBasicConsoleMicroservice(
         this IHostBuilder hostBuilder,
-        Configuration.ConsulConfigurationOptions? consulConfigurationOptions = null)
+        ConsulConfigurationOptions? consulConfigurationOptions = null)
     {
         hostBuilder.ConfigureHostConfiguration(config =>
             config.AddEnvironmentVariables(prefix: "ASPNETCORE_"));
@@ -88,7 +88,7 @@ public static class BasicMicroserviceConfigurationExtensions
     public static IConfigurationBuilder ConfigureConsul(
         this IConfigurationBuilder configBuilder,
         IHostEnvironment environment,
-        Configuration.ConsulConfigurationOptions? configOptions = null)
+        ConsulConfigurationOptions? configOptions = null)
     {
         ConfigureConsul(configBuilder.Build(), configBuilder, configOptions, environment);
         return configBuilder;
@@ -217,7 +217,7 @@ public static class BasicMicroserviceConfigurationExtensions
     [RequiresUnreferencedCode("Calls IConfiguration.Configure is incompatible with trimming.")]
     static IHostBuilder ConfigureBasicMicroserviceCore(
         this IHostBuilder hostBuilder,
-        Configuration.ConsulConfigurationOptions? consulConfigurationOptions = null)
+        ConsulConfigurationOptions? consulConfigurationOptions = null)
     {
         hostBuilder.ConfigureCustomCertificates();
         hostBuilder.ConfigureConsul(consulConfigurationOptions);
@@ -248,7 +248,7 @@ public static class BasicMicroserviceConfigurationExtensions
     static void ConfigureConsul(
         this IConfiguration configuration,
         IConfigurationBuilder configBuilder,
-        Configuration.ConsulConfigurationOptions? configOptions,
+        ConsulConfigurationOptions? configOptions,
         IHostEnvironment env)
     {
         // Применяем переменную APPLICATION_NAME из переменных среды,
@@ -257,7 +257,7 @@ public static class BasicMicroserviceConfigurationExtensions
         if (!string.IsNullOrEmpty(configuration[ApplicationNameEnv]))
             applicationName = configuration[ApplicationNameEnv];
 
-        configOptions ??= new Configuration.ConsulConfigurationOptions();
+        configOptions ??= new ConsulConfigurationOptions();
 
         // Если находимся в DEV, то используем appsettings.development.json
         if (env.IsDevelopment())

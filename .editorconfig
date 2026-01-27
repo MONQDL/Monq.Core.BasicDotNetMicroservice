@@ -34,15 +34,15 @@ insert_final_newline = true
 csharp_default_private_modifier = implicit
 
 dotnet_naming_rule.constant_fields_should_be_pascal_case.severity = error
-dotnet_naming_rule.constant_fields_should_be_pascal_case.symbols = constant_fields
+dotnet_naming_rule.constant_fields_should_be_pascal_case.symbols  = constant_fields
 dotnet_naming_rule.constant_fields_should_be_pascal_case.style = pascal_case_style
-dotnet_naming_symbols.constant_fields.applicable_kinds = field
+dotnet_naming_symbols.constant_fields.applicable_kinds   = field
 dotnet_naming_symbols.constant_fields.required_modifiers = const
 dotnet_naming_style.pascal_case_style.capitalization = pascal_case
 
 ##### Namespace per file scope
-csharp_style_namespace_declarations = file_scoped:suggestion
-csharp_indent_braces = false
+csharp_style_namespace_declarations= file_scoped:suggestion
+csharp_indent_braces=false
 
 spelling_languages = en-us,ru-ru
 
@@ -121,7 +121,7 @@ csharp_style_conditional_delegate_call = true:suggestion
 
 # Предпочтения модификатора
 csharp_prefer_static_local_function = true:suggestion
-csharp_preferred_modifier_order = public, private, protected, internal, static, extern, new, virtual, abstract, sealed, override, readonly, unsafe, volatile, async
+csharp_preferred_modifier_order = public,private,protected,internal,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,volatile,async
 
 # Предпочтения для блоков кода
 csharp_prefer_braces = false:silent
@@ -257,6 +257,7 @@ csharp_style_allow_blank_line_after_token_in_conditional_expression_experimental
 csharp_style_allow_blank_line_after_token_in_arrow_expression_clause_experimental = true:silent
 csharp_style_prefer_readonly_struct = true:suggestion
 csharp_style_prefer_readonly_struct_member = true:suggestion
+csharp_style_prefer_primary_constructors = false
 
 [*.{cs,vb}]
 dotnet_style_operator_placement_when_wrapping = beginning_of_line
@@ -293,3 +294,6 @@ dotnet_style_parentheses_in_other_binary_operators = always_for_clarity:silent
 dotnet_style_parentheses_in_relational_binary_operators = always_for_clarity:silent
 dotnet_style_parentheses_in_other_operators = never_if_unnecessary:silent
 dotnet_style_require_accessibility_modifiers = omit_if_default:suggestion
+dotnet_diagnostic.CA1851.severity = none
+dotnet_diagnostic.CA1873.severity = none
+resharper_possible_multiple_enumeration_highlighting = none

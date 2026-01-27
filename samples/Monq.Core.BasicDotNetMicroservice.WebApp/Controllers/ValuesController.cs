@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Monq.Core.BasicDotNetMicroservice.WebApp.ModelsExceptions;
+using System.Net;
 
 namespace Monq.Core.BasicDotNetMicroservice.WebApp.Controllers;
 
@@ -26,6 +27,14 @@ public class ValuesController : Controller
         return Ok(model);
     }
 
+    [HttpGet("error")]
+    public string Get(int id)
+        => throw new ResponseException(
+            "id is null.",
+            Guid.NewGuid().ToString(),
+            HttpStatusCode.BadRequest,
+            "{\"data\": [ {\"f\": 1 }, {\"f\": 2 } ]}");
+
     [Authorize]
     [HttpGet("auth")]
     public IActionResult GetAuthenticated()
@@ -34,8 +43,4 @@ public class ValuesController : Controller
         _logger.LogInformation("Result {result}", model);
         return Ok(model);
     }
-
-    [HttpGet("error")]
-    public string Get(int id) => throw new ResponseException("id is null.", Guid.NewGuid().ToString(),
-        System.Net.HttpStatusCode.BadRequest, "{\"data\": [ {\"f\": 1 }, {\"f\": 2 } ]}");
 }
