@@ -62,6 +62,11 @@ public static class MicroserviceConstants
         public const string RabbitMq = "RabbitMQ";
 
         /// <summary>
+        /// ClickHouse section.
+        /// </summary>
+        public const string ClickHouse = "ClickHouseHttp:DefaultConnection";
+
+        /// <summary>
         /// ClickHouse connection string.
         /// </summary>
         public const string ClickHouseConnectionString = "ClickHouseHttp:DefaultConnection:ConnectionString";

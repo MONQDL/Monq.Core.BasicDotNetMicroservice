@@ -21,7 +21,7 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
     serverOptions.Listen(IPAddress.Any, 5006, listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
 });
 
-builder.Services.ConfigureSMAuthentication(builder.Configuration);
+builder.Services.ConfigureMonqAuthentication(builder.Configuration);
 
 builder.Services
         .AddGlobalExceptionFilter()

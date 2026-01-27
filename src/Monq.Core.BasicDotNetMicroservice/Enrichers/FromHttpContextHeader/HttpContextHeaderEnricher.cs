@@ -30,7 +30,7 @@ public class HttpContextHeaderEnricher : ILogEventEnricher
         _propertyName = propertyName;
         _contextAccessor = contextAccessor;
     }
-    
+
     /// <inheritdoc />
     public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
     {

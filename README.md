@@ -400,6 +400,17 @@ builder.Services.AddInlineValidator<YourRequest>(rules =>
 });
 ```
 
+### REST HTTP client configuration
+
+```csharp
+builder.Services.AddRestHttpPreConfiguredClient(builder.Configuration, client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(1);
+});
+```
+
+The library provides extensions for configuring REST HTTP clients. More info: <https://github.com/MONQDL/Monq.Core.HttpClientExtensions/blob/master/README.md>.
+
 ### Authentication and authorization
 
 #### Authorization policy
@@ -436,7 +447,7 @@ using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
 
 ```csharp
-builder.Services.ConfigureSMAuthentication(Configuration);
+builder.Services.ConfigureMonqAuthentication(Configuration);
 
 var app = builder.Build();
 
@@ -567,6 +578,7 @@ app.Run();
 ```
 
 **Method signature:**
+
 ```csharp
 public static void CreateDbSchemaOnFirstRun<T>(this IApplicationBuilder app,
     bool terminateOnException = true,
@@ -576,7 +588,18 @@ public static void CreateDbSchemaOnFirstRun<T>(this IApplicationBuilder app,
 ```
 
 **Parameters:**
+
 - `T` - The concrete database context type
 - `terminateOnException` - If true, the application will terminate when an exception occurs (default: true)
 - `sleepBeforeTerminate` - If true and `terminateOnException` is true, the main thread will sleep before termination (default: true)
 - `terminationSleepMilliseconds` - Sleep interval when `terminateOnException` is true and `sleepBeforeTerminate` is true (default: 10000ms)
+
+### Migration guide to v9
+
+1. Replace `services.ConfigureSMAuthentication()` with `services.ConfigureMonqAuthentication()`.
+2. Replace `RestHttpClientFromOptions<T>` with `RestHttpClient` and remove unnecessary injections in implementation class constructor.
+3. Replace DI registration for all classes that are derived from `RestHttpClient` with
+
+```csharp
+services.AddRestHttpPreConfiguredClient<IService, Service>();
+```

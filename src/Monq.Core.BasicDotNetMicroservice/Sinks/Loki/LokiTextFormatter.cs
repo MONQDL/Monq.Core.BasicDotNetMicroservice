@@ -99,15 +99,15 @@ internal class LokiTextFormatter : ITextFormatter
     }
 
     static string GetLevel(LogEventLevel level) => level switch
-        {
-            LogEventLevel.Verbose => "trace",
-            LogEventLevel.Debug => "debug",
-            LogEventLevel.Information => "info",
-            LogEventLevel.Warning => "warning",
-            LogEventLevel.Error => "error",
-            LogEventLevel.Fatal => "critical",
-            _ => "unknown"
-        };
+    {
+        LogEventLevel.Verbose => "trace",
+        LogEventLevel.Debug => "debug",
+        LogEventLevel.Information => "info",
+        LogEventLevel.Warning => "warning",
+        LogEventLevel.Error => "error",
+        LogEventLevel.Fatal => "critical",
+        _ => "unknown"
+    };
 
     HandleAction DetermineHandleActionForProperty(string propertyName)
     {

@@ -57,7 +57,7 @@ public static class LoggerEnvironment
 
     static string? GetAssemblyName() => Assembly.GetEntryAssembly()?.GetName().Name;
 
-    static void ReadVariables() => 
+    static void ReadVariables() =>
         MicroserviceName = Environment.GetEnvironmentVariable("ASPNETCORE_" + MicroserviceConstants.HostConfiguration.ApplicationNameEnv);
 
     /// <summary>
