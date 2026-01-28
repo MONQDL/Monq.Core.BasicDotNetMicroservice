@@ -116,7 +116,8 @@ public static class BasicMicroserviceConfigurationExtensions
         {
             var version = MicroserviceVersionInfo.GetVersion(anyEndpointType);
             return Results.Text($$"""{"version": "{{version}}"}""", "application/json");
-        });
+        })
+        .ShortCircuit();
 
     /// <summary>
     /// Configure authorization policies.
