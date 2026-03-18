@@ -110,7 +110,6 @@ public static class BasicMicroserviceConfigurationExtensions
     /// </summary>
     /// <param name="app"></param>
     /// <param name="anyEndpointType">Any type in startup assembly. Example: typeof(Program)</param>
-    [RequiresUnreferencedCode("Method uses minimal api MapGet which is incompatible with trimming.")]
     public static void MapApiVersion(this WebApplication app, Type anyEndpointType) =>
         app.MapGet("/api/version", () =>
         {
