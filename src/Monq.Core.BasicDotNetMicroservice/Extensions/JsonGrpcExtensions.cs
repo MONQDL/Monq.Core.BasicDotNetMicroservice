@@ -1,4 +1,5 @@
 using Google.Protobuf.WellKnownTypes;
+using System;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -7,7 +8,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 /// <summary>
 /// Extension methods for converting Grpc Struct to System.Text.Json and back.
 /// </summary>
-public static class JsonGrpc
+public static class JsonGrpcExtensions
 {
     /// <summary>
     /// Convert Grpc <see cref="Struct"/> to <see cref="JsonObject"/>.
@@ -29,7 +30,8 @@ public static class JsonGrpc
     /// </summary>
     /// <param name="value">The Grpc <see cref="Value"/> object.</param>
     /// <returns>JsonNode or null.</returns>
-    public static JsonNode? ToJsonNode(this Value value) => GetJsonValue(value);
+    public static JsonNode? ToJsonNode(this Value value)
+        => GetJsonValue(value);
 
     /// <summary>
     /// Convert Grpc <see cref="ListValue"/> to <see cref="JsonArray"/>.
@@ -81,36 +83,30 @@ public static class JsonGrpc
     /// </summary>
     /// <param name="jsonNode">Json <see cref="JsonNode"/>.</param>
     /// <returns></returns>
-    public static Value ToProtoValue(this JsonNode jsonNode) =>
-        GetProtoValue(jsonNode);
+    public static Value ToProtoValue(this JsonNode jsonNode)
+        => GetProtoValue(jsonNode);
 
     static JsonNode? GetJsonValue(Value value)
-    {
-        switch (value.KindCase)
+        => value.KindCase switch
         {
-            // Такой интересный хак, из-за https://github.com/dotnet/runtime/issues/64472 пункт 2.
-            case Value.KindOneofCase.BoolValue: return JsonValue.Parse(JsonValue.Create(value.BoolValue).ToJsonString());
-            case Value.KindOneofCase.NullValue: return null;
-            case Value.KindOneofCase.StructValue: return ToJsonObject(value.StructValue);
-            case Value.KindOneofCase.NumberValue: return JsonValue.Parse(JsonValue.Create(value.NumberValue).ToJsonString());
-            case Value.KindOneofCase.StringValue: return JsonValue.Parse(JsonValue.Create(value.StringValue).ToJsonString());
-            case Value.KindOneofCase.ListValue: return ToJsonArray(value.ListValue);
-            default: return null;
-        }
-    }
+            Value.KindOneofCase.NullValue => null,
+            Value.KindOneofCase.NumberValue => JsonValue.Create(value.NumberValue).AsJsonElementValue(),
+            Value.KindOneofCase.StringValue => JsonValue.Create(value.StringValue),
+            Value.KindOneofCase.BoolValue => JsonValue.Create(value.BoolValue),
+            Value.KindOneofCase.StructValue => value.StructValue.ToJsonObject(),
+            Value.KindOneofCase.ListValue => value.ListValue.ToJsonArray(),
+            _ => null
+        };
 
     static Value GetProtoValue(JsonNode? value)
-    {
-        if (value == null)
-            return new Value { NullValue = NullValue.NullValue };
-        return value switch
+        => value switch
         {
+            null => new Value { NullValue = NullValue.NullValue },
             JsonObject jO => GetProtoValue(jO),
             JsonArray jA => GetProtoValue(jA),
             JsonValue jV => GetProtoValue(jV),
             _ => new Value()
         };
-    }
 
     static Value GetProtoValue(this JsonObject jsonObject)
     {
@@ -133,16 +129,24 @@ public static class JsonGrpc
     }
 
     static Value GetProtoValue(this JsonValue jsonValue)
-    {
-        switch (jsonValue.GetValue<JsonElement>().ValueKind)
+        => jsonValue.GetValueKind() switch
         {
-            case JsonValueKind.Null: return new Value { NullValue = NullValue.NullValue };
-            case JsonValueKind.String: return new Value { StringValue = jsonValue.GetValue<string>() };
-            case JsonValueKind.Number: return new Value { NumberValue = jsonValue.GetValue<double>() };
-            case JsonValueKind.True: return new Value { BoolValue = jsonValue.GetValue<bool>() };
-            case JsonValueKind.False: return new Value { BoolValue = jsonValue.GetValue<bool>() };
-            default:
-                return new Value { StringValue = jsonValue.ToString() };
-        }
+            JsonValueKind.Null => new Value { NullValue = NullValue.NullValue },
+            JsonValueKind.String => new Value { StringValue = jsonValue.GetValue<string>() },
+            JsonValueKind.Number => new Value { NumberValue = jsonValue.AsJsonElementValue()?.GetValue<double>() ?? 0 },
+            JsonValueKind.True => new Value { BoolValue = jsonValue.GetValue<bool>() },
+            JsonValueKind.False => new Value { BoolValue = jsonValue.GetValue<bool>() },
+            JsonValueKind => new Value { StringValue = jsonValue.ToString() },
+        };
+
+    /// <summary>
+    /// Force using <see cref="JsonElement"/> as underlying value to automatically handle type conversions in <see cref="JsonNode.GetValue{T}"/>.
+    /// <para> See p.2 https://github.com/dotnet/runtime/issues/64472</para>
+    /// </summary>
+    static JsonValue AsJsonElementValue(this JsonValue jsonValue)
+    {
+        var node = JsonNode.Parse(jsonValue.ToJsonString())
+            ?? throw new InvalidOperationException();
+        return node.AsValue();
     }
 }
