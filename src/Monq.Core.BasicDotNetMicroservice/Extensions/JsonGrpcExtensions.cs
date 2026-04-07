@@ -132,8 +132,8 @@ public static class JsonGrpcExtensions
         => jsonValue.GetValueKind() switch
         {
             JsonValueKind.Null => new Value { NullValue = NullValue.NullValue },
-            JsonValueKind.String => new Value { StringValue = jsonValue.GetValue<string>() },
-            JsonValueKind.Number => new Value { NumberValue = jsonValue.AsJsonElementValue()?.GetValue<double>() ?? 0 },
+            JsonValueKind.String => new Value { StringValue = jsonValue.AsJsonElementValue().GetValue<string>() },
+            JsonValueKind.Number => new Value { NumberValue = jsonValue.AsJsonElementValue().GetValue<double>() },
             JsonValueKind.True => new Value { BoolValue = jsonValue.GetValue<bool>() },
             JsonValueKind.False => new Value { BoolValue = jsonValue.GetValue<bool>() },
             JsonValueKind => new Value { StringValue = jsonValue.ToString() },

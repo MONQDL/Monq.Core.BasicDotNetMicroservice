@@ -158,7 +158,7 @@ public class JsonGrpcExtensionsTests
     }
 
     [Fact]
-    public void ToJsonNode_AllowsCrossTypeNumericConversion()
+    public void ToJsonNode_AllowsCrossTypeConversion()
     {
         var intVal = new Value { NumberValue = 42 };
         var intNode = intVal.ToJsonNode();
@@ -176,7 +176,7 @@ public class JsonGrpcExtensionsTests
     }
 
     [Fact]
-    public void ToProtoValue_AllowsCrossTypeNumericConversion()
+    public void ToProtoValue_AllowsCrossTypeConversion()
     {
         JsonNode intJsonNode = 100;
         Assert.Equal(100.0, intJsonNode.ToProtoValue().NumberValue);
@@ -186,6 +186,9 @@ public class JsonGrpcExtensionsTests
 
         JsonNode zeroJsonNode = 0;
         Assert.Equal(0, zeroJsonNode.ToProtoValue().NumberValue);
+
+        JsonNode guidJsonNode = Guid.Parse("d67251b2-64f8-4673-96e0-0f2ddaaa847e");
+        Assert.Equal("d67251b2-64f8-4673-96e0-0f2ddaaa847e", guidJsonNode.ToProtoValue().StringValue);
     }
 
     [Fact]
