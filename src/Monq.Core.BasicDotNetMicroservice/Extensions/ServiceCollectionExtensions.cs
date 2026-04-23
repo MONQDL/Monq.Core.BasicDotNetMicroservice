@@ -64,7 +64,6 @@ public static class ServiceCollectionExtensions
     /// <param name="services">IServiceCollection to add the services to.</param>
     /// <param name="hostContext">Context containing the common services on the IHost.</param>
     /// <returns><see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
-    [RequiresUnreferencedCode("Calls IConfiguration.Bind is incompatible with trimming.")]
     public static IServiceCollection AddConsoleMetrics(this IServiceCollection services, HostBuilderContext hostContext)
     {
         var metricsBuilder = AppMetrics.CreateDefaultBuilder()
@@ -76,21 +75,19 @@ public static class ServiceCollectionExtensions
         metricsBuilder.OutputMetrics.AsPrometheusPlainText();
 
         var metricsConfig = hostContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
-        var metricsOptions = new MetricsConfigurationOptions();
-        // TODO: Use source generator after net7 drop.
-        metricsConfig.Bind(metricsOptions);
+        var bindOptions = metricsConfig.Get<MetricsConfigurationOptions>() ?? new MetricsConfigurationOptions();
 
-        metricsBuilder.AddInfluxDb(metricsOptions.ReportingInfluxDb);
-        metricsBuilder.AddOverHttp(hostContext.HostingEnvironment, metricsOptions.ReportingOverHttp);
+        metricsBuilder.AddInfluxDb(bindOptions.ReportingInfluxDb.ToMetricsReportingInfluxDbOptions());
+        metricsBuilder.AddOverHttp(hostContext.HostingEnvironment, bindOptions.ReportingOverHttp.ToMetricsReportingHttpOptions());
 
         var metrics = metricsBuilder.Build();
 
         services.AddSingleton(metrics.OutputEnvFormatters);
         services.AddSingleton<IMetrics>(metrics);
         services.AddSingleton(metrics);
-        services.AddMetricsReporter(metricsOptions);
+        services.AddMetricsReporter(bindOptions);
 
-        if (metricsOptions.AddSystemMetrics)
+        if (bindOptions.AddSystemMetrics)
             services.AddAppMetricsCollectors();
 
         return services;
@@ -101,7 +98,7 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <param name="metricsBuilder">IMetricBuilder to add InfluxDB reporting to.</param>
     /// <param name="influxDbOptions">Configuration options for InfluxDB reporting.</param>
-    static void AddInfluxDb(this IMetricsBuilder metricsBuilder, MetricsReportingInfluxDbOptions influxDbOptions)
+    static void AddInfluxDb(this IMetricsBuilder metricsBuilder, App.Metrics.Reporting.InfluxDB.MetricsReportingInfluxDbOptions influxDbOptions)
     {
         if (influxDbOptions.InfluxDb.BaseUri == null) return;
 
@@ -114,7 +111,7 @@ public static class ServiceCollectionExtensions
     /// <param name="metricsBuilder">IMetricBuilder to add InfluxDB reporting to.</param>
     /// <param name="hostEnvironment">Provides information about the hosting environment an application is running in.</param>
     /// <param name="httpOptions">Configuration options of HTTP reporting. </param>
-    static void AddOverHttp(this IMetricsBuilder metricsBuilder, IHostEnvironment hostEnvironment, MetricsReportingHttpOptions httpOptions)
+    static void AddOverHttp(this IMetricsBuilder metricsBuilder, IHostEnvironment hostEnvironment, App.Metrics.Reporting.Http.MetricsReportingHttpOptions httpOptions)
     {
         if (httpOptions.HttpSettings.RequestUri == null)
             return;

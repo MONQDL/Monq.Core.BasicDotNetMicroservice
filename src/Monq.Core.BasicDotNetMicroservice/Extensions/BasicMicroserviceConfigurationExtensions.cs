@@ -12,7 +12,6 @@ using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
 using Monq.Core.HttpClientExtensions;
 using System;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
@@ -32,7 +31,6 @@ public static class BasicMicroserviceConfigurationExtensions
     /// <param name="hostBuilder">The host builder.</param>
     /// <param name="consulConfigurationOptions">The configuration options.</param>
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
-    [RequiresUnreferencedCode("Method uses ConfigureBasicMicroserviceCore which is incompatible with trimming.")]
     public static IHostBuilder ConfigureBasicMicroservice(
         this IHostBuilder hostBuilder,
         ConsulConfigurationOptions? consulConfigurationOptions = null)
@@ -48,7 +46,6 @@ public static class BasicMicroserviceConfigurationExtensions
     /// <param name="hostBuilder">The host builder.</param>
     /// <param name="consulConfigurationOptions">The configuration options.</param>
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
-    [RequiresUnreferencedCode("Method uses ConfigureBasicMicroserviceCore which is incompatible with trimming.")]
     public static IHostBuilder ConfigureBasicConsoleMicroservice(
         this IHostBuilder hostBuilder,
         ConsulConfigurationOptions? consulConfigurationOptions = null)
@@ -69,7 +66,6 @@ public static class BasicMicroserviceConfigurationExtensions
     /// <param name="hostBuilder">The host builder.</param>
     /// <param name="configOptions">The configuration options.</param>
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
-    [RequiresUnreferencedCode("Method uses ConfigureConsul which is incompatible with trimming.")]
     public static IHostBuilder ConfigureConsul(this IHostBuilder hostBuilder, Configuration.ConsulConfigurationOptions? configOptions = null)
     {
         hostBuilder.ConfigureAppConfiguration((hostContext, config) =>
@@ -84,7 +80,6 @@ public static class BasicMicroserviceConfigurationExtensions
     /// <param name="environment">The environment.</param>
     /// <param name="configOptions">The configuration options.</param>
     /// <returns>The same <see cref="IConfigurationBuilder"/> for chaining.</returns>
-    [RequiresUnreferencedCode("Method uses ConfigureConsul which is incompatible with trimming.")]
     public static IConfigurationBuilder ConfigureConsul(
         this IConfigurationBuilder configBuilder,
         IHostEnvironment environment,
@@ -140,7 +135,6 @@ public static class BasicMicroserviceConfigurationExtensions
     /// </summary>
     /// <param name="hostBuilder">The host builder.</param>
     /// <returns>The same <see cref="IWebHostBuilder"/> for chaining.</returns>
-    [RequiresUnreferencedCode("Calls IConfiguration.Bind is incompatible with trimming.")]
     public static IWebHostBuilder ConfigureMetricsAndHealth(this IWebHostBuilder hostBuilder)
     {
         hostBuilder
@@ -150,12 +144,13 @@ public static class BasicMicroserviceConfigurationExtensions
                 metricsBuilder.OutputMetrics.AsPrometheusPlainText();
 
                 var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
-                var metricsOptions = new MetricsConfigurationOptions();
-                // TODO: Use source generator after net7 drop.
-                metricsConfig.Bind(metricsOptions);
+                var bindOptions = metricsConfig.Get<MetricsConfigurationOptions>() ?? new MetricsConfigurationOptions();
 
-                if (metricsOptions.ReportingInfluxDb.InfluxDb.BaseUri != null)
-                    metricsBuilder.Report.ToInfluxDb(metricsOptions.ReportingInfluxDb);
+                if (bindOptions.ReportingInfluxDb.InfluxDb.BaseUri != null)
+                    metricsBuilder.Report.ToInfluxDb(bindOptions.ReportingInfluxDb.ToMetricsReportingInfluxDbOptions());
+
+                if (bindOptions.ReportingOverHttp != null)
+                    metricsBuilder.Report.OverHttp(bindOptions.ReportingOverHttp.ToMetricsReportingHttpOptions());
             })
             .UseMetricsWebTracking()
             .UseMetrics(options
@@ -214,7 +209,6 @@ public static class BasicMicroserviceConfigurationExtensions
         return hostBuilder;
     }
 
-    [RequiresUnreferencedCode("Calls IConfiguration.Configure is incompatible with trimming.")]
     static IHostBuilder ConfigureBasicMicroserviceCore(
         this IHostBuilder hostBuilder,
         ConsulConfigurationOptions? consulConfigurationOptions = null)
@@ -237,14 +231,12 @@ public static class BasicMicroserviceConfigurationExtensions
             services.AddHttpContextAccessor();
             services.AddOptions();
             services.AddDistributedMemoryCache();
-            // TODO: Use source generator after net7 drop.
             services.Configure<AppConfiguration>(context.Configuration);
         });
 
         return hostBuilder;
     }
 
-    [RequiresUnreferencedCode("Calls IConfiguration.Bind is incompatible with trimming.")]
     static void ConfigureConsul(
         this IConfiguration configuration,
         IConfigurationBuilder configBuilder,
@@ -273,8 +265,6 @@ public static class BasicMicroserviceConfigurationExtensions
 
         configBuilder.AddJsonFile(consulConfigFile, optional: false, reloadOnChange: false);
 
-        var consulClientConfiguration = new ConsulClientConfiguration();
-
         var consulBuilder = new ConfigurationBuilder();
         consulBuilder.SetBasePath(env.ContentRootPath);
         consulBuilder.AddJsonFile(consulConfigFile, optional: false, reloadOnChange: false);
@@ -289,9 +279,10 @@ public static class BasicMicroserviceConfigurationExtensions
         if (!string.IsNullOrEmpty(consulRoot))
             consulEnv = consulRoot.ToLowerInvariant();
 
-        consulConfig
+        var consulBindOptions = consulConfig
             .GetSection(ConsulConfigFileSectionName)
-            .Bind(consulClientConfiguration);
+            .Get<ConsulClientBindOptions>() ?? new ConsulClientBindOptions();
+        var consulClientConfiguration = consulBindOptions.ToConsulClientConfiguration();
 
         var appsettingsFileName = string.IsNullOrEmpty(configOptions.AppsettingsFileName) ? AppsettingsFile : configOptions.AppsettingsFileName;
 
@@ -328,18 +319,15 @@ public static class BasicMicroserviceConfigurationExtensions
     /// </summary>
     /// <param name="hostBuilder">The host builder.</param>
     /// <returns></returns>
-    [RequiresUnreferencedCode("Calls IConfiguration.Bind is incompatible with trimming.")]
     static IWebHostBuilder UseSystemMetrics(this IWebHostBuilder hostBuilder)
     {
         hostBuilder
             .ConfigureServices((builderContext, services) =>
             {
                 var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
-                var metricsOptions = new MetricsConfigurationOptions();
-                // TODO: Use source generator after net7 drop.
-                metricsConfig.Bind(metricsOptions);
+                var bindOptions = metricsConfig.Get<MetricsConfigurationOptions>() ?? new MetricsConfigurationOptions();
 
-                if (metricsOptions.AddSystemMetrics)
+                if (bindOptions.AddSystemMetrics)
                     services.AddAppMetricsCollectors();
             });
 

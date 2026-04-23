@@ -2,6 +2,7 @@ using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -84,7 +85,7 @@ public sealed class RpcDownstreamExceptionInterceptor : Interceptor
             ["GrpcMethod"] = methodName,
             ["GrpcStatusCode"] = exception.StatusCode.ToString(),
             ["GrpcStatusDetail"] = exception.Status.Detail,
-            ["TraceId"] = _httpContextAccessor?.HttpContext?.TraceIdentifier
+            ["TraceId"] = _httpContextAccessor?.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString()
         }))
         {
             _logger.LogError(exception,

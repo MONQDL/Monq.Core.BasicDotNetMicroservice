@@ -95,14 +95,20 @@ To configure Consul management, you need to add the `aspnet_consul_config.json` 
 ```json
 {
     "Address" : "http://127.0.0.1:8500",
+    "Datacenter" : "dc1",
     "Token" : "",
+    "WaitTime" : "00:00:05",
     "RootFolder": "custom-root/keys"
 }
 ```
 
 `"Address"` - the http(s) address of a Consul server, where the configuration is stored.
 
+`"Datacenter"` - the datacenter to use. Optional.
+
 `"Token"` - the token to connect to the Consul server.
+
+`"WaitTime"` - the maximum time to wait for a blocking query. Optional.
 
 `"RootFolder"` - the path to the Consul configuration. By default equals the `ASPNETCORE_ENVIRONMENT` variable.
 
@@ -537,19 +543,28 @@ The configuration should contain the following JSON:
     "ReportingInfluxDb": {
       "FlushInterval": "00:00:10",
       "InfluxDb": {
+        "BaseUri": "http://influxdb:8888",
+        "Database": "metrics",
+        "UserName": "",
+        "Password": "",
         "Consistenency": "",
         "Endpoint": "",
-        "BaseUri": "http://influxdb:8888",
-        "Database": "",
-        "Password": "",
-        "RetensionPolicy": "",
-        "UserName": ""
+        "RetensionPolicy": ""
       }
     },
     "ReportingOverHttp": {
       "FlushInterval": "00:00:10",
       "HttpSettings": {
-        "RequestUri": "http://localhost:9091/metrics"
+        "RequestUri": "http://localhost:9091/metrics",
+        "UserName": "",
+        "Password": "",
+        "AuthorizationToken": "",
+        "AllowInsecureSsl": false
+      },
+      "HttpPolicy": {
+        "Timeout": "00:00:10",
+        "BackoffPeriod": "00:00:01",
+        "FailuresBeforeBackoff": 3
       }
     },
     "AddSystemMetrics": true
@@ -561,10 +576,33 @@ The configuration should contain the following JSON:
 
 Options for InfluxDB reporting. Optional.
 
+| Property | Type | Description |
+|----------|------|-------------|
+| `FlushInterval` | `TimeSpan` | Interval between flushing metrics. |
+| `InfluxDb.BaseUri` | `Uri` | InfluxDB server URL. |
+| `InfluxDb.Database` | `string` | Database name. |
+| `InfluxDb.UserName` | `string` | Authentication username. |
+| `InfluxDb.Password` | `string` | Authentication password. |
+| `InfluxDb.Consistenency` | `string` | Write consistency level. |
+| `InfluxDb.Endpoint` | `string` | Custom endpoint. |
+| `InfluxDb.RetensionPolicy` | `string` | Retention policy name. |
+
 #### ReportingOverHttp
 
 Options of HTTP reporting. Optional.
 For sending metrics to the Prometheus Pushgateway it is nessesary for the RequestUri ended up with "/metrics".
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `FlushInterval` | `TimeSpan` | Interval between flushing metrics. |
+| `HttpSettings.RequestUri` | `Uri` | URL where to POST metrics. |
+| `HttpSettings.UserName` | `string` | Basic auth username. |
+| `HttpSettings.Password` | `string` | Basic auth password. |
+| `HttpSettings.AuthorizationToken` | `string` | Authorization token for the request. |
+| `HttpSettings.AllowInsecureSsl` | `bool` | Allow insecure SSL calls (self-signed certs). |
+| `HttpPolicy.Timeout` | `TimeSpan` | Request timeout. |
+| `HttpPolicy.BackoffPeriod` | `TimeSpan` | Backoff period after failures. |
+| `HttpPolicy.FailuresBeforeBackoff` | `int` | Number of failures before entering backoff mode. |
 
 #### AddSystemMetrics
 
