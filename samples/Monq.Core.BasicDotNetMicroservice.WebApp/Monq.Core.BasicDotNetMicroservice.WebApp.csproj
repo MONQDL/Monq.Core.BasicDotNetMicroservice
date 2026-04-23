@@ -9,5 +9,19 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Monq.Core.BasicDotNetMicroservice\Monq.Core.BasicDotNetMicroservice.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <!-- Удалить с обновлением Npgsql.EntityFrameworkCore.PostgreSQL -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.7" />
+    <!-- ___________________________________________________________ -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+  </ItemGroup>
+
+  <!-- Import MSBuild targets for NativeAOT SQL generation (for testing) -->
+  <Import Project="..\..\build\Monq.Core.BasicDotNetMicroservice.targets" />
   
 </Project>

@@ -1,7 +1,5 @@
 using App.Metrics;
 using App.Metrics.Formatters.Prometheus;
-using App.Metrics.Reporting.Http;
-using App.Metrics.Reporting.InfluxDB;
 using Calzolari.Grpc.AspNetCore.Validation;
 using Duende.AspNetCore.Authentication.OAuth2Introspection;
 using Grpc.Core;
@@ -160,8 +158,6 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    [RequiresUnreferencedCode(
-            "Uses IConfiguration.GetValue<T>() which internally relies on reflection is incompatible with trimming.")]
     static void ConfigureGrpcClient(
         GrpcClientOptions options,
         IConfiguration configuration)
@@ -169,7 +165,7 @@ public static class ServiceCollectionExtensions
         // Логика из лямбды
         options.ClientOptionsAction = clientOptions =>
             clientOptions.Address = new Uri(
-                configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
+                configuration.GetSection(nameof(AppConfiguration.BaseUri)).Value
                 ?? throw new Exception("BaseUri not found at configuration."));
         options.ChannelOptionsAction = channelOptions =>
         {
@@ -189,9 +185,7 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
     /// <param name="configureOptions">A delegate that is used to configure a <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    [RequiresUnreferencedCode(
-            "Uses ConfigureGrpcClient which internally relies on reflection is incompatible with trimming.")]
-    public static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(
+    public static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         IConfiguration configuration,
         Action<GrpcClientOptions>? configureOptions = null)
@@ -213,9 +207,7 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
     /// <param name="configureOptions">A delegate that is used to configure a <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    [RequiresUnreferencedCode(
-            "Uses ConfigureGrpcClient which internally relies on reflection is incompatible with trimming.")]
-    public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(
+    public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         IConfiguration configuration,
         Action<GrpcClientOptions>? configureOptions = null)
@@ -237,8 +229,7 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
     /// <param name="configureHttpClient">A delegate that is used to configure underlying <see cref="HttpClient"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    [RequiresUnreferencedCode("Uses AddHttpClient which internally relies on reflection is incompatible with trimming.")]
-    public static IHttpClientBuilder AddRestHttpPreConfiguredClient<TClient, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+    public static IHttpClientBuilder AddRestHttpPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
         this IServiceCollection services,
         IConfiguration configuration,
         Action<HttpClient>? configureHttpClient = null)
@@ -246,7 +237,7 @@ public static class ServiceCollectionExtensions
         where TImplementation : RestHttpClient, TClient
     {
         var baseUri = new Uri(
-            configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
+            configuration.GetSection(nameof(AppConfiguration.BaseUri)).Value
             ?? throw new Exception("BaseUri not found at configuration."));
         var httpClientBuilder = services.AddHttpClient<TClient, TImplementation>(
             client =>

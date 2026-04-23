@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.EntityFrameworkCore;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Filters;
+using Monq.Core.BasicDotNetMicroservice.WebApp.Configuration;
 using Monq.Core.HttpClientExtensions.Exceptions;
 using System.Net;
 using System.Text;
@@ -22,6 +24,8 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 });
 
 builder.Services.ConfigureMonqAuthentication(builder.Configuration);
+
+builder.Services.AddDbContext<TestDbContext>(options => options.UseNpgsql("host=localhost"));
 
 builder.Services
         .AddGlobalExceptionFilter()
@@ -57,5 +61,11 @@ app.UseAuthorization();
 app.UseLogUser();
 app.UseRequestLocalization();
 app.MapControllers();
+
+// NativeAOT-compatible schema initialization
+// Uses pre-generated SQL script embedded at build time
+app.CreateDbSchemaOnFirstRunNative<TestDbContext>(
+    typeof(Program).Assembly,
+    "Schema.sql");
 
 app.Run();
