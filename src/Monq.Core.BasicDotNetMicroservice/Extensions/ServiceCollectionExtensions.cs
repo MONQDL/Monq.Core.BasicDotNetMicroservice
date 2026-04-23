@@ -3,6 +3,7 @@ using App.Metrics.Formatters.Prometheus;
 using App.Metrics.Reporting.Http;
 using App.Metrics.Reporting.InfluxDB;
 using Calzolari.Grpc.AspNetCore.Validation;
+using Duende.AspNetCore.Authentication.OAuth2Introspection;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Microsoft.AspNetCore.Http;
@@ -41,8 +42,6 @@ public static class ServiceCollectionExtensions
 
         if (!bool.TryParse(authConfig[AuthConstants.AuthenticationConfiguration.RequireHttpsMetadata], out var requireHttps))
             requireHttps = false;
-        if (!bool.TryParse(authConfig[AuthConstants.AuthenticationConfiguration.EnableCaching], out var enableCaching))
-            enableCaching = true;
 
         services.AddAuthentication(AuthConstants.AuthenticationScheme)
             .AddOAuth2Introspection(AuthConstants.AuthenticationScheme, x =>
@@ -50,7 +49,6 @@ public static class ServiceCollectionExtensions
                 x.Authority = authConfig[AuthConstants.AuthenticationConfiguration.Authority];
                 x.ClientId = authConfig[AuthConstants.AuthenticationConfiguration.ScopeName];
                 x.ClientSecret = authConfig[AuthConstants.AuthenticationConfiguration.ScopeSecret];
-                x.EnableCaching = enableCaching;
                 x.CacheDuration = TimeSpan.FromMinutes(5);
                 x.NameClaimType = "fullName";
                 x.DiscoveryPolicy.RequireHttps = requireHttps;

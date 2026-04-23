@@ -29,21 +29,46 @@ By default, logging to the console is used. For adding other logging outputs con
 
 Logging to the ElasticSearch can be added. To achive that, add the properties from the rendered JSON format example to the `appsettings.json` file.
 
+More documentation at [Elastic](https://github.com/elastic/ecs-dotnet/tree/main/src/Elastic.Serilog.Sinks)
+
 ```json
 {
   "Serilog": {
+    "Using": [ "Elastic.Serilog.Sinks" ],
     "WriteTo": [
       {
         "Name": "Elasticsearch",
         "Args": {
-          "nodeUris": "http://els-1.example.com",
-          "indexFormat": "aspnetcore-{0:yyyy.MM.dd}",
-          "typeName": "aspnet_events",
-          "autoRegisterTemplate": true
+          "bootstrapMethod": "Silent",
+          "nodes": [ "http://elastichost:9200" ],
+          "useSniffing": true,
+          "apiKey": "<apiKey>",
+          "username": "<username>",
+          "password": "<password>",
+
+          "ilmPolicy" : "my-policy",
+          "dataStream" : "logs-dotnet-default",
+          "includeHost" : true,
+          "includeUser" : true,
+          "includeProcess" : true,
+          "includeActivity" : true,
+          "filterProperties" : [ "prop1", "prop2" ],
+          "proxy": "http://localhost:8200",
+          "proxyUsername": "x",
+          "proxyPassword": "y",
+          "debugMode": false,
+
+          //EXPERT settings, do not set unless you need to 
+          "maxRetries": 3,
+          "maxConcurrency": 20,
+          "maxInflight": 100000,
+          "maxExportSize": 1000,
+          "maxLifeTime": "00:00:05",
+          "fullMode": "Wait"
         }
       }
     ],
-    "MinimumLevel": "Information"
+    "MinimumLevel": { "Default": "Information" },
   }
 }
 ```

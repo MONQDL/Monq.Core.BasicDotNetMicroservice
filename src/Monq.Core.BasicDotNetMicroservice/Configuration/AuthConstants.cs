@@ -14,7 +14,6 @@ public static class AuthConstants
         public const string ScopeSecret = "ApiResource:Password";
 
         public const string RequireHttpsMetadata = "RequireHttpsMetadata";
-        public const string EnableCaching = "EnableCaching";
     }
 
     /// <summary>
