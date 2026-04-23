@@ -74,4 +74,9 @@
     <PackageReference Include="Calzolari.Grpc.AspNetCore.Validation" Version="8.1.0" />
   </ItemGroup>
 
+  <!-- Include MSBuild targets for NativeAOT EF migration SQL generation -->
+  <ItemGroup>
+    <None Include="..\..\build\Monq.Core.BasicDotNetMicroservice.targets" Pack="true" PackagePath="build\" />
+  </ItemGroup>
+
 </Project>

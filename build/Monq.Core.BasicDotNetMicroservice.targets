@@ -1,0 +1,139 @@
+<Project>
+  <!--
+    MSBuild Target for NativeAOT-compatible EF Core migration SQL generation.
+    
+    This target:
+    1. Detects if the project has EF Core migrations (Migrations folder exists)
+    2. Runs 'dotnet ef migrations script -idempotent' to generate SQL
+    3. Extracts migration names from the Migrations folder
+    4. Prepends MONQ_MIGRATIONS metadata to the SQL file
+    5. Embeds the SQL file as a resource (trimming-safe)
+    
+    Usage: Just reference Monq.Core.BasicDotNetMicroservice package.
+    The target activates automatically when Migrations folder exists.
+    
+    Optional properties:
+      MonqEfMigrationsEnabled - Set to 'false' to disable (default: true)
+      MonqEfMigrationsOutputFileName - Output SQL filename (default: Schema.sql)
+      MonqEfMigrationsFolder - Migrations folder name (default: Migrations)
+    
+    Note: First build generates SQL, second build includes it in the assembly.
+  -->
+
+  <PropertyGroup>
+    <MonqEfMigrationsEnabled Condition="'$(MonqEfMigrationsEnabled)' == ''">true</MonqEfMigrationsEnabled>
+    <MonqEfMigrationsOutputFileName Condition="'$(MonqEfMigrationsOutputFileName)' == ''">Schema.sql</MonqEfMigrationsOutputFileName>
+    <MonqEfMigrationsFolder Condition="'$(MonqEfMigrationsFolder)' == ''">Migrations</MonqEfMigrationsFolder>
+  </PropertyGroup>
+
+  <!-- Detect migrations folder (skip for library project itself) -->
+  <PropertyGroup>
+    <MonqEfHasMigrations>false</MonqEfHasMigrations>
+    <MonqEfHasMigrations Condition="Exists('$(MSBuildProjectDirectory)\$(MonqEfMigrationsFolder)') AND '$(MonqEfMigrationsEnabled)' == 'true' AND '$(MSBuildProjectFile)' != 'Monq.Core.BasicDotNetMicroservice.csproj'">true</MonqEfHasMigrations>
+  </PropertyGroup>
+
+  <!-- Add EF Core Tools dependency only when migrations are detected -->
+  <ItemGroup Condition="'$(MonqEfHasMigrations)' == 'true'">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="$(MicrosoftEntityFrameworkCoreToolsVersion)" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Define EF Core Tools version based on target framework -->
+  <PropertyGroup Condition="'$(MonqEfHasMigrations)' == 'true'">
+    <MicrosoftEntityFrameworkCoreToolsVersion Condition="'$(TargetFramework)' == 'net10.0'">10.0.0</MicrosoftEntityFrameworkCoreToolsVersion>
+    <MicrosoftEntityFrameworkCoreToolsVersion Condition="'$(TargetFramework)' == 'net9.0'">9.0.0</MicrosoftEntityFrameworkCoreToolsVersion>
+    <MicrosoftEntityFrameworkCoreToolsVersion Condition="'$(TargetFramework)' == 'net8.0'">8.0.4</MicrosoftEntityFrameworkCoreToolsVersion>
+    <MicrosoftEntityFrameworkCoreToolsVersion Condition="'$(MicrosoftEntityFrameworkCoreToolsVersion)' == ''">9.0.0</MicrosoftEntityFrameworkCoreToolsVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <_MonqEfMigrationsDir>$(MSBuildProjectDirectory)\$(MonqEfMigrationsFolder)</_MonqEfMigrationsDir>
+    <_MonqEfOutputSql>$(MSBuildProjectDirectory)\$(MonqEfMigrationsOutputFileName)</_MonqEfOutputSql>
+  </PropertyGroup>
+
+  <!-- Target 1: Generate SQL script after successful build -->
+  <Target Name="MonqGenerateEfSchemaSql"
+          AfterTargets="Build"
+          Condition="'$(MonqEfHasMigrations)' == 'true'">
+
+    <!-- Step 1: Generate idempotent migration script -->
+    <Message Importance="high" Text="[MONQ] Generating EF migration SQL script..." />
+    <Exec Command="dotnet ef migrations script --idempotent --output &quot;$(_MonqEfOutputSql)&quot; --project &quot;$(MSBuildProjectDirectory)&quot; --startup-project &quot;$(MSBuildProjectDirectory)&quot; --no-build"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          IgnoreExitCode="false" />
+
+    <!-- Step 2: Extract migration names from .cs files in Migrations/ folder -->
+    <Message Importance="high" Text="[MONQ] Extracting migration metadata..." />
+    <MonqExtractMigrations MigrationsDirectory="$(_MonqEfMigrationsDir)">
+      <Output TaskParameter="MigrationNames" ItemName="_MonqMigrationNames" />
+    </MonqExtractMigrations>
+
+    <!-- Step 3: Prepend MONQ_MIGRATIONS metadata to SQL file (JSON formatted in task) -->
+    <MonqPrependMetadataToFile FilePath="$(_MonqEfOutputSql)" MigrationNames="@(_MonqMigrationNames->'%(Identity)', '|')" />
+
+    <Message Importance="high" Text="[MONQ] Generated SQL schema: $(_MonqEfOutputSql) with $(_MonqMigrationNames->Count()) migrations" />
+  </Target>
+
+  <!-- Target 2: Include SQL as embedded resource -->
+  <Target Name="MonqIncludeEfSchemaResource"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(MonqEfHasMigrations)' == 'true' AND Exists('$(_MonqEfOutputSql)')">
+
+    <ItemGroup>
+      <EmbeddedResource Include="$(_MonqEfOutputSql)" LogicalName="$(MonqEfMigrationsOutputFileName)" />
+    </ItemGroup>
+
+    <Message Importance="high" Text="[MONQ] Including SQL schema resource: $(_MonqEfOutputSql)" />
+  </Target>
+
+  <!-- Inline Task: Extract migration names from .cs files -->
+  <UsingTask TaskName="MonqExtractMigrations" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <MigrationsDirectory ParameterType="System.String" Required="true" />
+      <MigrationNames ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs">
+<![CDATA[
+        var migrations = new List<ITaskItem>();
+        if (Directory.Exists(MigrationsDirectory))
+        {
+            var migrationFiles = Directory.GetFiles(MigrationsDirectory, "*_*.Designer.cs", SearchOption.TopDirectoryOnly);
+            foreach (var file in migrationFiles.OrderBy(f => f))
+            {
+                var fileName = Path.GetFileNameWithoutExtension(file);
+                var migrationName = fileName.EndsWith(".Designer") ? fileName.Substring(0, fileName.Length - ".Designer".Length) : fileName;
+                migrations.Add(new TaskItem(migrationName));
+            }
+        }
+        MigrationNames = migrations.ToArray();
+]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <!-- Inline Task: Prepend metadata line to file with JSON-formatted migrations -->
+  <UsingTask TaskName="MonqPrependMetadataToFile" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <FilePath ParameterType="System.String" Required="true" />
+      <MigrationNames ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs">
+<![CDATA[
+        if (File.Exists(FilePath))
+        {
+            var migrations = MigrationNames.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+            var jsonItems = migrations.Select(m => $"\"{m}\"");
+            var jsonArray = "[" + string.Join(", ", jsonItems) + "]";
+            var metadataLine = "-- MONQ_MIGRATIONS: " + jsonArray;
+
+            var content = File.ReadAllText(FilePath);
+            var newContent = metadataLine + Environment.NewLine + content;
+            File.WriteAllText(FilePath, newContent);
+        }
+]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+</Project>

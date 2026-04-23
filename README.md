@@ -657,6 +657,159 @@ public static void CreateDbSchemaOnFirstRun<T>(this IApplicationBuilder app,
 - `sleepBeforeTerminate` - If true and `terminateOnException` is true, the main thread will sleep before termination (default: true)
 - `terminationSleepMilliseconds` - Sleep interval when `terminateOnException` is true and `sleepBeforeTerminate` is true (default: 10000ms)
 
+#### NativeAOT-Compatible Schema Initialization
+
+The `CreateDbSchemaOnFirstRunNative<T>()` method provides the same functionality but is fully compatible with **NativeAOT** and **trimming**.
+
+**Why use this method?**
+
+The standard `CreateDbSchemaOnFirstRun<T>()` uses `IMigrator.Migrate()` internally, which relies on runtime reflection to discover and execute migrations. This is incompatible with:
+
+- NativeAOT compilation (requires all code to be known at compile time)
+- Trimming (removes unused code, breaking reflection-based discovery)
+- `[RequiresDynamicCode]` and `[RequiresUnreferencedCode]` warnings
+
+The NativeAOT-compatible version uses a **pre-generated SQL script** that is embedded into the assembly at build time, eliminating all runtime reflection.
+
+**How it works:**
+
+1. At build time, an MSBuild target automatically generates an idempotent SQL script from your EF Core migrations
+2. The script is embedded as a resource in your assembly (trimming-safe)
+3. At runtime, the script is executed directly via `ExecuteSqlRaw` — no reflection needed
+
+**Configuration steps:**
+
+**Step 1: Ensure you have EF Core migrations**
+
+Your project must have a `Migrations/` folder with migration files. If not, create an initial migration:
+
+```bash
+dotnet ef migrations add InitialCreate
+```
+
+**Step 2: Add required packages**
+
+Ensure your project references the design-time tools:
+
+```xml
+<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+  <PrivateAssets>all</PrivateAssets>
+  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+</PackageReference>
+```
+
+**Step 3: Add IDesignTimeDbContextFactory**
+
+EF Core tools need a factory to create your DbContext at design time:
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
+
+public sealed class MyDbContextFactory : IDesignTimeDbContextFactory<MyDbContext>
+{
+    public MyDbContext CreateDbContext(string[] args)
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<MyDbContext>();
+        optionsBuilder.UseNpgsql("host=localhost;database=mydb;username=postgres;password=postgres");
+        return new MyDbContext(optionsBuilder.Options);
+    }
+}
+```
+
+**Step 4: Use the NativeAOT method in Program.cs**
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+
+var app = builder.Build();
+
+// Option 1: Load SQL from embedded resource (recommended)
+app.CreateDbSchemaOnFirstRunNative<MyDbContext>(
+    typeof(Program).Assembly,
+    "Schema.sql");
+
+// Option 2: Provide SQL via delegate
+app.CreateDbSchemaOnFirstRunNative<MyDbContext>(
+    () => {
+        using var stream = typeof(Program).Assembly
+            .GetManifestResourceStream("Schema.sql");
+        using var reader = new StreamReader(stream!);
+        return reader.ReadToEnd();
+    });
+
+app.Run();
+```
+
+**MSBuild Target (automatic SQL generation):**
+
+When you reference `Monq.Core.BasicDotNetMicroservice`, an MSBuild target is automatically imported. It activates when a `Migrations/` folder exists in your project.
+
+**What the target does:**
+
+1. Runs `dotnet ef migrations script --idempotent` after each build
+2. Extracts migration names from `Migrations/*.Designer.cs` files
+3. Prepends `-- MONQ_MIGRATIONS: ["Migration1", "Migration2"]` metadata to the SQL
+4. Embeds `Schema.sql` as a resource in your assembly
+
+**Build workflow:**
+
+- **First build:** Generates `Schema.sql` in your project root
+- **Second build:** Embeds `Schema.sql` as a resource (available at runtime)
+- **Subsequent builds:** Regenerates SQL if migrations changed, keeps resource embedded
+
+**Customization properties:**
+
+You can override the default behavior in your `.csproj`:
+
+```xml
+<PropertyGroup>
+  <!-- Disable automatic generation -->
+  <MonqEfMigrationsEnabled>false</MonQEfMigrationsEnabled>
+  
+  <!-- Change output filename -->
+  <MonqEfMigrationsOutputFileName>MySchema.sql</MonqEfMigrationsOutputFileName>
+  
+  <!-- Change migrations folder location -->
+  <MonqEfMigrationsFolder>Database/Migrations</MonqEfMigrationsFolder>
+</PropertyGroup>
+```
+
+**Example of complete setup:**
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Monq.Core.BasicDotNetMicroservice" Version="9.2.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>
+```
+
+```csharp
+// Program.cs
+builder.Services.AddDbContext<MyDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+
+var app = builder.Build();
+
+// NativeAOT-safe schema initialization
+app.CreateDbSchemaOnFirstRunNative<MyDbContext>(
+    typeof(Program).Assembly,
+    "Schema.sql");
+
+app.Run();
+```
+
 ### Migration guide to v9
 
 1. Replace `services.ConfigureSMAuthentication()` with `services.ConfigureMonqAuthentication()`.
