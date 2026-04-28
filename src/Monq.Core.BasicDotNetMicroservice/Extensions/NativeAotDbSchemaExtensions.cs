@@ -116,6 +116,45 @@ public static class NativeAotDbSchemaExtensions
             terminationSleepMilliseconds);
     }
 
+    /// <summary>
+    /// Create schema on empty database or validate migrations if schema exists.
+    /// Reads SQL from output directory file first, falls back to embedded resource.
+    /// </summary>
+    /// <typeparam name="T">The concrete database context.</typeparam>
+    /// <param name="app">The <see cref="IApplicationBuilder"/> object.</param>
+    /// <param name="fileName">SQL filename (default: "PgSchema.sql").</param>
+    /// <param name="terminateOnException">If true when the exception occurs the application will be terminated.</param>
+    /// <param name="sleepBeforeTerminate">If true when <paramref name="terminateOnException"/> the main thread will sleep before terminate.</param>
+    /// <param name="terminationSleepMilliseconds">The sleep interval when <paramref name="terminateOnException"/> is true and <paramref name="sleepBeforeTerminate"/> is true.</param>
+    public static void CreateDbSchemaOnFirstRunNative<T>(
+        this IApplicationBuilder app,
+        string fileName = "PgSchema.sql",
+        bool terminateOnException = true,
+        bool sleepBeforeTerminate = true,
+        int terminationSleepMilliseconds = 10000)
+            where T : DbContext
+    {
+        app.CreateDbSchemaOnFirstRunNative<T>(
+            () =>
+            {
+                var filePath = Path.Combine(AppContext.BaseDirectory, fileName);
+                if (File.Exists(filePath))
+                {
+                    return File.ReadAllText(filePath, Encoding.UTF8);
+                }
+
+                var assembly = Assembly.GetEntryAssembly() ?? typeof(T).Assembly;
+                var stream = assembly.GetManifestResourceStream(fileName)
+                    ?? throw new InvalidOperationException(
+                        $"SQL file not found at '{filePath}' and embedded resource '{fileName}' not found in assembly '{assembly.FullName}'.");
+                using var reader = new StreamReader(stream, Encoding.UTF8);
+                return reader.ReadToEnd();
+            },
+            terminateOnException,
+            sleepBeforeTerminate,
+            terminationSleepMilliseconds);
+    }
+
     static void InitializeSchemaFromSql(DbContext context, string sql)
     {
         context.Database.ExecuteSqlRaw(sql);

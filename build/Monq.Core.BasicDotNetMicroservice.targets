@@ -7,7 +7,7 @@
     2. Runs 'dotnet ef migrations script -idempotent' to generate SQL
     3. Extracts migration names from the Migrations folder
     4. Prepends MONQ_MIGRATIONS metadata to the SQL file
-    5. Embeds the SQL file as a resource (trimming-safe)
+    5. Copies SQL to output directory (available at runtime on first build)
     
     Usage: Just reference Monq.Core.BasicDotNetMicroservice package.
     The target activates automatically when Migrations folder exists.
@@ -16,17 +16,17 @@
       MonqEfMigrationsEnabled - Set to 'false' to disable (default: true)
       MonqEfMigrationsOutputFileName - Output SQL filename (default: PgSchema.sql)
       MonqEfMigrationsFolder - Migrations folder name (default: Migrations)
-      MonqEfDbContextName - DbContext class name (default: $(AssemblyName)Context)
+      MonqEfDbContextName - Fully qualified DbContext name (default: $(RootNamespace).$(AssemblyName)Context)
     
-    Note: First build generates SQL, second build includes it in the assembly.
+    Note: SQL is copied to output directory in the same build — no second build required.
   -->
 
   <PropertyGroup>
     <MonqEfMigrationsEnabled Condition="'$(MonqEfMigrationsEnabled)' == ''">true</MonqEfMigrationsEnabled>
     <MonqEfMigrationsOutputFileName Condition="'$(MonqEfMigrationsOutputFileName)' == ''">PgSchema.sql</MonqEfMigrationsOutputFileName>
     <MonqEfMigrationsFolder Condition="'$(MonqEfMigrationsFolder)' == ''">Migrations</MonqEfMigrationsFolder>
-    <!-- DbContext name convention: $(AssemblyName)Context by default -->
-    <MonqEfDbContextName Condition="'$(MonqEfDbContextName)' == ''">$(AssemblyName)Context</MonqEfDbContextName>
+    <!-- DbContext fully qualified name convention: $(RootNamespace).$(AssemblyName)Context by default -->
+    <MonqEfDbContextName Condition="'$(MonqEfDbContextName)' == ''">$(RootNamespace).$(AssemblyName)Context</MonqEfDbContextName>
   </PropertyGroup>
 
   <!-- Detect migrations folder (skip for library project itself) -->
@@ -51,17 +51,20 @@
   <PropertyGroup>
     <_MonqEfMigrationsDir>$(MSBuildProjectDirectory)\$(MonqEfMigrationsFolder)</_MonqEfMigrationsDir>
     <_MonqEfOutputSql>$(MSBuildProjectDirectory)\$(MonqEfMigrationsOutputFileName)</_MonqEfOutputSql>
-    <_MonqEfDesignTimeFactoryFile>$(IntermediateOutputPath)MonqDesignTimeDbContextFactory.cs</_MonqEfDesignTimeFactoryFile>
   </PropertyGroup>
 
-  <!-- Target 0: Generate temporary DesignTimeDbContextFactory -->
+  <!-- Target 0: Generate temporary DesignTimeDbContextFactory BEFORE compilation -->
   <Target Name="MonqGenerateDesignTimeFactory"
-          BeforeTargets="MonqGenerateEfSchemaSql"
+          BeforeTargets="CoreCompile"
           Condition="'$(MonqEfHasMigrations)' == 'true'">
-    
+
+    <PropertyGroup>
+      <_MonqEfDesignTimeFactoryFile>$(IntermediateOutputPath)MonqDesignTimeDbContextFactory.cs</_MonqEfDesignTimeFactoryFile>
+    </PropertyGroup>
+
     <Message Importance="high" Text="[MONQ] Generating temporary DesignTimeDbContextFactory for '$(MonqEfDbContextName)'..." />
-    <MonqGenerateFactoryFile DbContextName="$(MonqEfDbContextName)" Namespace="$(RootNamespace)" OutputFile="$(_MonqEfDesignTimeFactoryFile)" />
-    
+    <MonqGenerateFactoryFile DbContextFullName="$(MonqEfDbContextName)" OutputFile="$(_MonqEfDesignTimeFactoryFile)" />
+
     <!-- Add generated file to compilation -->
     <ItemGroup>
       <Compile Include="$(_MonqEfDesignTimeFactoryFile)" />
@@ -72,6 +75,10 @@
   <Target Name="MonqGenerateEfSchemaSql"
           AfterTargets="Build"
           Condition="'$(MonqEfHasMigrations)' == 'true'">
+
+    <PropertyGroup>
+      <_MonqEfDesignTimeFactoryFile>$(IntermediateOutputPath)MonqDesignTimeDbContextFactory.cs</_MonqEfDesignTimeFactoryFile>
+    </PropertyGroup>
 
     <!-- Step 1: Generate idempotent migration script -->
     <Message Importance="high" Text="[MONQ] Generating EF migration SQL script..." />
@@ -89,29 +96,20 @@
     <MonqPrependMetadataToFile FilePath="$(_MonqEfOutputSql)" MigrationNames="@(_MonqMigrationNames->'%(Identity)', '|')" />
 
     <Message Importance="high" Text="[MONQ] Generated SQL schema: $(_MonqEfOutputSql) with $(_MonqMigrationNames->Count()) migrations" />
+
+    <!-- Step 4: Copy SQL to output directory for runtime access -->
+    <Copy SourceFiles="$(_MonqEfOutputSql)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="[MONQ] Copied SQL to output directory: $(OutputPath)$(MonqEfMigrationsOutputFileName)" />
     
     <!-- Clean up temporary factory file -->
     <Message Importance="high" Text="[MONQ] Cleaning up temporary DesignTimeDbContextFactory..." />
     <Delete Files="$(_MonqEfDesignTimeFactoryFile)" Condition="Exists('$(_MonqEfDesignTimeFactoryFile)')" />
   </Target>
 
-  <!-- Target 2: Include SQL as embedded resource -->
-  <Target Name="MonqIncludeEfSchemaResource"
-          BeforeTargets="PrepareForBuild"
-          Condition="'$(MonqEfHasMigrations)' == 'true' AND Exists('$(_MonqEfOutputSql)')">
-
-    <ItemGroup>
-      <EmbeddedResource Include="$(_MonqEfOutputSql)" LogicalName="$(MonqEfMigrationsOutputFileName)" />
-    </ItemGroup>
-
-    <Message Importance="high" Text="[MONQ] Including SQL schema resource: $(_MonqEfOutputSql)" />
-  </Target>
-
   <!-- Inline Task: Generate temporary DesignTimeDbContextFactory -->
   <UsingTask TaskName="MonqGenerateFactoryFile" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
-      <DbContextName ParameterType="System.String" Required="true" />
-      <Namespace ParameterType="System.String" Required="true" />
+      <DbContextFullName ParameterType="System.String" Required="true" />
       <OutputFile ParameterType="System.String" Required="true" />
     </ParameterGroup>
     <Task>
@@ -123,25 +121,49 @@
             Directory.CreateDirectory(directory);
         }
 
+        var lastDot = DbContextFullName.LastIndexOf('.');
+        string dbContextNamespace;
+        string dbContextClassName;
+        
+        if (lastDot > 0)
+        {
+            dbContextNamespace = DbContextFullName.Substring(0, lastDot);
+            dbContextClassName = DbContextFullName.Substring(lastDot + 1);
+        }
+        else
+        {
+            dbContextNamespace = string.Empty;
+            dbContextClassName = DbContextFullName;
+        }
+
+        var usingDirective = string.IsNullOrEmpty(dbContextNamespace) 
+            ? string.Empty 
+            : $"using {dbContextNamespace};";
+
+        var namespaceDirective = string.IsNullOrEmpty(dbContextNamespace) 
+            ? string.Empty 
+            : $"namespace {dbContextNamespace};";
+
         var content = $@"// <auto-generated />
 // This file was auto-generated by Monq.Core.BasicDotNetMicroservice targets.
 // Do not edit manually.
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+{usingDirective}
 
-namespace {Namespace};
+{namespaceDirective}
 
-public sealed class MonqDesignTimeDbContextFactory : IDesignTimeDbContextFactory<{DbContextName}>
+public sealed class MonqDesignTimeDbContextFactory : IDesignTimeDbContextFactory<{dbContextClassName}>
 {{
-    public {DbContextName} CreateDbContext(string[] args)
+    public {dbContextClassName} CreateDbContext(string[] args)
     {{
-        var optionsBuilder = new DbContextOptionsBuilder<{DbContextName}>();
+        var optionsBuilder = new DbContextOptionsBuilder<{dbContextClassName}>();
         var connectionString = Environment.GetEnvironmentVariable(""MONQ_DESIGN_TIME_CONNECTION_STRING"")
             ?? ""host=localhost;database=monq;username=postgres;password=postgres"";
         
         optionsBuilder.UseNpgsql(connectionString);
-        return new {DbContextName}(optionsBuilder.Options);
+        return new {dbContextClassName}(optionsBuilder.Options);
     }}
 }}
 ";
@@ -181,14 +203,16 @@ public sealed class MonqDesignTimeDbContextFactory : IDesignTimeDbContextFactory
   <UsingTask TaskName="MonqPrependMetadataToFile" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
       <FilePath ParameterType="System.String" Required="true" />
-      <MigrationNames ParameterType="System.String" Required="true" />
+      <MigrationNames ParameterType="System.String" Required="false" />
     </ParameterGroup>
     <Task>
       <Code Type="Fragment" Language="cs">
 <![CDATA[
         if (File.Exists(FilePath))
         {
-            var migrations = MigrationNames.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+            var migrations = string.IsNullOrEmpty(MigrationNames) 
+                ? Array.Empty<string>() 
+                : MigrationNames.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
             var jsonItems = migrations.Select(m => $"\"{m}\"");
             var jsonArray = "[" + string.Join(", ", jsonItems) + "]";
             var metadataLine = "-- MONQ_MIGRATIONS: " + jsonArray;

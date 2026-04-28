@@ -30,7 +30,7 @@ builder.Services.AddDbContext<WebAppContext>(options => options.UseNpgsql("host=
 builder.Services
         .AddGlobalExceptionFilter()
         .AddExceptionHandler<ResponseException>(ex =>
-            new ObjectResult(JsonSerializer.Deserialize<object>(ex.ResponseData, new JsonSerializerOptions
+            new ObjectResult(JsonSerializer.Deserialize<object>(ex.ResponseData!, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -63,9 +63,7 @@ app.UseRequestLocalization();
 app.MapControllers();
 
 // NativeAOT-compatible schema initialization
-// Uses pre-generated SQL script embedded at build time
-app.CreateDbSchemaOnFirstRunNative<WebAppContext>(
-    typeof(Program).Assembly,
-    "PgSchema.sql");
+// Reads SQL from output directory (copied during build), fallback to embedded resource
+app.CreateDbSchemaOnFirstRunNative<WebAppContext>();
 
 app.Run();

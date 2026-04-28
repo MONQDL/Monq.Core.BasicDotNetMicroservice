@@ -702,13 +702,14 @@ Ensure your project references the design-time tools:
 
 No manual `IDesignTimeDbContextFactory` is required! The MSBuild target automatically generates a temporary factory during build.
 
-By convention, the target expects your DbContext to be named `$(AssemblyName)Context`. For example, if your assembly is `MyApp.Api`, the DbContext should be `MyApp.ApiContext`.
+By convention, the target expects your DbContext's fully qualified name to be `$(RootNamespace).$(AssemblyName)Context`. For example, if your root namespace is `MyApp.Api` and assembly is `MyApp.Api`, the DbContext should be `MyApp.Api.ApiContext`.
 
-If your DbContext has a different name, specify it in your `.csproj`:
+If your DbContext has a different name or is in a different namespace, specify the **fully qualified name** in your `.csproj`:
 
 ```xml
 <PropertyGroup>
-  <MonqEfDbContextName>MyCustomDbContext</MonqEfDbContextName>
+  <!-- Fully qualified name including namespace -->
+  <MonqEfDbContextName>MyApp.Api.Configuration.MyDbContext</MonqEfDbContextName>
 </PropertyGroup>
 ```
 
@@ -717,12 +718,18 @@ using Microsoft.Extensions.DependencyInjection;
 
 var app = builder.Build();
 
-// Option 1: Load SQL from embedded resource (recommended)
+// Simplest — reads from output file, fallback to embedded resource
+app.CreateDbSchemaOnFirstRunNative<MyDbContext>();
+
+// With custom filename
+app.CreateDbSchemaOnFirstRunNative<MyDbContext>("MySchema.sql");
+
+// From embedded resource (legacy)
 app.CreateDbSchemaOnFirstRunNative<MyDbContext>(
     typeof(Program).Assembly,
     "PgSchema.sql");
 
-// Option 2: Provide SQL via delegate
+// Provide SQL via delegate
 app.CreateDbSchemaOnFirstRunNative<MyDbContext>(
     () => {
         using var stream = typeof(Program).Assembly
@@ -743,13 +750,12 @@ When you reference `Monq.Core.BasicDotNetMicroservice`, an MSBuild target is aut
 1. Runs `dotnet ef migrations script --idempotent` after each build
 2. Extracts migration names from `Migrations/*.Designer.cs` files
 3. Prepends `-- MONQ_MIGRATIONS: ["Migration1", "Migration2"]` metadata to the SQL
-4. Embeds `PgSchema.sql` as a resource in your assembly
+4. Copies `PgSchema.sql` to the output directory (available at runtime in the same build)
 
 **Build workflow:**
 
-- **First build:** Generates `PgSchema.sql` in your project root
-- **Second build:** Embeds `PgSchema.sql` as a resource (available at runtime)
-- **Subsequent builds:** Regenerates SQL if migrations changed, keeps resource embedded
+- **Single build:** Generates `PgSchema.sql` and copies it to output directory — ready at runtime
+- **Subsequent builds:** Regenerates SQL if migrations changed, keeps file in output directory
 
 **Customization properties:**
 
@@ -766,8 +772,8 @@ You can override the default behavior in your `.csproj`:
   <!-- Change migrations folder location -->
   <MonqEfMigrationsFolder>Database/Migrations</MonqEfMigrationsFolder>
   
-  <!-- Override DbContext name (default: $(AssemblyName)Context) -->
-  <MonqEfDbContextName>MyCustomDbContext</MonqEfDbContextName>
+  <!-- Override DbContext fully qualified name (default: $(RootNamespace).$(AssemblyName)Context) -->
+  <MonqEfDbContextName>MyApp.Configuration.MyCustomDbContext</MonqEfDbContextName>
 </PropertyGroup>
 ```
 
@@ -826,8 +832,8 @@ app.Run();
 
 During build, the MSBuild target:
 
-1. Generates a temporary `MonqDesignTimeDbContextFactory.cs` in the `obj/` folder
-2. Uses the project's `$(RootNamespace)` for the correct namespace
+1. Parses the fully qualified `MonqEfDbContextName` to extract namespace and class name
+2. Generates a temporary `MonqDesignTimeDbContextFactory.cs` in the `obj/` folder with correct using directives and namespace
 3. Uses the factory to run `dotnet ef migrations script`
 4. Deletes the temporary factory after SQL generation
 

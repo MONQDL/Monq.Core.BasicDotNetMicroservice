@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Fully qualified DbContext name for EF Core tools -->
+    <MonqEfDbContextName>Monq.Core.BasicDotNetMicroservice.WebApp.Configuration.WebAppContext</MonqEfDbContextName>
   </PropertyGroup>
 
   <ItemGroup>
