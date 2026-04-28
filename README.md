@@ -698,26 +698,19 @@ Ensure your project references the design-time tools:
 </PackageReference>
 ```
 
-**Step 3: Add IDesignTimeDbContextFactory**
+**Step 3: Use the NativeAOT method in Program.cs**
 
-EF Core tools need a factory to create your DbContext at design time:
+No manual `IDesignTimeDbContextFactory` is required! The MSBuild target automatically generates a temporary factory during build.
 
-```csharp
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Design;
+By convention, the target expects your DbContext to be named `$(AssemblyName)Context`. For example, if your assembly is `MyApp.Api`, the DbContext should be `MyApp.ApiContext`.
 
-public sealed class MyDbContextFactory : IDesignTimeDbContextFactory<MyDbContext>
-{
-    public MyDbContext CreateDbContext(string[] args)
-    {
-        var optionsBuilder = new DbContextOptionsBuilder<MyDbContext>();
-        optionsBuilder.UseNpgsql("host=localhost;database=mydb;username=postgres;password=postgres");
-        return new MyDbContext(optionsBuilder.Options);
-    }
-}
+If your DbContext has a different name, specify it in your `.csproj`:
+
+```xml
+<PropertyGroup>
+  <MonqEfDbContextName>MyCustomDbContext</MonqEfDbContextName>
+</PropertyGroup>
 ```
-
-**Step 4: Use the NativeAOT method in Program.cs**
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
@@ -765,14 +758,31 @@ You can override the default behavior in your `.csproj`:
 ```xml
 <PropertyGroup>
   <!-- Disable automatic generation -->
-  <MonqEfMigrationsEnabled>false</MonQEfMigrationsEnabled>
+  <MonqEfMigrationsEnabled>false</MonqEfMigrationsEnabled>
   
   <!-- Change output filename -->
   <MonqEfMigrationsOutputFileName>MySchema.sql</MonqEfMigrationsOutputFileName>
   
   <!-- Change migrations folder location -->
   <MonqEfMigrationsFolder>Database/Migrations</MonqEfMigrationsFolder>
+  
+  <!-- Override DbContext name (default: $(AssemblyName)Context) -->
+  <MonqEfDbContextName>MyCustomDbContext</MonqEfDbContextName>
 </PropertyGroup>
+```
+
+**Connection string for design-time factory:**
+
+The auto-generated factory uses a default connection string. To override it for migration generation, set the environment variable:
+
+```bash
+# Linux/macOS
+export MONQ_DESIGN_TIME_CONNECTION_STRING="host=db;database=mydb;username=postgres;password=secret"
+
+# Windows (PowerShell)
+$env:MONQ_DESIGN_TIME_CONNECTION_STRING="host=db;database=mydb;username=postgres;password=secret"
+
+dotnet build
 ```
 
 **Example of complete setup:**
@@ -782,6 +792,8 @@ You can override the default behavior in your `.csproj`:
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <PublishAot>true</PublishAot>
+    <!-- Optional: Override DbContext name if not following convention -->
+    <!-- <MonqEfDbContextName>MyCustomDbContext</MonqEfDbContextName> -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -809,6 +821,17 @@ app.CreateDbSchemaOnFirstRunNative<MyDbContext>(
 
 app.Run();
 ```
+
+**How the auto-generated factory works:**
+
+During build, the MSBuild target:
+
+1. Checks if `Migrations/DesignTimeDbContextFactory.cs` exists
+2. If not, generates a temporary factory for your DbContext type
+3. Uses the factory to run `dotnet ef migrations script`
+4. Deletes the temporary factory after SQL generation
+
+This eliminates the need to manually create and maintain `IDesignTimeDbContextFactory` in each microservice.
 
 ### Migration guide to v9
 
