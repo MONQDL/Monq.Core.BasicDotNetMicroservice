@@ -826,12 +826,12 @@ app.Run();
 
 During build, the MSBuild target:
 
-1. Checks if `Migrations/DesignTimeDbContextFactory.cs` exists
-2. If not, generates a temporary factory for your DbContext type
+1. Generates a temporary `MonqDesignTimeDbContextFactory.cs` in the `obj/` folder
+2. Uses the project's `$(RootNamespace)` for the correct namespace
 3. Uses the factory to run `dotnet ef migrations script`
 4. Deletes the temporary factory after SQL generation
 
-This eliminates the need to manually create and maintain `IDesignTimeDbContextFactory` in each microservice.
+The generated file is automatically cleaned up and never committed to source control. This eliminates the need to manually create and maintain `IDesignTimeDbContextFactory` in each microservice.
 
 ### Migration guide to v9
 
