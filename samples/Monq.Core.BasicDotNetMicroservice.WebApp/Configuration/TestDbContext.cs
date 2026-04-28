@@ -3,9 +3,9 @@ using Monq.Core.BasicDotNetMicroservice.WebApp.Models;
 
 namespace Monq.Core.BasicDotNetMicroservice.WebApp.Configuration;
 
-public sealed class TestDbContext : DbContext
+public sealed class WebAppContext : DbContext
 {
-    public TestDbContext(DbContextOptions<TestDbContext> options) : base(options)
+    public WebAppContext(DbContextOptions<WebAppContext> options) : base(options)
     {
     }
 
@@ -18,4 +18,4 @@ public sealed class TestDbContext : DbContext
                 .ValueGeneratedOnAdd();
         });
     }
-    }
+}

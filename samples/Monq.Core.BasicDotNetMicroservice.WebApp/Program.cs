@@ -25,7 +25,7 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 
 builder.Services.ConfigureMonqAuthentication(builder.Configuration);
 
-builder.Services.AddDbContext<TestDbContext>(options => options.UseNpgsql("host=localhost"));
+builder.Services.AddDbContext<WebAppContext>(options => options.UseNpgsql("host=localhost"));
 
 builder.Services
         .AddGlobalExceptionFilter()
@@ -64,7 +64,7 @@ app.MapControllers();
 
 // NativeAOT-compatible schema initialization
 // Uses pre-generated SQL script embedded at build time
-app.CreateDbSchemaOnFirstRunNative<TestDbContext>(
+app.CreateDbSchemaOnFirstRunNative<WebAppContext>(
     typeof(Program).Assembly,
     "PgSchema.sql");
 

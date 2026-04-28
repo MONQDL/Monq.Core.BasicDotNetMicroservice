@@ -16,6 +16,7 @@
       MonqEfMigrationsEnabled - Set to 'false' to disable (default: true)
       MonqEfMigrationsOutputFileName - Output SQL filename (default: PgSchema.sql)
       MonqEfMigrationsFolder - Migrations folder name (default: Migrations)
+      MonqEfDbContextName - DbContext class name (default: $(AssemblyName)Context)
     
     Note: First build generates SQL, second build includes it in the assembly.
   -->
@@ -24,6 +25,8 @@
     <MonqEfMigrationsEnabled Condition="'$(MonqEfMigrationsEnabled)' == ''">true</MonqEfMigrationsEnabled>
     <MonqEfMigrationsOutputFileName Condition="'$(MonqEfMigrationsOutputFileName)' == ''">PgSchema.sql</MonqEfMigrationsOutputFileName>
     <MonqEfMigrationsFolder Condition="'$(MonqEfMigrationsFolder)' == ''">Migrations</MonqEfMigrationsFolder>
+    <!-- DbContext name convention: $(AssemblyName)Context by default -->
+    <MonqEfDbContextName Condition="'$(MonqEfDbContextName)' == ''">$(AssemblyName)Context</MonqEfDbContextName>
   </PropertyGroup>
 
   <!-- Detect migrations folder (skip for library project itself) -->
@@ -39,16 +42,26 @@
 
   <!-- Define EF Core Tools version based on target framework -->
   <PropertyGroup Condition="'$(MonqEfHasMigrations)' == 'true'">
-    <MicrosoftEntityFrameworkCoreToolsVersion Condition="'$(TargetFramework)' == 'net10.0'">10.0.0</MicrosoftEntityFrameworkCoreToolsVersion>
+    <MicrosoftEntityFrameworkCoreToolsVersion Condition="'$(TargetFramework)' == 'net10.0'">10.0.7</MicrosoftEntityFrameworkCoreToolsVersion>
     <MicrosoftEntityFrameworkCoreToolsVersion Condition="'$(TargetFramework)' == 'net9.0'">9.0.0</MicrosoftEntityFrameworkCoreToolsVersion>
     <MicrosoftEntityFrameworkCoreToolsVersion Condition="'$(TargetFramework)' == 'net8.0'">8.0.4</MicrosoftEntityFrameworkCoreToolsVersion>
-    <MicrosoftEntityFrameworkCoreToolsVersion Condition="'$(MicrosoftEntityFrameworkCoreToolsVersion)' == ''">9.0.0</MicrosoftEntityFrameworkCoreToolsVersion>
+    <MicrosoftEntityFrameworkCoreToolsVersion Condition="'$(MicrosoftEntityFrameworkCoreToolsVersion)' == ''">10.0.7</MicrosoftEntityFrameworkCoreToolsVersion>
   </PropertyGroup>
 
   <PropertyGroup>
     <_MonqEfMigrationsDir>$(MSBuildProjectDirectory)\$(MonqEfMigrationsFolder)</_MonqEfMigrationsDir>
     <_MonqEfOutputSql>$(MSBuildProjectDirectory)\$(MonqEfMigrationsOutputFileName)</_MonqEfOutputSql>
+    <_MonqEfDesignTimeFactoryFile>$(MSBuildProjectDirectory)\$(MonqEfMigrationsFolder)\DesignTimeDbContextFactory.cs</_MonqEfDesignTimeFactoryFile>
   </PropertyGroup>
+
+  <!-- Target 0: Generate temporary DesignTimeDbContextFactory if not exists -->
+  <Target Name="MonqGenerateDesignTimeFactory"
+          BeforeTargets="MonqGenerateEfSchemaSql"
+          Condition="'$(MonqEfHasMigrations)' == 'true' AND !Exists('$(_MonqEfDesignTimeFactoryFile)')">
+    
+    <Message Importance="high" Text="[MONQ] Generating temporary DesignTimeDbContextFactory for '$(MonqEfDbContextName)'..." />
+    <MonqGenerateFactoryFile DbContextName="$(MonqEfDbContextName)" OutputFile="$(_MonqEfDesignTimeFactoryFile)" />
+  </Target>
 
   <!-- Target 1: Generate SQL script after successful build -->
   <Target Name="MonqGenerateEfSchemaSql"
@@ -57,7 +70,7 @@
 
     <!-- Step 1: Generate idempotent migration script -->
     <Message Importance="high" Text="[MONQ] Generating EF migration SQL script..." />
-    <Exec Command="dotnet ef migrations script --idempotent --output &quot;$(_MonqEfOutputSql)&quot; --project &quot;$(MSBuildProjectDirectory)&quot; --startup-project &quot;$(MSBuildProjectDirectory)&quot; --no-build"
+    <Exec Command="dotnet ef migrations script --idempotent --context &quot;$(MonqEfDbContextName)&quot; --output &quot;$(_MonqEfOutputSql)&quot; --project &quot;$(MSBuildProjectDirectory)&quot; --startup-project &quot;$(MSBuildProjectDirectory)&quot; --no-build"
           WorkingDirectory="$(MSBuildProjectDirectory)"
           IgnoreExitCode="false" />
 
@@ -71,6 +84,10 @@
     <MonqPrependMetadataToFile FilePath="$(_MonqEfOutputSql)" MigrationNames="@(_MonqMigrationNames->'%(Identity)', '|')" />
 
     <Message Importance="high" Text="[MONQ] Generated SQL schema: $(_MonqEfOutputSql) with $(_MonqMigrationNames->Count()) migrations" />
+    
+    <!-- Clean up temporary factory file -->
+    <Message Importance="high" Text="[MONQ] Cleaning up temporary DesignTimeDbContextFactory..." />
+    <Delete Files="$(_MonqEfDesignTimeFactoryFile)" Condition="Exists('$(_MonqEfDesignTimeFactoryFile)')" />
   </Target>
 
   <!-- Target 2: Include SQL as embedded resource -->
@@ -84,6 +101,49 @@
 
     <Message Importance="high" Text="[MONQ] Including SQL schema resource: $(_MonqEfOutputSql)" />
   </Target>
+
+  <!-- Inline Task: Generate temporary DesignTimeDbContextFactory -->
+  <UsingTask TaskName="MonqGenerateFactoryFile" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <DbContextName ParameterType="System.String" Required="true" />
+      <OutputFile ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs">
+<![CDATA[
+        var directory = Path.GetDirectoryName(OutputFile);
+        if (!Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var content = $@"// <auto-generated />
+// This file was auto-generated by Monq.Core.BasicDotNetMicroservice targets.
+// Do not edit manually.
+
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
+
+namespace Monq.AutoGenerated;
+
+public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<{DbContextName}>
+{{
+    public {DbContextName} CreateDbContext(string[] args)
+    {{
+        var optionsBuilder = new DbContextOptionsBuilder<{DbContextName}>();
+        var connectionString = Environment.GetEnvironmentVariable(""MONQ_DESIGN_TIME_CONNECTION_STRING"")
+            ?? ""host=localhost;database=monq;username=postgres;password=postgres"";
+        
+        optionsBuilder.UseNpgsql(connectionString);
+        return new {DbContextName}(optionsBuilder.Options);
+    }}
+}}
+";
+        File.WriteAllText(OutputFile, content);
+]]>
+      </Code>
+    </Task>
+  </UsingTask>
 
   <!-- Inline Task: Extract migration names from .cs files -->
   <UsingTask TaskName="MonqExtractMigrations" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
