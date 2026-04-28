@@ -29,10 +29,13 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Restore dependencies
-        run: dotnet restore
+        run: |
+          dotnet restore ${MAINAPP_ASP_PROJECT_PATH}
+          dotnet restore ${TEST_MAINAPP_ASP_PROJECT_PATH}
       - name: Build
         run: |
-          dotnet build -c Release --no-restore
+          dotnet build -c Release --no-restore ${MAINAPP_ASP_PROJECT_PATH}
+          dotnet build -c Release --no-restore ${TEST_MAINAPP_ASP_PROJECT_PATH}
           echo "APP_VERSION=v$(cat ${MAINAPP_ASP_PROJECT_PATH}/*.csproj | grep '<Version>' | head -n 1 | awk -F '>' '{print $2;}' | awk -F '<' '{print $1;}' | sed 's/\-\*//g')" >> $GITHUB_ENV
       - name: Test
         run: |

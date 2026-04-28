@@ -66,6 +66,6 @@ app.MapControllers();
 // Uses pre-generated SQL script embedded at build time
 app.CreateDbSchemaOnFirstRunNative<TestDbContext>(
     typeof(Program).Assembly,
-    "Schema.sql");
+    "PgSchema.sql");
 
 app.Run();

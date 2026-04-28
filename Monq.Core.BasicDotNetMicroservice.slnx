@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/build-targets/">
+    <File Path="build/Monq.Core.BasicDotNetMicroservice.targets" />
+  </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/Monq.Core.BasicDotNetMicroservice.ConsoleApp/Monq.Core.BasicDotNetMicroservice.ConsoleApp.csproj" />
     <Project Path="samples/Monq.Core.BasicDotNetMicroservice.WebApp/Monq.Core.BasicDotNetMicroservice.WebApp.csproj" />

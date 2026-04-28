@@ -727,13 +727,13 @@ var app = builder.Build();
 // Option 1: Load SQL from embedded resource (recommended)
 app.CreateDbSchemaOnFirstRunNative<MyDbContext>(
     typeof(Program).Assembly,
-    "Schema.sql");
+    "PgSchema.sql");
 
 // Option 2: Provide SQL via delegate
 app.CreateDbSchemaOnFirstRunNative<MyDbContext>(
     () => {
         using var stream = typeof(Program).Assembly
-            .GetManifestResourceStream("Schema.sql");
+            .GetManifestResourceStream("PgSchema.sql");
         using var reader = new StreamReader(stream!);
         return reader.ReadToEnd();
     });
@@ -750,12 +750,12 @@ When you reference `Monq.Core.BasicDotNetMicroservice`, an MSBuild target is aut
 1. Runs `dotnet ef migrations script --idempotent` after each build
 2. Extracts migration names from `Migrations/*.Designer.cs` files
 3. Prepends `-- MONQ_MIGRATIONS: ["Migration1", "Migration2"]` metadata to the SQL
-4. Embeds `Schema.sql` as a resource in your assembly
+4. Embeds `PgSchema.sql` as a resource in your assembly
 
 **Build workflow:**
 
-- **First build:** Generates `Schema.sql` in your project root
-- **Second build:** Embeds `Schema.sql` as a resource (available at runtime)
+- **First build:** Generates `PgSchema.sql` in your project root
+- **Second build:** Embeds `PgSchema.sql` as a resource (available at runtime)
 - **Subsequent builds:** Regenerates SQL if migrations changed, keeps resource embedded
 
 **Customization properties:**
@@ -805,7 +805,7 @@ var app = builder.Build();
 // NativeAOT-safe schema initialization
 app.CreateDbSchemaOnFirstRunNative<MyDbContext>(
     typeof(Program).Assembly,
-    "Schema.sql");
+    "PgSchema.sql");
 
 app.Run();
 ```

@@ -14,7 +14,7 @@
     
     Optional properties:
       MonqEfMigrationsEnabled - Set to 'false' to disable (default: true)
-      MonqEfMigrationsOutputFileName - Output SQL filename (default: Schema.sql)
+      MonqEfMigrationsOutputFileName - Output SQL filename (default: PgSchema.sql)
       MonqEfMigrationsFolder - Migrations folder name (default: Migrations)
     
     Note: First build generates SQL, second build includes it in the assembly.
@@ -22,7 +22,7 @@
 
   <PropertyGroup>
     <MonqEfMigrationsEnabled Condition="'$(MonqEfMigrationsEnabled)' == ''">true</MonqEfMigrationsEnabled>
-    <MonqEfMigrationsOutputFileName Condition="'$(MonqEfMigrationsOutputFileName)' == ''">Schema.sql</MonqEfMigrationsOutputFileName>
+    <MonqEfMigrationsOutputFileName Condition="'$(MonqEfMigrationsOutputFileName)' == ''">PgSchema.sql</MonqEfMigrationsOutputFileName>
     <MonqEfMigrationsFolder Condition="'$(MonqEfMigrationsFolder)' == ''">Migrations</MonqEfMigrationsFolder>
   </PropertyGroup>
 

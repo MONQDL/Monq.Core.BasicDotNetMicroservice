@@ -89,14 +89,14 @@ public static class NativeAotDbSchemaExtensions
     /// <typeparam name="T">The concrete database context.</typeparam>
     /// <param name="app">The <see cref="IApplicationBuilder"/> object.</param>
     /// <param name="sqlAssembly">Assembly containing the embedded SQL resource.</param>
-    /// <param name="resourceName">The resource name (e.g., "MyService.Schema.sql").</param>
+    /// <param name="resourceName">The resource name (e.g., "MyService.PgSchema.sql").</param>
     /// <param name="terminateOnException">If true when the exception occurs the application will be terminated.</param>
     /// <param name="sleepBeforeTerminate">If true when <paramref name="terminateOnException"/> the main thread will sleep before terminate.</param>
     /// <param name="terminationSleepMilliseconds">The sleep interval when <paramref name="terminateOnException"/> is true and <paramref name="sleepBeforeTerminate"/> is true.</param>
     public static void CreateDbSchemaOnFirstRunNative<T>(
         this IApplicationBuilder app,
         Assembly sqlAssembly,
-        string resourceName,
+        string resourceName = "PgSchema.sql",
         bool terminateOnException = true,
         bool sleepBeforeTerminate = true,
         int terminationSleepMilliseconds = 10000)
