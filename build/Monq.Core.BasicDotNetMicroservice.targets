@@ -78,13 +78,18 @@
 
     <PropertyGroup>
       <_MonqEfDesignTimeFactoryFile>$(IntermediateOutputPath)MonqDesignTimeDbContextFactory.cs</_MonqEfDesignTimeFactoryFile>
+      <_MonqEfIsNativeAot>false</_MonqEfIsNativeAot>
+      <_MonqEfIsNativeAot Condition="'$(PublishAot)' == 'true' OR '$(IsAotCompatible)' == 'true'">true</_MonqEfIsNativeAot>
     </PropertyGroup>
 
     <!-- Step 1: Generate idempotent migration script -->
     <Message Importance="high" Text="[MONQ] Generating EF migration SQL script..." />
     <Exec Command="dotnet ef migrations script --idempotent --context &quot;$(MonqEfDbContextName)&quot; --output &quot;$(_MonqEfOutputSql)&quot; --project &quot;$(MSBuildProjectDirectory)&quot; --startup-project &quot;$(MSBuildProjectDirectory)&quot; --no-build"
           WorkingDirectory="$(MSBuildProjectDirectory)"
-          IgnoreExitCode="false" />
+          Condition="'$(_MonqEfIsNativeAot)' != 'true'" />
+    <Exec Command="dotnet ef migrations script --idempotent --context &quot;$(MonqEfDbContextName)&quot; --output &quot;$(_MonqEfOutputSql)&quot; --project &quot;$(MSBuildProjectDirectory)&quot; --startup-project &quot;$(MSBuildProjectDirectory)&quot; -- /p:PublishAot=false /p:IlcGenerateStackTraceData=false /p:StripSymbols=false"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          Condition="'$(_MonqEfIsNativeAot)' == 'true'" />
 
     <!-- Step 2: Extract migration names from .cs files in Migrations/ folder -->
     <Message Importance="high" Text="[MONQ] Extracting migration metadata..." />
@@ -101,7 +106,7 @@
     <Copy SourceFiles="$(_MonqEfOutputSql)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
     <Message Importance="high" Text="[MONQ] Copied SQL to output directory: $(OutputPath)$(MonqEfMigrationsOutputFileName)" />
     
-    <!-- Clean up temporary factory file -->
+    <!-- Step 5: Clean up temporary factory file -->
     <Message Importance="high" Text="[MONQ] Cleaning up temporary DesignTimeDbContextFactory..." />
     <Delete Files="$(_MonqEfDesignTimeFactoryFile)" Condition="Exists('$(_MonqEfDesignTimeFactoryFile)')" />
   </Target>
@@ -154,8 +159,10 @@ using Microsoft.EntityFrameworkCore.Design;
 
 {namespaceDirective}
 
+/// <summary>Design-time factory for EF Core migrations.</summary>
 public sealed class MonqDesignTimeDbContextFactory : IDesignTimeDbContextFactory<{dbContextClassName}>
 {{
+    /// <summary>Creates a new instance of the DbContext for design-time operations.</summary>
     public {dbContextClassName} CreateDbContext(string[] args)
     {{
         var optionsBuilder = new DbContextOptionsBuilder<{dbContextClassName}>();
