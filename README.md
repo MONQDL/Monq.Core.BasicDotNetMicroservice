@@ -29,21 +29,46 @@ By default, logging to the console is used. For adding other logging outputs con
 
 Logging to the ElasticSearch can be added. To achive that, add the properties from the rendered JSON format example to the `appsettings.json` file.
 
+More documentation at [Elastic](https://github.com/elastic/ecs-dotnet/tree/main/src/Elastic.Serilog.Sinks)
+
 ```json
 {
   "Serilog": {
+    "Using": [ "Elastic.Serilog.Sinks" ],
     "WriteTo": [
       {
         "Name": "Elasticsearch",
         "Args": {
-          "nodeUris": "http://els-1.example.com",
-          "indexFormat": "aspnetcore-{0:yyyy.MM.dd}",
-          "typeName": "aspnet_events",
-          "autoRegisterTemplate": true
+          "bootstrapMethod": "Silent",
+          "nodes": [ "http://elastichost:9200" ],
+          "useSniffing": true,
+          "apiKey": "<apiKey>",
+          "username": "<username>",
+          "password": "<password>",
+
+          "ilmPolicy" : "my-policy",
+          "dataStream" : "logs-dotnet-default",
+          "includeHost" : true,
+          "includeUser" : true,
+          "includeProcess" : true,
+          "includeActivity" : true,
+          "filterProperties" : [ "prop1", "prop2" ],
+          "proxy": "http://localhost:8200",
+          "proxyUsername": "x",
+          "proxyPassword": "y",
+          "debugMode": false,
+
+          //EXPERT settings, do not set unless you need to 
+          "maxRetries": 3,
+          "maxConcurrency": 20,
+          "maxInflight": 100000,
+          "maxExportSize": 1000,
+          "maxLifeTime": "00:00:05",
+          "fullMode": "Wait"
         }
       }
     ],
-    "MinimumLevel": "Information"
+    "MinimumLevel": { "Default": "Information" },
   }
 }
 ```
@@ -70,14 +95,20 @@ To configure Consul management, you need to add the `aspnet_consul_config.json` 
 ```json
 {
     "Address" : "http://127.0.0.1:8500",
+    "Datacenter" : "dc1",
     "Token" : "",
+    "WaitTime" : "00:00:05",
     "RootFolder": "custom-root/keys"
 }
 ```
 
 `"Address"` - the http(s) address of a Consul server, where the configuration is stored.
 
+`"Datacenter"` - the datacenter to use. Optional.
+
 `"Token"` - the token to connect to the Consul server.
+
+`"WaitTime"` - the maximum time to wait for a blocking query. Optional.
 
 `"RootFolder"` - the path to the Consul configuration. By default equals the `ASPNETCORE_ENVIRONMENT` variable.
 
@@ -512,19 +543,28 @@ The configuration should contain the following JSON:
     "ReportingInfluxDb": {
       "FlushInterval": "00:00:10",
       "InfluxDb": {
+        "BaseUri": "http://influxdb:8888",
+        "Database": "metrics",
+        "UserName": "",
+        "Password": "",
         "Consistenency": "",
         "Endpoint": "",
-        "BaseUri": "http://influxdb:8888",
-        "Database": "",
-        "Password": "",
-        "RetensionPolicy": "",
-        "UserName": ""
+        "RetensionPolicy": ""
       }
     },
     "ReportingOverHttp": {
       "FlushInterval": "00:00:10",
       "HttpSettings": {
-        "RequestUri": "http://localhost:9091/metrics"
+        "RequestUri": "http://localhost:9091/metrics",
+        "UserName": "",
+        "Password": "",
+        "AuthorizationToken": "",
+        "AllowInsecureSsl": false
+      },
+      "HttpPolicy": {
+        "Timeout": "00:00:10",
+        "BackoffPeriod": "00:00:01",
+        "FailuresBeforeBackoff": 3
       }
     },
     "AddSystemMetrics": true
@@ -536,10 +576,33 @@ The configuration should contain the following JSON:
 
 Options for InfluxDB reporting. Optional.
 
+| Property | Type | Description |
+|----------|------|-------------|
+| `FlushInterval` | `TimeSpan` | Interval between flushing metrics. |
+| `InfluxDb.BaseUri` | `Uri` | InfluxDB server URL. |
+| `InfluxDb.Database` | `string` | Database name. |
+| `InfluxDb.UserName` | `string` | Authentication username. |
+| `InfluxDb.Password` | `string` | Authentication password. |
+| `InfluxDb.Consistenency` | `string` | Write consistency level. |
+| `InfluxDb.Endpoint` | `string` | Custom endpoint. |
+| `InfluxDb.RetensionPolicy` | `string` | Retention policy name. |
+
 #### ReportingOverHttp
 
 Options of HTTP reporting. Optional.
 For sending metrics to the Prometheus Pushgateway it is nessesary for the RequestUri ended up with "/metrics".
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `FlushInterval` | `TimeSpan` | Interval between flushing metrics. |
+| `HttpSettings.RequestUri` | `Uri` | URL where to POST metrics. |
+| `HttpSettings.UserName` | `string` | Basic auth username. |
+| `HttpSettings.Password` | `string` | Basic auth password. |
+| `HttpSettings.AuthorizationToken` | `string` | Authorization token for the request. |
+| `HttpSettings.AllowInsecureSsl` | `bool` | Allow insecure SSL calls (self-signed certs). |
+| `HttpPolicy.Timeout` | `TimeSpan` | Request timeout. |
+| `HttpPolicy.BackoffPeriod` | `TimeSpan` | Backoff period after failures. |
+| `HttpPolicy.FailuresBeforeBackoff` | `int` | Number of failures before entering backoff mode. |
 
 #### AddSystemMetrics
 

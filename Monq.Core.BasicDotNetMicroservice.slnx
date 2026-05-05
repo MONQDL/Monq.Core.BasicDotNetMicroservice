@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/Monq.Core.BasicDotNetMicroservice.ConsoleApp/Monq.Core.BasicDotNetMicroservice.ConsoleApp.csproj" />
+    <Project Path="samples/Monq.Core.BasicDotNetMicroservice.WebApp/Monq.Core.BasicDotNetMicroservice.WebApp.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".github/workflows/netcorelibrary.yml" />
+    <File Path=".gitignore" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Monq.Core.BasicDotNetMicroservice.Tests/Monq.Core.BasicDotNetMicroservice.Tests.csproj" />
+    <Project Path="src/Monq.Core.BasicDotNetMicroservice/Monq.Core.BasicDotNetMicroservice.csproj" />
+  </Folder>
+</Solution>

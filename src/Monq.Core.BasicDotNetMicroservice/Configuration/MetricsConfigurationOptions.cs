@@ -1,22 +1,20 @@
-﻿using App.Metrics.Reporting.Http;
-using App.Metrics.Reporting.InfluxDB;
-
-namespace Monq.Core.BasicDotNetMicroservice.Configuration;
+﻿namespace Monq.Core.BasicDotNetMicroservice.Configuration;
 
 /// <summary>
 /// Metrics configuration options.
+/// Compatible with ConfigurationBindingGenerator source generator.
 /// </summary>
 public class MetricsConfigurationOptions
 {
     /// <summary>
     ///  Provides programmatic configuration for InfluxDB Reporting in the App Metrics framework.
     /// </summary>
-    public MetricsReportingInfluxDbOptions ReportingInfluxDb { get; set; } = new();
+    public MetricsReportingInfluxDbBindOptions ReportingInfluxDb { get; set; } = new();
 
     /// <summary>
     /// Provides programmatic configuration of HTTP Reporting in the App Metrics framework.
     /// </summary>
-    public MetricsReportingHttpOptions ReportingOverHttp { get; set; } = new();
+    public MetricsReportingHttpBindOptions ReportingOverHttp { get; set; } = new();
 
     /// <summary>
     /// Configuration option for reporting system and GC events metrics.
