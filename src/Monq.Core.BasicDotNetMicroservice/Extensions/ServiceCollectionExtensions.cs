@@ -160,8 +160,6 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    [RequiresUnreferencedCode(
-            "Uses IConfiguration.GetValue<T>() which internally relies on reflection is incompatible with trimming.")]
     static void ConfigureGrpcClient(
         GrpcClientOptions options,
         IConfiguration configuration)
@@ -189,9 +187,7 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
     /// <param name="configureOptions">A delegate that is used to configure a <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    [RequiresUnreferencedCode(
-            "Uses ConfigureGrpcClient which internally relies on reflection is incompatible with trimming.")]
-    public static IHttpClientBuilder AddGrpcPreConfiguredClient<TClient>(
+    public static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]  TClient>(
         this IServiceCollection services,
         IConfiguration configuration,
         Action<GrpcClientOptions>? configureOptions = null)
@@ -213,9 +209,7 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
     /// <param name="configureOptions">A delegate that is used to configure a <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    [RequiresUnreferencedCode(
-            "Uses ConfigureGrpcClient which internally relies on reflection is incompatible with trimming.")]
-    public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<TClient>(
+    public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]  TClient>(
         this IServiceCollection services,
         IConfiguration configuration,
         Action<GrpcClientOptions>? configureOptions = null)
@@ -237,7 +231,6 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
     /// <param name="configureHttpClient">A delegate that is used to configure underlying <see cref="HttpClient"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    [RequiresUnreferencedCode("Uses AddHttpClient which internally relies on reflection is incompatible with trimming.")]
     public static IHttpClientBuilder AddRestHttpPreConfiguredClient<TClient, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
         this IServiceCollection services,
         IConfiguration configuration,
