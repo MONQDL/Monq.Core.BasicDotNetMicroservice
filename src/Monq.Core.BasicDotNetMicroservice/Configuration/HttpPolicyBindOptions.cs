@@ -1,4 +1,5 @@
 using System;
+using Constants = Monq.Core.BasicDotNetMicroservice.MicroserviceConstants.MetricsConfiguration;
 
 namespace Monq.Core.BasicDotNetMicroservice.Configuration;
 
@@ -10,17 +11,17 @@ public class HttpPolicyBindOptions
     /// <summary>
     /// The backoff period after failures.
     /// </summary>
-    public TimeSpan BackoffPeriod { get; set; }
+    public TimeSpan BackoffPeriod { get; set; } = Constants.DefaultBackoffPeriod;
 
     /// <summary>
     /// Number of failures before entering backoff mode.
     /// </summary>
-    public int FailuresBeforeBackoff { get; set; }
+    public int FailuresBeforeBackoff { get; set; } = Constants.DefaultFailuresBeforeBackoff;
 
     /// <summary>
     /// The request timeout.
     /// </summary>
-    public TimeSpan Timeout { get; set; }
+    public TimeSpan Timeout { get; set; } = Constants.DefaultTimeout;
 
     /// <summary>
     /// Maps to App.Metrics.Reporting.Http.Client.HttpPolicy.
