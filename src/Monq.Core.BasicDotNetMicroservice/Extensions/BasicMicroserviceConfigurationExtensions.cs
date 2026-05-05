@@ -12,6 +12,7 @@ using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
 using Monq.Core.HttpClientExtensions;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
@@ -149,7 +150,7 @@ public static class BasicMicroserviceConfigurationExtensions
                 if (bindOptions.ReportingInfluxDb.InfluxDb.BaseUri != null)
                     metricsBuilder.Report.ToInfluxDb(bindOptions.ReportingInfluxDb.ToMetricsReportingInfluxDbOptions());
 
-                if (bindOptions.ReportingOverHttp != null)
+                if (bindOptions.ReportingOverHttp?.HttpSettings?.RequestUri != null)
                     metricsBuilder.Report.OverHttp(bindOptions.ReportingOverHttp.ToMetricsReportingHttpOptions());
             })
             .UseMetricsWebTracking()
