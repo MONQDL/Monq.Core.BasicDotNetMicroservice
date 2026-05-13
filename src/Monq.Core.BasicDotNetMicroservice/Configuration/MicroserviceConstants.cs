@@ -3,6 +3,7 @@ using App.Metrics.Counter;
 using App.Metrics.Meter;
 using App.Metrics.ReservoirSampling.Uniform;
 using App.Metrics.Timer;
+using System;
 
 namespace Monq.Core.BasicDotNetMicroservice;
 
@@ -91,6 +92,12 @@ public static class MicroserviceConstants
     {
         public const string ConfigSection = "Metrics:ReportingInfluxDb";
         public const string Metrics = "Metrics";
+
+        public static readonly TimeSpan DefaultBackoffPeriod = TimeSpan.FromSeconds(30.0);
+
+        public static readonly int DefaultFailuresBeforeBackoff = 3;
+
+        public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30.0);
     }
 
     /// <summary>

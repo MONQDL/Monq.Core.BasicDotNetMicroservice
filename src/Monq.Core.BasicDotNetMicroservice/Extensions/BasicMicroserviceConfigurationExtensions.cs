@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
+using Monq.Core.BasicDotNetMicroservice.Middleware;
 using Monq.Core.HttpClientExtensions;
 using System;
 using System.Diagnostics.CodeAnalysis;
@@ -102,17 +103,16 @@ public static class BasicMicroserviceConfigurationExtensions
     }
 
     /// <summary>
-    /// Configure the access point to the microservice version info /api/version.
+    /// Configures the <c>/api/version</c> endpoint that returns the microservice package version as JSON.
     /// </summary>
-    /// <param name="app"></param>
-    /// <param name="anyEndpointType">Any type in startup assembly. Example: typeof(Program)</param>
-    public static void MapApiVersion(this WebApplication app, Type anyEndpointType) =>
-        app.MapGet("/api/version", () =>
-        {
-            var version = MicroserviceVersionInfo.GetVersion(anyEndpointType);
-            return Results.Text($$"""{"version": "{{version}}"}""", "application/json");
-        })
-        .ShortCircuit();
+    /// <param name="builder">The application builder.</param>
+    /// <param name="versionType">
+    /// A type from the entry assembly used to determine the package version.
+    /// Example: <c>typeof(Program)</c>.
+    /// </param>
+    /// <returns>The same <see cref="IApplicationBuilder"/> for chaining.</returns>
+    public static IApplicationBuilder MapApiVersion(this IApplicationBuilder builder, Type versionType) =>
+        builder.UseMiddleware<ApiVersionMiddleware>(versionType);
 
     /// <summary>
     /// Configure authorization policies.

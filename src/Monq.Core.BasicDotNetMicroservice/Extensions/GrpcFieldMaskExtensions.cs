@@ -83,14 +83,22 @@ public static class GrpcFieldMaskExtensions
     }
 
     /// <summary>
-    /// True, if <paramref name="fieldMask"/> is not null and Paths contains <paramref name="fieldName"/>.
+    /// Check if <paramref name="fieldName"/> is included in <paramref name="fieldMask"/>.
     /// </summary>
-    /// <param name="fieldMask"><see cref="FieldMask"/> from GRPC request.</param>
+    /// <param name="fieldMask"><see cref="FieldMask"/> from gRPC request.</param>
     /// <param name="fieldName">The name of a model property that 
     /// can be included in the mask's Paths array.</param>
-    /// <returns></returns>
-    public static bool ShouldIncludeField(this FieldMask? fieldMask, string fieldName) =>
-        fieldMask == null || fieldMask?.Paths?.Contains(fieldName) == true;
+    /// <returns>
+    /// True, if <paramref name="fieldMask"/> is null
+    /// or <see cref="FieldMask.Paths"/> is empty
+    /// or <see cref="FieldMask.Paths"/> contains <paramref name="fieldName"/>.
+    /// </returns>
+    public static bool ShouldIncludeField(this FieldMask? fieldMask, string fieldName)
+    {
+        if (fieldMask?.Paths == null || fieldMask.Paths.Count == 0)
+            return true;
+        return fieldMask.Paths.Contains(fieldName);
+    }
 
     /// <summary>
     /// Get gRPC field mask for an object.

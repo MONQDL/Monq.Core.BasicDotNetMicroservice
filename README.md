@@ -118,6 +118,14 @@ The `aspnet_consul_config.json` file path can be set by the environment variable
 
 The extension adds the new API point `/api/version`. This API contains information about the package version of the program entry point where `class Program` is located at.
 
+The endpoint returns a JSON response in the following format:
+
+```json
+{
+  "version": "1.2.3.4"
+}
+```
+
 Set up the API version point in the `Program.cs`.
 
 ```csharp
@@ -129,7 +137,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 var app = builder.Build();
 
-app.MapApiVersion(typeof(Program));// You can add it firs.
+app.MapApiVersion(typeof(Program));
 ```
 
 ### TraceEventId logging request chain
