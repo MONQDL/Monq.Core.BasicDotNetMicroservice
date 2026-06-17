@@ -13,7 +13,6 @@ Console.OutputEncoding = Encoding.UTF8;
 
 builder.Host.ConfigureBasicMicroservice();
 builder.Host.ConfigureStaticAuthentication();
-builder.WebHost.ConfigureMetricsAndHealth();
 
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
@@ -42,19 +41,16 @@ builder.Services
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    })
-    .AddMetrics();
+    });
 
 Serilog.Debugging.SelfLog.Enable(Console.Error);
 
 var app = builder.Build();
 
 app.MapApiVersion(typeof(Program));
-app.UseTraceEventId();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseLogUser();
 app.UseRequestLocalization();
 app.MapControllers();
 

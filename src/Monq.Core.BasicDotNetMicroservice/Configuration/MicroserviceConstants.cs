@@ -1,10 +1,3 @@
-using App.Metrics;
-using App.Metrics.Counter;
-using App.Metrics.Meter;
-using App.Metrics.ReservoirSampling.Uniform;
-using App.Metrics.Timer;
-using System;
-
 namespace Monq.Core.BasicDotNetMicroservice;
 
 /// <summary>
@@ -90,91 +83,6 @@ public static class MicroserviceConstants
 
     internal static class MetricsConfiguration
     {
-        public const string ConfigSection = "Metrics:ReportingInfluxDb";
         public const string Metrics = "Metrics";
-
-        public static readonly TimeSpan DefaultBackoffPeriod = TimeSpan.FromSeconds(30.0);
-
-        public static readonly int DefaultFailuresBeforeBackoff = 3;
-
-        public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30.0);
-    }
-
-    /// <summary>
-    /// Metrics parameters for RabbitMQ.
-    /// </summary>
-    internal static class RabbitMQMetrics
-    {
-        static readonly string _rabbitMQContextLabel = "NetCoreRabbitMQ Metrics";
-
-        public static class Counters
-        {
-            public static readonly CounterOptions EventsCounter = new()
-            {
-                Context = _rabbitMQContextLabel,
-                Name = "EventsCountCounter",
-                MeasurementUnit = Unit.Items,
-                ResetOnReporting = true
-            };
-        }
-
-        public static class Timers
-        {
-            public static readonly TimerOptions EventProcessTimer = new()
-            {
-                Context = _rabbitMQContextLabel,
-                Name = "EventProcessTimer",
-                Reservoir = () => new DefaultAlgorithmRReservoir(),
-            };
-        }
-
-        public static class Meters
-        {
-            public static readonly MeterOptions EventsRate = new()
-            {
-                Context = _rabbitMQContextLabel,
-                Name = "EventsRate",
-                MeasurementUnit = Unit.Events
-            };
-        }
-    }
-
-    /// <summary>
-    /// Metrics parameters for tasks.
-    /// </summary>
-    internal static class TasksMetrics
-    {
-        static readonly string _tasksContextLabel = "ConsoleTasks Metrics";
-
-        public static class Counters
-        {
-            public static readonly CounterOptions TasksCounter = new()
-            {
-                Context = _tasksContextLabel,
-                Name = "TasksCountCounter",
-                MeasurementUnit = Unit.Items,
-                ResetOnReporting = true
-            };
-        }
-
-        public static class Timers
-        {
-            public static readonly TimerOptions TaskProcessTimer = new()
-            {
-                Context = _tasksContextLabel,
-                Name = "TaskProcessTimer",
-                Reservoir = () => new DefaultAlgorithmRReservoir(),
-            };
-        }
-
-        public static class Meters
-        {
-            public static readonly MeterOptions TasksRate = new()
-            {
-                Context = _tasksContextLabel,
-                Name = "TasksRate",
-                MeasurementUnit = Unit.Events
-            };
-        }
     }
 }

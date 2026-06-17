@@ -3,7 +3,6 @@ using Serilog;
 using Serilog.Configuration;
 using Serilog.Formatting.Display;
 using Serilog.Sinks.Http;
-using System;
 
 namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki;
 

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Serilog.Core;
 using Serilog.Events;
-using System.Linq;
 
 namespace Monq.Core.BasicDotNetMicroservice.Enrichers.FromHttpContextHeader;
 

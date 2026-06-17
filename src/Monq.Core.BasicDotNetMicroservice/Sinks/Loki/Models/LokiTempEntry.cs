@@ -1,5 +1,4 @@
 using Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Labels;
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Models;

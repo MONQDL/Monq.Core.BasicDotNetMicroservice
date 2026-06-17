@@ -1,7 +1,6 @@
-﻿using Grpc.AspNetCore.ClientFactory;
+using Grpc.AspNetCore.ClientFactory;
 using Grpc.Net.Client;
 using Grpc.Net.ClientFactory;
-using System;
 
 namespace Monq.Core.BasicDotNetMicroservice.Configuration;
 

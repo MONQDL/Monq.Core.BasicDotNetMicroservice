@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using System;
 
 namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
 

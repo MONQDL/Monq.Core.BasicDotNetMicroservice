@@ -2,8 +2,6 @@ using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Microsoft.Extensions.Logging;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
-using System;
-using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.GrpcInterceptors;
 

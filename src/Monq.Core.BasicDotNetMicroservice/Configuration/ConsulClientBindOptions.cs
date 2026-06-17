@@ -1,5 +1,3 @@
-using System;
-
 namespace Monq.Core.BasicDotNetMicroservice.Configuration;
 
 /// <summary>

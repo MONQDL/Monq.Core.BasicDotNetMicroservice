@@ -1,21 +1,17 @@
-using App.Metrics;
-using App.Metrics.AspNetCore;
-using App.Metrics.Formatters.Prometheus;
 using Consul;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
+using Monq.Core.BasicDotNetMicroservice.Enrichers.ActivityTrace;
+using Monq.Core.BasicDotNetMicroservice.Enrichers.User;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
 using Monq.Core.BasicDotNetMicroservice.Middleware;
 using Monq.Core.HttpClientExtensions;
-using System;
-using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using System.Linq;
+using Serilog;
 using System.Security.Cryptography.X509Certificates;
 using Winton.Extensions.Configuration.Consul;
 using static Monq.Core.BasicDotNetMicroservice.MicroserviceConstants.HostConfiguration;
@@ -29,9 +25,11 @@ public static class BasicMicroserviceConfigurationExtensions
 {
     /// <summary>
     /// Configure basic microservice.
+    /// Includes Consul, Serilog logging, authorization policies, HTTP client configuration,
+    /// metrics (OpenTelemetry) and tracing.
     /// </summary>
     /// <param name="hostBuilder">The host builder.</param>
-    /// <param name="consulConfigurationOptions">The configuration options.</param>
+    /// <param name="consulConfigurationOptions">Optional Consul configuration options.</param>
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
     public static IHostBuilder ConfigureBasicMicroservice(
         this IHostBuilder hostBuilder,
@@ -44,9 +42,11 @@ public static class BasicMicroserviceConfigurationExtensions
 
     /// <summary>
     /// Configure basic console microservice.
+    /// Includes Consul, Serilog logging, HTTP client configuration,
+    /// metrics (OpenTelemetry) and tracing. Uses console lifetime for non-web hosting.
     /// </summary>
     /// <param name="hostBuilder">The host builder.</param>
-    /// <param name="consulConfigurationOptions">The configuration options.</param>
+    /// <param name="consulConfigurationOptions">Optional Consul configuration options.</param>
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
     public static IHostBuilder ConfigureBasicConsoleMicroservice(
         this IHostBuilder hostBuilder,
@@ -56,7 +56,10 @@ public static class BasicMicroserviceConfigurationExtensions
             config.AddEnvironmentVariables(prefix: "ASPNETCORE_"));
         hostBuilder.ConfigureBasicMicroserviceCore(consulConfigurationOptions);
         hostBuilder.ConfigureServices((hostContext, services) =>
-            services.AddConsoleMetrics(hostContext));
+        {
+            services.AddMonqMetrics();
+            services.AddMonqOpenTelemetry(hostContext.Configuration);
+        });
         hostBuilder.UseConsoleLifetime();
         return hostBuilder;
     }
@@ -66,7 +69,7 @@ public static class BasicMicroserviceConfigurationExtensions
     /// File <c>appsettings.Development.json</c> is allowed.
     /// </summary>
     /// <param name="hostBuilder">The host builder.</param>
-    /// <param name="configOptions">The configuration options.</param>
+    /// <param name="configOptions">Optional Consul configuration options.</param>
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
     public static IHostBuilder ConfigureConsul(this IHostBuilder hostBuilder, Configuration.ConsulConfigurationOptions? configOptions = null)
     {
@@ -79,8 +82,8 @@ public static class BasicMicroserviceConfigurationExtensions
     /// Load configuration from Consul.
     /// </summary>
     /// <param name="configBuilder">The configuration builder.</param>
-    /// <param name="environment">The environment.</param>
-    /// <param name="configOptions">The configuration options.</param>
+    /// <param name="environment">The hosting environment.</param>
+    /// <param name="configOptions">Optional Consul configuration options.</param>
     /// <returns>The same <see cref="IConfigurationBuilder"/> for chaining.</returns>
     public static IConfigurationBuilder ConfigureConsul(
         this IConfigurationBuilder configBuilder,
@@ -92,13 +95,22 @@ public static class BasicMicroserviceConfigurationExtensions
     }
 
     /// <summary>
-    /// Configure Serilog logging.
+    /// Configure Serilog logging with automatic enrichment of TraceId, SpanId, UserId, UserName,
+    /// and UserspaceId from the current Activity and HTTP context.
     /// </summary>
     /// <param name="hostBuilder">The host builder.</param>
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
     public static IHostBuilder ConfigureSerilogLogging(this IHostBuilder hostBuilder)
     {
-        hostBuilder.ConfigureLogging(LoggerEnvironment.Configure);
+        hostBuilder.ConfigureServices(services =>
+        {
+            services.TryAddSingleton<ActivityTraceEnricher>();
+            services.TryAddSingleton<UserEnricher>();
+        });
+
+        hostBuilder.UseSerilog((context, services, logger) =>
+            LoggerEnvironment.Configure(context, services, logger));
+
         return hostBuilder;
     }
 
@@ -116,6 +128,7 @@ public static class BasicMicroserviceConfigurationExtensions
 
     /// <summary>
     /// Configure authorization policies.
+    /// Adds "Authenticated", "read" and "write" policies based on OAuth2 scopes.
     /// </summary>
     /// <param name="hostBuilder">The host builder.</param>
     /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
@@ -132,46 +145,14 @@ public static class BasicMicroserviceConfigurationExtensions
     }
 
     /// <summary>
-    /// Configure the metrics and health checks.
+    /// Load custom certificates from the configured certificates directory.
+    /// Uses the CERTS_DIR environment variable or defaults to /certs.
     /// </summary>
     /// <param name="hostBuilder">The host builder.</param>
-    /// <returns>The same <see cref="IWebHostBuilder"/> for chaining.</returns>
-    public static IWebHostBuilder ConfigureMetricsAndHealth(this IWebHostBuilder hostBuilder)
-    {
-        hostBuilder
-            .ConfigureHealthWithDefaults(builder => { })
-            .ConfigureMetricsWithDefaults((builderContext, metricsBuilder) =>
-            {
-                metricsBuilder.OutputMetrics.AsPrometheusPlainText();
-
-                var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
-                var bindOptions = metricsConfig.Get<MetricsConfigurationOptions>() ?? new MetricsConfigurationOptions();
-
-                if (bindOptions.ReportingInfluxDb.InfluxDb.BaseUri != null)
-                    metricsBuilder.Report.ToInfluxDb(bindOptions.ReportingInfluxDb.ToMetricsReportingInfluxDbOptions());
-
-                if (bindOptions.ReportingOverHttp?.HttpSettings?.RequestUri != null)
-                    metricsBuilder.Report.OverHttp(bindOptions.ReportingOverHttp.ToMetricsReportingHttpOptions());
-            })
-            .UseMetricsWebTracking()
-            .UseMetrics(options
-                => options.EndpointOptions = endpointsOptions =>
-                {
-                    endpointsOptions.MetricsTextEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
-                    endpointsOptions.MetricsEndpointOutputFormatter = Metrics.Instance.OutputMetricsFormatters.OfType<MetricsPrometheusTextOutputFormatter>().First();
-                })
-            .UseSystemMetrics();
-
-        return hostBuilder;
-    }
-
-    /// <summary>
-    /// Load custom certificates.
-    /// </summary>
-    /// <param name="hostBuilder">The host builder.</param>
-    /// <param name="certsDir">Certificates directory that will be used to load custom certificates. 
-    /// This option has highest priority on the ENV variable.</param>
-    /// <returns></returns>
+    /// <param name="certsDir">
+    /// Optional certificates directory. Overrides the CERTS_DIR environment variable and the default /certs path.
+    /// </param>
+    /// <returns>The same <see cref="IHostBuilder"/> for chaining.</returns>
     public static IHostBuilder ConfigureCustomCertificates(this IHostBuilder hostBuilder, string? certsDir = null)
     {
         if (string.IsNullOrEmpty(certsDir))
@@ -197,7 +178,7 @@ public static class BasicMicroserviceConfigurationExtensions
 #else
                     var certificate = new X509Certificate2(cerFileName);
 #endif
-                    store.Add(certificate); //where cert is an X509Certificate object
+                    store.Add(certificate);
                     Console.WriteLine($"Successfully installed {cerFileName}");
                 }
                 catch (Exception e)
@@ -233,6 +214,8 @@ public static class BasicMicroserviceConfigurationExtensions
             services.AddOptions();
             services.AddDistributedMemoryCache();
             services.Configure<AppConfiguration>(context.Configuration);
+            services.AddMonqMetrics();
+            services.AddMonqOpenTelemetry(context.Configuration);
         });
 
         return hostBuilder;
@@ -244,19 +227,15 @@ public static class BasicMicroserviceConfigurationExtensions
         ConsulConfigurationOptions? configOptions,
         IHostEnvironment env)
     {
-        // Применяем переменную APPLICATION_NAME из переменных среды,
-        // если она не задана, то используем встроенное значение env.ApplicationName.
         var applicationName = env.ApplicationName;
         if (!string.IsNullOrEmpty(configuration[ApplicationNameEnv]))
             applicationName = configuration[ApplicationNameEnv];
 
         configOptions ??= new ConsulConfigurationOptions();
 
-        // Если находимся в DEV, то используем appsettings.development.json
         if (env.IsDevelopment())
             return;
 
-        // Загружаем конфигурацию подключения в Consul из примонтированного файла.
         var consulConfigFile = ConsulConfigFileDefault;
         if (!File.Exists(ConsulConfigFileDefault) && !string.IsNullOrEmpty(configuration[ConsulConfigFileEnv]))
         {
@@ -295,7 +274,6 @@ public static class BasicMicroserviceConfigurationExtensions
                     $"{consulEnv}/{commonAppsettingsFileName}",
                     options => ConfigureConsulOptions(options, consulClientConfiguration));
         }
-        // Включение конфигурации для микросервиса.
         configBuilder
             .AddConsul(
                 $"{consulEnv}/{applicationName?.ToLower()}/{appsettingsFileName}",
@@ -313,25 +291,5 @@ public static class BasicMicroserviceConfigurationExtensions
             x.WaitTime = consulClientConfiguration.WaitTime;
         };
         options.ReloadOnChange = false;
-    }
-
-    /// <summary>
-    /// Add GC metrics, CPU metrics and memory usage metrics.
-    /// </summary>
-    /// <param name="hostBuilder">The host builder.</param>
-    /// <returns></returns>
-    static IWebHostBuilder UseSystemMetrics(this IWebHostBuilder hostBuilder)
-    {
-        hostBuilder
-            .ConfigureServices((builderContext, services) =>
-            {
-                var metricsConfig = builderContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
-                var bindOptions = metricsConfig.Get<MetricsConfigurationOptions>() ?? new MetricsConfigurationOptions();
-
-                if (bindOptions.AddSystemMetrics)
-                    services.AddAppMetricsCollectors();
-            });
-
-        return hostBuilder;
     }
 }

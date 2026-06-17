@@ -1,6 +1,3 @@
-using System.Linq;
-using System.Net.Http;
-
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
 /// <summary>

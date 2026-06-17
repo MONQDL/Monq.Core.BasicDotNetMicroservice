@@ -1,8 +1,7 @@
-﻿using Grpc.AspNetCore.Server;
+using Grpc.AspNetCore.Server;
 using Grpc.Core;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
 using Monq.Core.BasicDotNetMicroservice.GrpcInterceptors;
-using System;
 
 namespace Monq.Core.BasicDotNetMicroservice.Helpers;
 
