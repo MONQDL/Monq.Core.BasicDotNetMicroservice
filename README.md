@@ -591,7 +591,8 @@ Add OpenTelemetry configuration to `appsettings.json`:
     },
     "EnableTracing": true,
     "EnableMetrics": true,
-    "EnablePrometheusEndpoint": true
+    "EnablePrometheusEndpoint": true,
+    "SamplingRatio": 1.0
   }
 }
 ```
@@ -606,6 +607,32 @@ Add OpenTelemetry configuration to `appsettings.json`:
 | `EnableTracing` | `bool` | `true` | Enable distributed tracing |
 | `EnableMetrics` | `bool` | `true` | Enable metrics collection |
 | `EnablePrometheusEndpoint` | `bool` | `true` | Expose `/metrics` endpoint |
+| `SamplingRatio` | `double` | `1.0` | Trace sampling ratio (0.0–1.0). Uses `ParentBasedSampler` with `TraceIdRatioBasedSampler`. |
+
+### Resource attributes
+
+The following resource attributes are automatically added to all telemetry data, following OpenTelemetry semantic conventions:
+
+| Attribute | Source | Description |
+|-----------|--------|-------------|
+| `deployment.environment.name` | `IHostEnvironment.EnvironmentName` | Hosting environment (e.g., `Development`, `Production`) |
+| `service.microservice` | `ASPNETCORE_APPLICATION_NAME` env var | Microservice name |
+| `host.name` | `HOSTNAME` env var | Kubernetes pod name or host name |
+
+Example telemetry output:
+
+```json
+{
+  "deployment.environment.name": "Production",
+  "service.microservice": "my-microservice",
+  "host.name": "pod-abc123",
+  "service.version": "1.2.3.4",
+  "service.instance.id": "54cbf61b-e3c4-4d89-a58e-a483c0337721",
+  "telemetry.sdk.language": "dotnet",
+  "telemetry.sdk.name": "opentelemetry",
+  "telemetry.sdk.version": "1.16.0"
+}
+```
 
 ### Custom metrics
 

@@ -7,6 +7,7 @@ using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using OpenTelemetry;
 using System.Reflection;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
@@ -56,6 +57,7 @@ public static class OpenTelemetryExtensions
             otelBuilder.WithTracing(tracing =>
             {
                 tracing
+                    .SetSampler(new ParentBasedSampler(new TraceIdRatioBasedSampler(options.SamplingRatio)))
                     .AddAspNetCoreInstrumentation(options =>
                     {
                         // Filter out infrastructure requests
@@ -67,9 +69,6 @@ public static class OpenTelemetryExtensions
                     })
                     .AddHttpClientInstrumentation()
                     .AddGrpcClientInstrumentation()
-                    .SetSampler(new ParentBasedSampler(
-                        new TraceIdRatioBasedSampler(0.1) // или 0.05, 0.01 и т.д.
-                    ))
                     .AddSource("RabbitMQ.Client.Publisher", "RabbitMQ.Client.Subscriber");
 
                 ConfigureOtlpExporter(tracing, options);

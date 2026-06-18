@@ -25,6 +25,12 @@ public class OpenTelemetryOptions
 
     /// <summary>Optional configuration for pushing metrics to a Prometheus Pushgateway.</summary>
     public PrometheusPushOptions? PrometheusPush { get; set; }
+
+    /// <summary>
+    /// Sampling ratio for traces (0.0 to 1.0). Default is 1.0 (sample all traces).
+    /// Uses ParentBasedSampler wrapping TraceIdRatioBasedSampler.
+    /// </summary>
+    public double SamplingRatio { get; set; } = 1.0;
 }
 
 /// <summary>
