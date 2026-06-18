@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
+using Monq.Core.BasicDotNetMicroservice.Helpers;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -20,30 +22,54 @@ public static class OpenTelemetryExtensions
     /// Supports OTLP exporter and optional Prometheus endpoint.
     /// </summary>
     /// <param name="services">The service collection to add OpenTelemetry to.</param>
-    /// <param name="configuration">Configuration to read the "OpenTelemetry" section from.</param>
+    /// <param name="context">The host builder context containing configuration and hosting environment.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddMonqOpenTelemetry(
         this IServiceCollection services,
-        IConfiguration configuration)
+        HostBuilderContext context)
     {
+        var configuration = context.Configuration;
+        var env = context.HostingEnvironment;
         var options = configuration.GetSection("OpenTelemetry").Get<OpenTelemetryOptions>() ?? new OpenTelemetryOptions();
 
         if (string.IsNullOrEmpty(options.ServiceName))
             options.ServiceName = Assembly.GetEntryAssembly()?.GetName().Name ?? "unknown-service";
 
+        var microserviceName = Environment.GetEnvironmentVariable("ASPNETCORE_" + MicroserviceConstants.HostConfiguration.ApplicationNameEnv);
+        var hostName = Environment.GetEnvironmentVariable("HOSTNAME");
+
+        var resourceAttributes = new Dictionary<string, object>
+        {
+            { "deployment.environment.name", env.EnvironmentName },
+            { "service.microservice", microserviceName ?? string.Empty },
+            { "host.name", hostName ?? string.Empty }
+        };
+
         var otelBuilder = services.AddOpenTelemetry()
             .ConfigureResource(r => r.AddService(
                 serviceName: options.ServiceName,
-                serviceVersion: options.ServiceVersion ?? Assembly.GetEntryAssembly()?.GetName().Version?.ToString()));
+                serviceVersion: options.ServiceVersion ?? MicroserviceVersionInfo.GetEntryPointAssemblyVersion())
+                .AddAttributes(resourceAttributes));
 
         if (options.EnableTracing)
         {
             otelBuilder.WithTracing(tracing =>
             {
                 tracing
-                    .AddAspNetCoreInstrumentation()
+                    .AddAspNetCoreInstrumentation(options =>
+                    {
+                        // Filter out infrastructure requests
+                        options.Filter = ctx => 
+                            ctx.Request.Path != "/health"
+                                && ctx.Request.Path != "/api/version"
+                                && ctx.Request.Path != "/ready";
+                        options.RecordException = true;
+                    })
                     .AddHttpClientInstrumentation()
                     .AddGrpcClientInstrumentation()
+                    .SetSampler(new ParentBasedSampler(
+                        new TraceIdRatioBasedSampler(0.1) // или 0.05, 0.01 и т.д.
+                    ))
                     .AddSource("RabbitMQ.Client.Publisher", "RabbitMQ.Client.Subscriber");
 
                 ConfigureOtlpExporter(tracing, options);

@@ -210,7 +210,7 @@ public static class BasicMicroserviceConfigurationExtensions
             services.AddDistributedMemoryCache();
             services.Configure<AppConfiguration>(context.Configuration);
             services.AddMonqMetrics();
-            services.AddMonqOpenTelemetry(context.Configuration);
+            services.AddMonqOpenTelemetry(context);
         });
 
         return hostBuilder;
