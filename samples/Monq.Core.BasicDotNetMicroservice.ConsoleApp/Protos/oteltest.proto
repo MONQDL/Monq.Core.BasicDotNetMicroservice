@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option csharp_namespace = "Monq.Core.BasicDotNetMicroservice.ConsoleApp.Grpc";
+
+package oteltest;
+
+service OtelTest {
+  rpc Test (TestRequest) returns (TestResponse);
+}
+
+message TestRequest {
+  string message = 1;
+}
+
+message TestResponse {
+  string result = 1;
+  string traceId = 2;
+}

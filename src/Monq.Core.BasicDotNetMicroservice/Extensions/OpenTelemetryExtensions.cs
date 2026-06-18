@@ -44,7 +44,7 @@ public static class OpenTelemetryExtensions
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddGrpcClientInstrumentation()
-                    .AddSource("RabbitMQCoreClient");
+                    .AddSource("RabbitMQ.Client.Publisher", "RabbitMQ.Client.Subscriber");
 
                 ConfigureOtlpExporter(tracing, options);
             });
@@ -58,7 +58,7 @@ public static class OpenTelemetryExtensions
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()
-                    .AddMeter("Monq.Core.*");
+                    .AddMeter("Monq.*");
 
                 if (options.EnablePrometheusEndpoint)
                     metrics.AddPrometheusExporter();

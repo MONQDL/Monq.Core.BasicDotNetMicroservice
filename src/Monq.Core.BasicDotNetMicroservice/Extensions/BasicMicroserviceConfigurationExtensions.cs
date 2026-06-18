@@ -55,11 +55,6 @@ public static class BasicMicroserviceConfigurationExtensions
         hostBuilder.ConfigureHostConfiguration(config =>
             config.AddEnvironmentVariables(prefix: "ASPNETCORE_"));
         hostBuilder.ConfigureBasicMicroserviceCore(consulConfigurationOptions);
-        hostBuilder.ConfigureServices((hostContext, services) =>
-        {
-            services.AddMonqMetrics();
-            services.AddMonqOpenTelemetry(hostContext.Configuration);
-        });
         hostBuilder.UseConsoleLifetime();
         return hostBuilder;
     }
