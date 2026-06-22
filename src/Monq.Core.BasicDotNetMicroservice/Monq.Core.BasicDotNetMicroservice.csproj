@@ -23,8 +23,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
     <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
-    <VerifyReferenceAotCompatibility>true</VerifyReferenceAotCompatibility>
+    <!--Trimming and AOT-->
     <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,7 +38,6 @@
     <PackageReference Include="Grpc.AspNetCore.Server.ClientFactory" Version="2.80.0" />
     <PackageReference Include="Grpc.Net.ClientFactory" Version="2.80.0" />
     <PackageReference Include="Google.Protobuf" Version="3.35.1" />
-    <PackageReference Include="Winton.Extensions.Configuration.Consul" Version="3.4.0" />
     <PackageReference Include="Mapster" Version="7.4.0" />
     <PackageReference Include="Monq.Core.HttpClientExtensions" Version="7.0.0" />
     <!--Serilog-->

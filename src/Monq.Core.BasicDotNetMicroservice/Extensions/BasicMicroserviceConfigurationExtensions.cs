@@ -1,4 +1,3 @@
-using Consul;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -13,7 +12,6 @@ using Monq.Core.BasicDotNetMicroservice.Middleware;
 using Monq.Core.HttpClientExtensions;
 using Serilog;
 using System.Security.Cryptography.X509Certificates;
-using Winton.Extensions.Configuration.Consul;
 using static Monq.Core.BasicDotNetMicroservice.MicroserviceConstants.HostConfiguration;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
@@ -257,34 +255,18 @@ public static class BasicMicroserviceConfigurationExtensions
         var consulBindOptions = consulConfig
             .GetSection(ConsulConfigFileSectionName)
             .Get<ConsulClientBindOptions>() ?? new ConsulClientBindOptions();
-        var consulClientConfiguration = consulBindOptions.ToConsulClientConfiguration();
 
         var appsettingsFileName = string.IsNullOrEmpty(configOptions.AppsettingsFileName) ? AppsettingsFile : configOptions.AppsettingsFileName;
 
         if (configOptions.UseCommonAppsettings)
         {
             var commonAppsettingsFileName = string.IsNullOrEmpty(configOptions.CommonAppsettingsFileName) ? CommonAppsettingsFile : configOptions.CommonAppsettingsFileName;
-            configBuilder
-                .AddConsul(
-                    $"{consulEnv}/{commonAppsettingsFileName}",
-                    options => ConfigureConsulOptions(options, consulClientConfiguration));
+            configBuilder.AddConsulKeyValue(
+                $"{consulEnv}/{commonAppsettingsFileName}",
+                consulBindOptions);
         }
-        configBuilder
-            .AddConsul(
-                $"{consulEnv}/{applicationName?.ToLower()}/{appsettingsFileName}",
-                options => ConfigureConsulOptions(options, consulClientConfiguration));
-    }
-
-    static void ConfigureConsulOptions(IConsulConfigurationSource options, ConsulClientConfiguration consulClientConfiguration)
-    {
-        options.Optional = false;
-        options.ConsulConfigurationOptions = x =>
-        {
-            x.Address = consulClientConfiguration.Address;
-            x.Datacenter = consulClientConfiguration.Datacenter;
-            x.Token = consulClientConfiguration.Token;
-            x.WaitTime = consulClientConfiguration.WaitTime;
-        };
-        options.ReloadOnChange = false;
+        configBuilder.AddConsulKeyValue(
+            $"{consulEnv}/{applicationName?.ToLower()}/{appsettingsFileName}",
+            consulBindOptions);
     }
 }

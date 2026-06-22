@@ -22,21 +22,13 @@ public class ConsulClientBindOptions
     public string? Token { get; set; }
 
     /// <summary>
-    /// The wait time for blocking queries.
+    /// The wait time for blocking queries (not used for one-time load).
     /// </summary>
     public TimeSpan WaitTime { get; set; }
 
     /// <summary>
-    /// Maps to Consul.ConsulClientConfiguration.
+    /// The root folder path in Consul KV store.
+    /// If set, overrides the environment name as the base path.
     /// </summary>
-    public Consul.ConsulClientConfiguration ToConsulClientConfiguration()
-    {
-        return new Consul.ConsulClientConfiguration
-        {
-            Address = Address,
-            Datacenter = Datacenter,
-            Token = Token,
-            WaitTime = WaitTime
-        };
-    }
+    public string? RootFolder { get; set; }
 }

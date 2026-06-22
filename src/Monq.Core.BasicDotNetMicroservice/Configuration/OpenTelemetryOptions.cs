@@ -6,7 +6,7 @@ namespace Monq.Core.BasicDotNetMicroservice.Configuration;
 public class OpenTelemetryOptions
 {
     /// <summary>Service name used in telemetry data. Defaults to entry assembly name.</summary>
-    public string ServiceName { get; set; } = "";
+    public string ServiceName { get; set; } = string.Empty;
 
     /// <summary>Optional service version. Defaults to entry assembly version.</summary>
     public string? ServiceVersion { get; set; }
@@ -54,7 +54,7 @@ public class OtlpExporterOptions
 public class PrometheusPushOptions
 {
     /// <summary>Pushgateway endpoint URL.</summary>
-    public string Endpoint { get; set; } = "";
+    public string Endpoint { get; set; } = string.Empty;
 
     /// <summary>Interval in milliseconds between metric flushes. Default is 10000.</summary>
     public int FlushIntervalMs { get; set; } = 10000;

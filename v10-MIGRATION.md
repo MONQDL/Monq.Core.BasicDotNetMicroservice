@@ -34,7 +34,8 @@ Remove `services.AddConsoleMetrics(context)` — metrics are now configured auto
 
 ## Tracing migration
 
-Remove `app.UseTraceEventId()` — tracing is now handled automatically by OpenTelemetry:
+Remove `app.UseTraceEventId()` — tracing is now handled automatically by OpenTelemetry.
+Remove `app.UseLogUser()` — user is now handled automatically by OpenTelemetry.
 
 ```csharp
 // BEFORE (v9):

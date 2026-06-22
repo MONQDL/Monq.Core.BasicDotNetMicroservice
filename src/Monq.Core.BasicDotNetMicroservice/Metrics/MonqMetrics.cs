@@ -9,47 +9,47 @@ namespace Monq.Core.BasicDotNetMicroservice.Metrics;
 /// </summary>
 public sealed class MonqMetrics
 {
-    static readonly Meter Meter = new("Monq.Core.Metrics", "1.0");
+    static readonly Meter _meter = new("Monq.Core.Metrics", "1.0");
 
-    static readonly Counter<long> RabbitMqReceived = Meter.CreateCounter<long>("rabbitmq.messages.received", "messages", "Count of received RabbitMQ messages");
-    static readonly Counter<long> RabbitMqRejected = Meter.CreateCounter<long>("rabbitmq.messages.rejected", "messages", "Count of rejected RabbitMQ messages");
-    static readonly Counter<long> RabbitMqProcessed = Meter.CreateCounter<long>("rabbitmq.messages.processed", "messages", "Count of processed RabbitMQ messages");
-    static readonly Counter<long> RabbitMqFailed = Meter.CreateCounter<long>("rabbitmq.messages.failed", "messages", "Count of failed RabbitMQ messages");
-    static readonly Histogram<double> RabbitMqProcessDuration = Meter.CreateHistogram<double>("rabbitmq.process.duration", "ms", "Duration of RabbitMQ message processing");
+    static readonly Counter<long> _rabbitMqReceived = _meter.CreateCounter<long>("rabbitmq.messages.received", "messages", "Count of received RabbitMQ messages");
+    static readonly Counter<long> _rabbitMqRejected = _meter.CreateCounter<long>("rabbitmq.messages.rejected", "messages", "Count of rejected RabbitMQ messages");
+    static readonly Counter<long> _rabbitMqProcessed = _meter.CreateCounter<long>("rabbitmq.messages.processed", "messages", "Count of processed RabbitMQ messages");
+    static readonly Counter<long> _rabbitMqFailed = _meter.CreateCounter<long>("rabbitmq.messages.failed", "messages", "Count of failed RabbitMQ messages");
+    static readonly Histogram<double> _rabbitMqProcessDuration = _meter.CreateHistogram<double>("rabbitmq.process.duration", "ms", "Duration of RabbitMQ message processing");
 
-    static readonly Counter<long> TasksReceived = Meter.CreateCounter<long>("tasks.received", "tasks", "Count of received tasks");
-    static readonly Counter<long> TasksRejected = Meter.CreateCounter<long>("tasks.rejected", "tasks", "Count of rejected tasks");
-    static readonly Counter<long> TasksProcessed = Meter.CreateCounter<long>("tasks.processed", "tasks", "Count of processed tasks");
-    static readonly Counter<long> TasksFailed = Meter.CreateCounter<long>("tasks.failed", "tasks", "Count of failed tasks");
-    static readonly Histogram<double> TasksProcessDuration = Meter.CreateHistogram<double>("tasks.process.duration", "ms", "Duration of task processing");
+    static readonly Counter<long> _tasksReceived = _meter.CreateCounter<long>("tasks.received", "tasks", "Count of received tasks");
+    static readonly Counter<long> _tasksRejected = _meter.CreateCounter<long>("tasks.rejected", "tasks", "Count of rejected tasks");
+    static readonly Counter<long> _tasksProcessed = _meter.CreateCounter<long>("tasks.processed", "tasks", "Count of processed tasks");
+    static readonly Counter<long> _tasksFailed = _meter.CreateCounter<long>("tasks.failed", "tasks", "Count of failed tasks");
+    static readonly Histogram<double> _tasksProcessDuration = _meter.CreateHistogram<double>("tasks.process.duration", "ms", "Duration of task processing");
 
     /// <summary>
     /// Increments the RabbitMQ messages received counter.
     /// </summary>
     /// <param name="handler">Handler or queue identifier. Defaults to "DefaultItem".</param>
     public void IncrementRabbitMQReceived(string handler = "DefaultItem") =>
-        RabbitMqReceived.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "received"));
+        _rabbitMqReceived.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "received"));
 
     /// <summary>
     /// Increments the RabbitMQ messages rejected counter.
     /// </summary>
     /// <param name="handler">Handler or queue identifier. Defaults to "DefaultItem".</param>
     public void IncrementRabbitMQRejected(string handler = "DefaultItem") =>
-        RabbitMqRejected.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "rejected"));
+        _rabbitMqRejected.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "rejected"));
 
     /// <summary>
     /// Increments the RabbitMQ messages processed counter.
     /// </summary>
     /// <param name="handler">Handler or queue identifier. Defaults to "DefaultItem".</param>
     public void IncrementRabbitMQProcessed(string handler = "DefaultItem") =>
-        RabbitMqProcessed.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "processed"));
+        _rabbitMqProcessed.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "processed"));
 
     /// <summary>
     /// Increments the RabbitMQ messages failed counter.
     /// </summary>
     /// <param name="handler">Handler or queue identifier. Defaults to "DefaultItem".</param>
     public void IncrementRabbitMQFailed(string handler = "DefaultItem") =>
-        RabbitMqFailed.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "failed"));
+        _rabbitMqFailed.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "failed"));
 
     /// <summary>
     /// Measures the duration of a synchronous RabbitMQ message processing action.
@@ -66,7 +66,7 @@ public sealed class MonqMetrics
         finally
         {
             var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(start);
-            RabbitMqProcessDuration.Record(elapsed.TotalMilliseconds);
+            _rabbitMqProcessDuration.Record(elapsed.TotalMilliseconds);
         }
     }
 
@@ -85,7 +85,7 @@ public sealed class MonqMetrics
         finally
         {
             var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(start);
-            RabbitMqProcessDuration.Record(elapsed.TotalMilliseconds);
+            _rabbitMqProcessDuration.Record(elapsed.TotalMilliseconds);
         }
     }
 
@@ -94,28 +94,28 @@ public sealed class MonqMetrics
     /// </summary>
     /// <param name="handler">Task identifier. Defaults to "DefaultItem".</param>
     public void IncrementTasksReceived(string handler = "DefaultItem") =>
-        TasksReceived.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "received"));
+        _tasksReceived.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "received"));
 
     /// <summary>
     /// Increments the tasks rejected counter.
     /// </summary>
     /// <param name="handler">Task identifier. Defaults to "DefaultItem".</param>
     public void IncrementTasksRejected(string handler = "DefaultItem") =>
-        TasksRejected.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "rejected"));
+        _tasksRejected.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "rejected"));
 
     /// <summary>
     /// Increments the tasks processed counter.
     /// </summary>
     /// <param name="handler">Task identifier. Defaults to "DefaultItem".</param>
     public void IncrementTasksProcessed(string handler = "DefaultItem") =>
-        TasksProcessed.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "processed"));
+        _tasksProcessed.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "processed"));
 
     /// <summary>
     /// Increments the tasks failed counter.
     /// </summary>
     /// <param name="handler">Task identifier. Defaults to "DefaultItem".</param>
     public void IncrementTasksFailed(string handler = "DefaultItem") =>
-        TasksFailed.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "failed"));
+        _tasksFailed.Add(1, new KeyValuePair<string, object?>("handler", handler), new KeyValuePair<string, object?>("action", "failed"));
 
     /// <summary>
     /// Measures the duration of a synchronous task processing action.
@@ -132,7 +132,7 @@ public sealed class MonqMetrics
         finally
         {
             var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(start);
-            TasksProcessDuration.Record(elapsed.TotalMilliseconds);
+            _tasksProcessDuration.Record(elapsed.TotalMilliseconds);
         }
     }
 
@@ -151,7 +151,7 @@ public sealed class MonqMetrics
         finally
         {
             var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(start);
-            TasksProcessDuration.Record(elapsed.TotalMilliseconds);
+            _tasksProcessDuration.Record(elapsed.TotalMilliseconds);
         }
     }
 }
