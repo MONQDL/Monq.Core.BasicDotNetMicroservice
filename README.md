@@ -574,7 +574,9 @@ Automatically collects:
 
 ### Prometheus endpoint
 
-When `EnablePrometheusEndpoint` is `true`, a `/metrics` endpoint is exposed for Prometheus scraping.
+When `EnablePrometheusEndpoint` is `true`, a `/metrics` endpoint is automatically exposed for Prometheus scraping. No additional setup is required — the endpoint is registered via `IStartupFilter` when `ConfigureBasicMicroservice()` is called.
+
+Prometheus scraping requests to `/metrics` are automatically excluded from distributed tracing.
 
 ### Configuration
 

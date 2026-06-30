@@ -1,8 +1,11 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
+using Monq.Core.BasicDotNetMicroservice.Middleware;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -31,7 +34,7 @@ public static class OpenTelemetryExtensions
     {
         var configuration = context.Configuration;
         var env = context.HostingEnvironment;
-        var options = configuration.GetSection("OpenTelemetry").Get<OpenTelemetryOptions>() ?? new OpenTelemetryOptions();
+        var options = configuration.GetSection(MicroserviceConstants.HostConfiguration.OpenTelemetrySectionName).Get<OpenTelemetryOptions>() ?? new OpenTelemetryOptions();
 
         if (string.IsNullOrEmpty(options.ServiceName))
             options.ServiceName = Assembly.GetEntryAssembly()?.GetName().Name ?? "unknown-service";
@@ -64,7 +67,8 @@ public static class OpenTelemetryExtensions
                         options.Filter = ctx => 
                             ctx.Request.Path != "/health"
                                 && ctx.Request.Path != "/api/version"
-                                && ctx.Request.Path != "/ready";
+                                && ctx.Request.Path != "/ready"
+                                && ctx.Request.Path != "/metrics";
                         options.RecordException = true;
                     })
                     .AddHttpClientInstrumentation()
@@ -86,7 +90,10 @@ public static class OpenTelemetryExtensions
                     .AddMeter("Monq.*");
 
                 if (options.EnablePrometheusEndpoint)
+                {
                     metrics.AddPrometheusExporter();
+                    services.TryAddEnumerable(ServiceDescriptor.Singleton<IStartupFilter, OpenTelemetryStartupFilter>());
+                }
 
                 ConfigureOtlpExporter(metrics, options);
             });
