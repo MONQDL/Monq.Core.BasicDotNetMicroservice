@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
-
 namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki.Labels;
 
 internal class DefaultLogLabelProvider : ILogLabelProvider

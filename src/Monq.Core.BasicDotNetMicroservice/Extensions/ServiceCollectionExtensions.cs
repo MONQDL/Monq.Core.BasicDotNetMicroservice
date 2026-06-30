@@ -1,7 +1,3 @@
-using App.Metrics;
-using App.Metrics.Formatters.Prometheus;
-using App.Metrics.Reporting.Http;
-using App.Metrics.Reporting.InfluxDB;
 using Calzolari.Grpc.AspNetCore.Validation;
 using Duende.AspNetCore.Authentication.OAuth2Introspection;
 using Grpc.Core;
@@ -10,32 +6,27 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
-using Monq.Core.BasicDotNetMicroservice.Services.Implementation;
+using Monq.Core.BasicDotNetMicroservice.Metrics;
 using Monq.Core.BasicDotNetMicroservice.Validation;
 using Monq.Core.HttpClientExtensions;
-using System;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
 /// <summary>
-/// <see cref="IServiceCollection"/> extensions.
+/// Extension methods for <see cref="IServiceCollection"/> to configure authentication, metrics, gRPC clients, and HTTP clients.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Configures authentication.
+    /// Configures OAuth2 introspection authentication using Duende library.
     /// </summary>
-    /// <param name="services"><see cref="IServiceCollection"/> to add the services to.</param>
-    /// <param name="configuration">The configuration being bound.</param>
-    /// <returns><see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
+    /// <param name="services">The service collection to add authentication to.</param>
+    /// <param name="configuration">The configuration containing authentication settings.</param>
+    /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection ConfigureMonqAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
         var authConfig = configuration.GetSection("Authentication");
@@ -58,98 +49,21 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Configures sending message handlers, tasks, system and GC events metrics
-    /// over http and into InfluxDb.
+    /// Registers <see cref="MonqMetrics"/> as a singleton for application metrics collection.
     /// </summary>
-    /// <param name="services">IServiceCollection to add the services to.</param>
-    /// <param name="hostContext">Context containing the common services on the IHost.</param>
-    /// <returns><see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
-    public static IServiceCollection AddConsoleMetrics(this IServiceCollection services, HostBuilderContext hostContext)
+    /// <param name="services">The service collection to add metrics to.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddMonqMetrics(this IServiceCollection services)
     {
-        var metricsBuilder = AppMetrics.CreateDefaultBuilder()
-            .Configuration.Configure(options =>
-            {
-                options.Enabled = true;
-                options.ReportingEnabled = true;
-            });
-        metricsBuilder.OutputMetrics.AsPrometheusPlainText();
-
-        var metricsConfig = hostContext.Configuration.GetSection(MicroserviceConstants.MetricsConfiguration.Metrics);
-        var bindOptions = metricsConfig.Get<MetricsConfigurationOptions>() ?? new MetricsConfigurationOptions();
-
-        metricsBuilder.AddInfluxDb(bindOptions.ReportingInfluxDb.ToMetricsReportingInfluxDbOptions());
-        metricsBuilder.AddOverHttp(hostContext.HostingEnvironment, bindOptions.ReportingOverHttp.ToMetricsReportingHttpOptions());
-
-        var metrics = metricsBuilder.Build();
-
-        services.AddSingleton(metrics.OutputEnvFormatters);
-        services.AddSingleton<IMetrics>(metrics);
-        services.AddSingleton(metrics);
-        services.AddMetricsReporter(bindOptions);
-
-        if (bindOptions.AddSystemMetrics)
-            services.AddAppMetricsCollectors();
-
+        services.AddSingleton<MonqMetrics>();
         return services;
     }
 
     /// <summary>
-    /// Adds InfluxDB reporting.
+    /// Enables gRPC request validation with message validation and default error message handler.
     /// </summary>
-    /// <param name="metricsBuilder">IMetricBuilder to add InfluxDB reporting to.</param>
-    /// <param name="influxDbOptions">Configuration options for InfluxDB reporting.</param>
-    static void AddInfluxDb(this IMetricsBuilder metricsBuilder, App.Metrics.Reporting.InfluxDB.MetricsReportingInfluxDbOptions influxDbOptions)
-    {
-        if (influxDbOptions.InfluxDb.BaseUri == null) return;
-
-        metricsBuilder.Report.ToInfluxDb(influxDbOptions);
-    }
-
-    /// <summary>
-    /// Adds HTTP reporting.
-    /// </summary>
-    /// <param name="metricsBuilder">IMetricBuilder to add InfluxDB reporting to.</param>
-    /// <param name="hostEnvironment">Provides information about the hosting environment an application is running in.</param>
-    /// <param name="httpOptions">Configuration options of HTTP reporting. </param>
-    static void AddOverHttp(this IMetricsBuilder metricsBuilder, IHostEnvironment hostEnvironment, App.Metrics.Reporting.Http.MetricsReportingHttpOptions httpOptions)
-    {
-        if (httpOptions.HttpSettings.RequestUri == null)
-            return;
-
-        string jobName;
-        var hostName = Environment.GetEnvironmentVariable("HOSTNAME");
-        if (!string.IsNullOrEmpty(hostName))
-            jobName = hostName.Replace('/', '.');
-        else
-            jobName = hostEnvironment.ApplicationName.Replace('/', '.');
-        var requestUrl = $"{httpOptions.HttpSettings.RequestUri.AbsoluteUri.TrimEnd('/')}/job/{jobName}";
-
-        httpOptions.HttpSettings.RequestUri = new Uri(requestUrl);
-        httpOptions.MetricsOutputFormatter = new MetricsPrometheusTextOutputFormatter();
-
-        metricsBuilder.Report.OverHttp(httpOptions);
-    }
-
-    /// <summary>
-    /// Add metrics reporter.
-    /// </summary>
-    /// <param name="services">IServiceCollection to add the services to.</param>
-    /// <param name="metricsOptions">Metrics configuration options.</param>
-    /// <returns></returns>
-    static IServiceCollection AddMetricsReporter(this IServiceCollection services, MetricsConfigurationOptions metricsOptions)
-    {
-        var metricsReporterOptions = new MetricsReporterOptions(metricsOptions);
-        services.AddSingleton(metricsReporterOptions);
-        services.AddHostedService<MetricsReporterService>();
-
-        return services;
-    }
-
-    /// <summary>
-    /// Add gRPC request validation.
-    /// </summary>
-    /// <param name="services"><see cref="IServiceCollection"/> to add the services to.</param>
-    /// <returns><see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
+    /// <param name="services">The service collection to add gRPC validation to.</param>
+    /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddGrpcRequestValidation(this IServiceCollection services)
     {
         services.AddGrpc(options => options.EnableMessageValidation());
@@ -164,7 +78,6 @@ public static class ServiceCollectionExtensions
         GrpcClientOptions options,
         IConfiguration configuration)
     {
-        // Логика из лямбды
         options.ClientOptionsAction = clientOptions =>
             clientOptions.Address = new Uri(
                 configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
@@ -172,22 +85,22 @@ public static class ServiceCollectionExtensions
         options.ChannelOptionsAction = channelOptions =>
         {
             channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
-            channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 Mb
+            channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024;
         };
         options.ContextPropagationOptionsAction = propagationOptions =>
             propagationOptions.SuppressContextNotFoundErrors = true;
     }
 
     /// <summary>
-    /// Add preconfigured gRPC client with configured address, channel options, call credentials and context propagation.
+    /// Adds a pre-configured gRPC client with address from configuration, insecure channel, 
+    /// max message size of 51MB, context propagation, authorization header forwarding, and additional headers interceptor.
     /// </summary>
-    /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
-    /// a transient service.</typeparam>
-    /// <param name="services">The <see cref="IServiceCollection"/>.</param>
-    /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
-    /// <param name="configureOptions">A delegate that is used to configure a <see cref="GrpcClientOptions"/>.</param>
-    /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    public static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]  TClient>(
+    /// <typeparam name="TClient">The gRPC client type to register as transient.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">Configuration to read BaseUri from.</param>
+    /// <param name="configureOptions">Optional delegate to customize <see cref="GrpcClientOptions"/>.</param>
+    /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
+    public static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         IConfiguration configuration,
         Action<GrpcClientOptions>? configureOptions = null)
@@ -201,15 +114,15 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Add preconfigured gRPC client with configured address, channel options, call credentials and context propagation for console application with static authentication.
+    /// Adds a pre-configured gRPC client for console/background applications with static authentication fallback.
+    /// If no HttpContext is available, obtains a token via <see cref="RestHttpClient.GetAccessToken"/>.
     /// </summary>
-    /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
-    /// a transient service.</typeparam>
-    /// <param name="services">The <see cref="IServiceCollection"/>.</param>
-    /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
-    /// <param name="configureOptions">A delegate that is used to configure a <see cref="GrpcClientOptions"/>.</param>
-    /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
-    public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]  TClient>(
+    /// <typeparam name="TClient">The gRPC client type to register as transient.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">Configuration to read BaseUri from.</param>
+    /// <param name="configureOptions">Optional delegate to customize <see cref="GrpcClientOptions"/>.</param>
+    /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
+    public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         IConfiguration configuration,
         Action<GrpcClientOptions>? configureOptions = null)
@@ -223,14 +136,15 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Add preconfigured REST HTTP client (<see cref="RestHttpClient"/>) with configured address, timeout, authentication and header forwarding.
+    /// Adds a pre-configured REST HTTP client based on <see cref="RestHttpClient"/> with base address from configuration,
+    /// infinite timeout (managed via cancellation tokens), and trailing slash normalization.
     /// </summary>
-    /// <typeparam name="TClient"> The type of the typed client interface.</typeparam>
-    /// <typeparam name="TImplementation"> The implementation type of the typed client and <see cref="RestHttpClient"/>.</typeparam>
-    /// <param name="services">The <see cref="IServiceCollection"/>.</param>
-    /// <param name="configuration">The <see cref="IConfiguration"/>.</param>
-    /// <param name="configureHttpClient">A delegate that is used to configure underlying <see cref="HttpClient"/>.</param>
-    /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
+    /// <typeparam name="TClient">The typed client interface.</typeparam>
+    /// <typeparam name="TImplementation">The implementation type inheriting from <see cref="RestHttpClient"/>.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">Configuration to read BaseUri from.</param>
+    /// <param name="configureHttpClient">Optional delegate to customize the <see cref="HttpClient"/>.</param>
+    /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
     public static IHttpClientBuilder AddRestHttpPreConfiguredClient<TClient, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -246,9 +160,6 @@ public static class ServiceCollectionExtensions
             {
                 client.BaseAddress = baseUri;
 
-                // To reuse the HttpClient instance, we will use the cancellation token to manage timeouts.
-                // To do this, you need to set the main timeout to the maximum value,
-                // because it will override the value specified in the cancellation token.
                 client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
                 configureHttpClient?.Invoke(client);
 
@@ -258,14 +169,6 @@ public static class ServiceCollectionExtensions
         return httpClientBuilder;
     }
 
-    /// <summary>
-    /// Add preconfigured gRPC client with configured call credentials.
-    /// </summary>
-    /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
-    /// a transient service.</typeparam>
-    /// <param name="services">The <see cref="IServiceCollection"/>.</param>
-    /// <param name="options">The <see cref="GrpcClientOptions"/>.</param>
-    /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
     static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         GrpcClientOptions? options = null)
@@ -287,20 +190,11 @@ public static class ServiceCollectionExtensions
             });
     }
 
-    /// <summary>
-    /// Add preconfigured gRPC client with configured call credentials for console application with static authentication.
-    /// </summary>
-    /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
-    /// a transient service.</typeparam>
-    /// <param name="services">The <see cref="IServiceCollection"/>.</param>
-    /// <param name="options">The <see cref="GrpcClientOptions"/>.</param>
-    /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
     static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         GrpcClientOptions? options = null)
         where TClient : class
     {
-        // REM: for getting an auth token in .AddCallCredentials().
         services.AddHttpClient<RestHttpClient>();
 
         services.TryAddTransient<AdditionalHeadersInterceptor>();
@@ -318,7 +212,6 @@ public static class ServiceCollectionExtensions
                 }
                 else
                 {
-                    // HACK: temporary solution. Consider getting an auth token in a special service.
                     var client = provider.GetService<RestHttpClient>();
                     if (client is not null)
                     {
@@ -334,16 +227,17 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Grpc interceptor that adds additional metadata from http headers.
+    /// gRPC client interceptor that propagates <c>userspace-id</c> and <c>culture</c> headers
+    /// from the current HTTP request to outgoing gRPC calls.
     /// </summary>
     public class AdditionalHeadersInterceptor : Interceptor
     {
         readonly IHttpContextAccessor _httpContextAccessor;
 
         /// <summary>
-        /// Creates new object of <see cref="AdditionalHeadersInterceptor"/>.
+        /// Creates a new instance of <see cref="AdditionalHeadersInterceptor"/>.
         /// </summary>
-        /// <param name="httpContextAccessor">HttpContextAccessor</param>
+        /// <param name="httpContextAccessor">The HTTP context accessor to read incoming headers from.</param>
         public AdditionalHeadersInterceptor(IHttpContextAccessor httpContextAccessor)
         {
             _httpContextAccessor = httpContextAccessor;
@@ -428,14 +322,6 @@ public static class ServiceCollectionExtensions
         }
     }
 
-    /// <summary>
-    /// Add gRPC client.
-    /// </summary>
-    /// <typeparam name="TClient">The type of the gRPC client. The type specified will be registered in the service collection as
-    /// a transient service.</typeparam>
-    /// <param name="services">The <see cref="IServiceCollection"/>.</param>
-    /// <param name="options">The <see cref="GrpcClientOptions"/>.</param>
-    /// <returns>An <see cref="IHttpClientBuilder"/> that can be used to configure the client.</returns>
     static IHttpClientBuilder AddGrpcClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         GrpcClientOptions? options = null)

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Models;
-using System;
 using System.Net;
 
 namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;

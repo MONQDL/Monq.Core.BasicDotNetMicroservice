@@ -1,11 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using Serilog.Sinks.Http;
-using System;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.Sinks.Loki;
 

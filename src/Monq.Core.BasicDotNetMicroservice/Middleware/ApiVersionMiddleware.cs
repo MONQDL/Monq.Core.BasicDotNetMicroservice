@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Http;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
-using System;
-using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.Middleware;
 

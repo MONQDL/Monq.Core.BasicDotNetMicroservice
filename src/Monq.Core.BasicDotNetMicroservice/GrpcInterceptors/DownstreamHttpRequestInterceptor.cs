@@ -2,7 +2,6 @@ using Grpc.Core;
 using Grpc.Core.Interceptors;
 using System.Net;
 using System.Text.Json.Nodes;
-using System.Threading.Tasks;
 
 namespace Monq.Core.BasicDotNetMicroservice.GrpcInterceptors;
 

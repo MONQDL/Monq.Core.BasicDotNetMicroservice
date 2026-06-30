@@ -2,6 +2,8 @@
 
 The library contains extension methods that used by most .NET Core microservices.
 
+Version 10.0.0 introduces **OpenTelemetry** for distributed tracing and metrics, replacing App.Metrics.
+
 ### Installing
 
 ```powershell
@@ -10,7 +12,7 @@ Install-Package Monq.Core.BasicDotNetMicroservice
 
 ### Configure logging (ElasticSearch)
 
-The extension configures Serilog logging.
+The extension configures Serilog logging with automatic `TraceId`/`SpanId` enrichment from OpenTelemetry.
 
 Set up the logging extension in the `Program.cs`.
 
@@ -25,9 +27,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.ConfigureSerilogLogging();
 ```
 
-By default, logging to the console is used. For adding other logging outputs confugure the `appsettings.json` configuration file.
+By default, logging to the console is used. For adding other logging outputs configure the `appsettings.json` configuration file.
 
-Logging to the ElasticSearch can be added. To achive that, add the properties from the rendered JSON format example to the `appsettings.json` file.
+Logging to the ElasticSearch can be added. To achieve that, add the properties from the rendered JSON format example to the `appsettings.json` file.
 
 More documentation at [Elastic](https://github.com/elastic/ecs-dotnet/tree/main/src/Elastic.Serilog.Sinks)
 
@@ -58,7 +60,7 @@ More documentation at [Elastic](https://github.com/elastic/ecs-dotnet/tree/main/
           "proxyPassword": "y",
           "debugMode": false,
 
-          //EXPERT settings, do not set unless you need to 
+          //EXPERT settings, do not set unless you need to
           "maxRetries": 3,
           "maxConcurrency": 20,
           "maxInflight": 100000,
@@ -140,54 +142,21 @@ var app = builder.Build();
 app.MapApiVersion(typeof(Program));
 ```
 
-### TraceEventId logging request chain
+### Distributed tracing
 
-The EventId is the unique identificator of the query execution in the current service.
-The extension adds the EventId to the HTTP header, so that the chain of calls from the first service to the last service can be tracked.
+Distributed tracing works automatically via OpenTelemetry. The `AddAspNetCoreInstrumentation()` creates an `Activity` for each incoming HTTP request, and the `ActivityTraceEnricher` automatically adds `TraceId` and `SpanId` to all log entries.
 
-Set up the logging request chain in the `Program.cs`.
+No middleware is required — just configure OpenTelemetry in `appsettings.json` and call `AddMonqOpenTelemetry()` during service registration (done automatically by `ConfigureBasicMicroservice()`).
 
-```csharp
-using Microsoft.Extensions.DependencyInjection;
-```
+### User logging
 
-```csharp
-var app = builder.Build();
-
-app.UseRouting();
-app.UseTraceEventId();
-app.MapControllers();
-```
-
-The `app.UseTraceEventId()` call have to be added strictly after the `app.UseRouting()` call in the pipeline.
-
-### Logging user basic information
-
-The extension adds the logging user by Id. A user name also adds to the logging if the user is authenticated.
-So the user action can be tracked by the API.
-
-Set up the user logging in the `Program.cs`.
-
-```csharp
-using Microsoft.Extensions.DependencyInjection;
-```
-
-```csharp
-var app = builder.Build();
-
-app.UseRouting();
-app.UseAuthentication();
-app.UseLogUser();
-app.MapControllers();
-```
-
-The `app.UseLogUser()` call have to be added strictly after the `app.UseAuthentication()` call in the pipeline.
+User `UserId` (from `sub` claim) and `UserName` are automatically added to all log entries via the `UserEnricher`. No middleware is required — the enricher reads the user from `IHttpContextAccessor` after authentication.
 
 ### ConfigureBasicMicroservice
 
 The extension configures the standard extension set for use by the ASP.NET Core MVC microservice.
 
-Version 7.0.0 contains:
+Version 10.0.0 contains:
 
 - hostBuilder.ConfigureCustomCertificates();
 - hostBuilder.ConfigureConsul();
@@ -195,6 +164,8 @@ Version 7.0.0 contains:
 - hostBuilder.UseVersionApiPoint();
 - hostBuilder.ConfigureAuthorizationPolicies();
 - hostBuilder.ConfigBasicHttpService();
+- services.AddMonqMetrics();
+- services.AddMonqOpenTelemetry();
 
 ```csharp
 hostBuilder.ConfigureServices((context, services) =>
@@ -223,7 +194,7 @@ builder.Host.ConfigureBasicMicroservice();
 
 The extension configures the standard extension set for use by the console hosting microservice.
 
-Version 7.0.0 contains:
+Version 10.0.0 contains:
 
 - hostBuilder.ConfigureCustomCertificates();
 - hostBuilder.ConfigureConsul();
@@ -231,17 +202,8 @@ Version 7.0.0 contains:
 - hostBuilder.UseVersionApiPoint();
 - hostBuilder.ConfigBasicHttpService();
 - hostBuilder.UseConsoleLifetime();
-
-```csharp
-hostBuilder.ConfigureServices((context, services) =>
-{
-    services.AddHttpContextAccessor();
-    services.AddOptions();
-    services.AddDistributedMemoryCache();
-    services.Configure<AppConfiguration>(context.Configuration);
-    services.AddConsoleMetrics(context);
-});
-```
+- services.AddMonqMetrics();
+- services.AddMonqOpenTelemetry();
 
 Set up the basic console microservice extension in the `Program.cs`.
 
@@ -276,7 +238,6 @@ using IHost host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((builder, services) =>
     {
         // Infra
-        services.AddConsoleMetrics(builder);
         var clickHouseConnectionString = builder.Configuration[MicroserviceConstants.ConfigConstants.ClickHouseConnectionString];
         services.ConfigureCHBuffer(builder.Configuration.GetSection(Monq.Core.Service.Statistics.Buffer.Configuration.AppConstants.Configuration.BufferEngineOptions), clickHouseConnectionString);
 
@@ -454,9 +415,9 @@ The library provides extensions for configuring REST HTTP clients. More info: <h
 
 #### Authorization policy
 
-The extension adds a standard set of the security policies. The policies check for the presence of scoup in the access_token.
+The extension adds a standard set of the security policies. The policies check for the presence of scope in the access_token.
 
-Version 7.0.0 includes:
+Version 10.0.0 includes:
 
 - [Authorize("Authenticated")]
 - [Authorize("read")]
@@ -523,98 +484,9 @@ Data cache duration: 5 minutes.
 
 ### Metrics sending
 
-The extension adds the ability to send message queue metrics, tasks metrics, system load metrics and garbage collector metrics.
+Metrics are handled by OpenTelemetry. See the [OpenTelemetry](#opentelemetry) section for configuration.
 
-Set up the metrics sending in the `Program.cs`.
-
-```csharp
-using Monq.Core.BasicDotNetMicroservice.Extensions;
-```
-
-```csharp
-Console.OutputEncoding = Encoding.UTF8;
-
-using var host = Host.CreateDefaultBuilder(args)
-    .ConfigureServices((context, services) =>
-    {
-        services.AddConsoleMetrics(context);
-    })
-    .UseConsoleLifetime()
-    .Build();
-```
-
-The configuration should contain the following JSON:
-
-```json
-{
-  "Metrics": {
-    "ReportingInfluxDb": {
-      "FlushInterval": "00:00:10",
-      "InfluxDb": {
-        "BaseUri": "http://influxdb:8888",
-        "Database": "metrics",
-        "UserName": "",
-        "Password": "",
-        "Consistenency": "",
-        "Endpoint": "",
-        "RetensionPolicy": ""
-      }
-    },
-    "ReportingOverHttp": {
-      "FlushInterval": "00:00:10",
-      "HttpSettings": {
-        "RequestUri": "http://localhost:9091/metrics",
-        "UserName": "",
-        "Password": "",
-        "AuthorizationToken": "",
-        "AllowInsecureSsl": false
-      },
-      "HttpPolicy": {
-        "Timeout": "00:00:10",
-        "BackoffPeriod": "00:00:01",
-        "FailuresBeforeBackoff": 3
-      }
-    },
-    "AddSystemMetrics": true
-  }
-}
-```
-
-#### ReportingInfluxDb
-
-Options for InfluxDB reporting. Optional.
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `FlushInterval` | `TimeSpan` | Interval between flushing metrics. |
-| `InfluxDb.BaseUri` | `Uri` | InfluxDB server URL. |
-| `InfluxDb.Database` | `string` | Database name. |
-| `InfluxDb.UserName` | `string` | Authentication username. |
-| `InfluxDb.Password` | `string` | Authentication password. |
-| `InfluxDb.Consistenency` | `string` | Write consistency level. |
-| `InfluxDb.Endpoint` | `string` | Custom endpoint. |
-| `InfluxDb.RetensionPolicy` | `string` | Retention policy name. |
-
-#### ReportingOverHttp
-
-Options of HTTP reporting. Optional.
-For sending metrics to the Prometheus Pushgateway it is nessesary for the RequestUri ended up with "/metrics".
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `FlushInterval` | `TimeSpan` | Interval between flushing metrics. |
-| `HttpSettings.RequestUri` | `Uri` | URL where to POST metrics. |
-| `HttpSettings.UserName` | `string` | Basic auth username. |
-| `HttpSettings.Password` | `string` | Basic auth password. |
-| `HttpSettings.AuthorizationToken` | `string` | Authorization token for the request. |
-| `HttpSettings.AllowInsecureSsl` | `bool` | Allow insecure SSL calls (self-signed certs). |
-| `HttpPolicy.Timeout` | `TimeSpan` | Request timeout. |
-| `HttpPolicy.BackoffPeriod` | `TimeSpan` | Backoff period after failures. |
-| `HttpPolicy.FailuresBeforeBackoff` | `int` | Number of failures before entering backoff mode. |
-
-#### AddSystemMetrics
-
-Options for collect system usage and gc event metrics. Optional.
+The `MonqMetrics` class is available via DI for recording custom RabbitMQ and task metrics.
 
 ### Database Schema Management
 
@@ -624,7 +496,7 @@ The extension provides methods for automatic database schema creation and valida
 
 The `CreateDbSchemaOnFirstRun<T>()` method automatically handles database schema initialization and validation:
 
-!NOTE: It applies only to PostgreSQL.
+> NOTE: It applies only to PostgreSQL.
 
 - If the database is empty, it creates the schema by applying all migrations
 - If the database already has tables, it validates that all migrations have been applied
@@ -665,12 +537,215 @@ public static void CreateDbSchemaOnFirstRun<T>(this IApplicationBuilder app,
 - `sleepBeforeTerminate` - If true and `terminateOnException` is true, the main thread will sleep before termination (default: true)
 - `terminationSleepMilliseconds` - Sleep interval when `terminateOnException` is true and `sleepBeforeTerminate` is true (default: 10000ms)
 
-### Migration guide to v9
+## OpenTelemetry
 
-1. Replace `services.ConfigureSMAuthentication()` with `services.ConfigureMonqAuthentication()`.
-2. Replace `RestHttpClientFromOptions<T>` with `RestHttpClient` and remove unnecessary injections in implementation class constructor.
-3. Replace DI registration for all classes that are derived from `RestHttpClient` with
+The library includes built-in OpenTelemetry support for distributed tracing and metrics.
+
+### Distributed tracing
+
+Automatically instruments:
+- ASP.NET Core (Controllers and Minimal API)
+- HTTP clients (including `RestHttpClient` from `Monq.Core.HttpClientExtensions`)
+- gRPC clients
+- RabbitMQ (via `RabbitMQCoreClient` library)
+
+Trace context is propagated via W3C `traceparent`/`tracestate` headers. Every HTTP request, gRPC call, and RabbitMQ message carries the trace context, enabling full distributed tracing across your microservice ecosystem.
+
+### RabbitMQ distributed tracing
+
+When using `RabbitMQCoreClient` (v7.x+), trace context is automatically propagated:
+
+- **On publish**: A `Producer` span is created and `traceparent`/`tracestate` are injected into message headers
+- **On consume**: `traceparent`/`tracestate` are extracted from message headers and a `Consumer` span is created with the correct parent context
+
+This enables end-to-end tracing across long message processing chains:
+
+```
+HTTP Request → ASP.NET Span → Publish to RabbitMQ → Consumer Span → Handler Span → HTTP/gRPC calls → ...
+```
+
+### Metrics
+
+Automatically collects:
+- ASP.NET Core request metrics
+- HTTP client metrics
+- .NET Runtime metrics (GC, CPU, memory)
+- Custom metrics via `MonqMetrics` class
+
+### Prometheus endpoint
+
+When `EnablePrometheusEndpoint` is `true`, a `/metrics` endpoint is exposed for Prometheus scraping.
+
+### Configuration
+
+Add OpenTelemetry configuration to `appsettings.json`:
+
+```json
+{
+  "OpenTelemetry": {
+    "ServiceName": "my-microservice",
+    "Otlp": {
+      "Endpoint": "http://otel-collector:4317",
+      "Protocol": "grpc",
+      "Headers": ""
+    },
+    "EnableTracing": true,
+    "EnableMetrics": true,
+    "EnablePrometheusEndpoint": true,
+    "SamplingRatio": 1.0
+  }
+}
+```
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `ServiceName` | `string` | Entry assembly name | Service name in traces |
+| `ServiceVersion` | `string?` | Entry assembly version | Service version |
+| `Otlp.Endpoint` | `string` | `http://localhost:4317` | OTLP collector endpoint |
+| `Otlp.Protocol` | `string` | `grpc` | `grpc` or `http/protobuf` |
+| `Otlp.Headers` | `string?` | `""` | Additional headers (e.g., `api-key=secret`) |
+| `EnableTracing` | `bool` | `true` | Enable distributed tracing |
+| `EnableMetrics` | `bool` | `true` | Enable metrics collection |
+| `EnablePrometheusEndpoint` | `bool` | `true` | Expose `/metrics` endpoint |
+| `SamplingRatio` | `double` | `1.0` | Trace sampling ratio (0.0–1.0). Uses `ParentBasedSampler` with `TraceIdRatioBasedSampler`. |
+
+### Resource attributes
+
+The following resource attributes are automatically added to all telemetry data, following OpenTelemetry semantic conventions:
+
+| Attribute | Source | Description |
+|-----------|--------|-------------|
+| `deployment.environment.name` | `IHostEnvironment.EnvironmentName` | Hosting environment (e.g., `Development`, `Production`) |
+| `service.microservice` | `ASPNETCORE_APPLICATION_NAME` env var | Microservice name |
+| `host.name` | `HOSTNAME` env var | Kubernetes pod name or host name |
+
+Example telemetry output:
+
+```json
+{
+  "deployment.environment.name": "Production",
+  "service.microservice": "my-microservice",
+  "host.name": "pod-abc123",
+  "service.version": "1.2.3.4",
+  "service.instance.id": "54cbf61b-e3c4-4d89-a58e-a483c0337721",
+  "telemetry.sdk.language": "dotnet",
+  "telemetry.sdk.name": "opentelemetry",
+  "telemetry.sdk.version": "1.16.0"
+}
+```
+
+### Custom metrics
+
+Use the `MonqMetrics` class to record custom business metrics:
 
 ```csharp
-services.AddRestHttpPreConfiguredClient<IService, Service>();
+public class MyService
+{
+    readonly MonqMetrics _metrics;
+
+    public MyService(MonqMetrics metrics) => _metrics = metrics;
+
+    public void HandleMessage(string handlerName)
+    {
+        _metrics.IncrementRabbitMQReceived(handlerName);
+
+        _metrics.MeasureRabbitMQPreprocessingTime(() =>
+        {
+            // processing logic
+        });
+    }
+}
 ```
+
+Or use `System.Diagnostics.Metrics` directly:
+
+```csharp
+using System.Diagnostics.Metrics;
+
+public class MyService
+{
+    static readonly Meter Meter = new("MyService", "1.0");
+    static readonly Counter<long> ItemsProcessed = Meter.CreateCounter<long>("items.processed");
+
+    public void Process() => ItemsProcessed.Add(1, new KeyValuePair<string, object?>("type", "document"));
+}
+```
+
+Custom meters are automatically picked up by OpenTelemetry when the meter name matches the `Monq.Core.*` pattern. To use custom meter names, configure them in `AddMonqOpenTelemetry()`.
+
+### Complete ASP.NET Core example
+
+```csharp
+using Monq.Core.BasicDotNetMicroservice.Extensions;
+using Monq.Core.BasicDotNetMicroservice.Metrics;
+
+Console.OutputEncoding = Encoding.UTF8;
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.ConfigureBasicMicroservice();
+
+builder.Services.AddControllers();
+
+var app = builder.Build();
+
+app.UseRouting();
+app.UseAuthentication();
+app.MapControllers();
+
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
+app.Run();
+```
+
+### Complete Console Host example
+
+```csharp
+using Monq.Core.BasicDotNetMicroservice.Extensions;
+using Monq.Core.BasicDotNetMicroservice.Metrics;
+
+Console.OutputEncoding = Encoding.UTF8;
+
+using var host = Host.CreateDefaultBuilder(args)
+    .ConfigureBasicConsoleMicroservice()
+    .ConfigureServices((context, services) =>
+    {
+        services.AddHostedService<MyBackgroundWorker>();
+    })
+    .UseConsoleLifetime()
+    .Build();
+
+await host.RunAsync();
+
+public class MyBackgroundWorker : BackgroundService
+{
+    readonly MonqMetrics _metrics;
+    readonly ILogger<MyBackgroundWorker> _logger;
+
+    public MyBackgroundWorker(MonqMetrics metrics, ILogger<MyBackgroundWorker> logger)
+    {
+        _metrics = metrics;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            _metrics.IncrementTasksReceived("my-task");
+
+            await _metrics.MeasureTasksPreprocessingTimeAsync(async () =>
+            {
+                _logger.LogInformation("Processing task...");
+                await Task.Delay(1000, stoppingToken);
+            });
+
+            _metrics.IncrementTasksProcessed("my-task");
+        }
+    }
+}
+```
+
+## Migration guides
+
+- [Migration to v10](v10-MIGRATION.md)
+- [Migration to v9](v9-MIGRATION.md)

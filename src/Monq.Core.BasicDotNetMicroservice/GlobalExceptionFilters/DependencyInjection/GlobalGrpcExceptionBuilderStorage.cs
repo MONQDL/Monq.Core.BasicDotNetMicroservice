@@ -1,7 +1,5 @@
-﻿using Grpc.Core;
+using Grpc.Core;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Models;
-using System;
-using System.Collections.Generic;
 
 namespace Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.DependencyInjection;
 

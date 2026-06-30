@@ -1,6 +1,5 @@
 using Serilog;
 using Serilog.Configuration;
-using System;
 
 namespace Monq.Core.BasicDotNetMicroservice.Enrichers.FromHttpContextHeader;
 

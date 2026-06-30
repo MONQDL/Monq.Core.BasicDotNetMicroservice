@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "OTEL test",
+    "Projects": [
+      {
+        "Path": "samples\\Monq.Core.BasicDotNetMicroservice.ConsoleApp\\Monq.Core.BasicDotNetMicroservice.ConsoleApp.csproj",
+        "Action": "StartWithoutDebugging"
+      },
+      {
+        "Path": "samples\\Monq.Core.BasicDotNetMicroservice.WebApp\\Monq.Core.BasicDotNetMicroservice.WebApp.csproj",
+        "Action": "StartWithoutDebugging"
+      }
+    ]
+  }
+]
