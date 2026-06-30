@@ -79,6 +79,7 @@ public static class MicroserviceConstants
         public const string ApplicationNameEnv = "APPLICATION_NAME";
         public const string AppsettingsFile = "appsettings.json";
         public const string CommonAppsettingsFile = "common-appsettings.json";
+        public const string OpenTelemetrySectionName = "OpenTelemetry";
     }
 
     internal static class MetricsConfiguration
