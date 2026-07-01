@@ -60,7 +60,10 @@ public static class OpenTelemetryExtensions
             otelBuilder.WithTracing(tracing =>
             {
                 tracing
-                    .SetSampler(new ParentBasedSampler(new TraceIdRatioBasedSampler(options.SamplingRatio)))
+                    .SetSampler(new ParentBasedSampler(
+                        rootSampler: new TraceIdRatioBasedSampler(options.SamplingRatio),
+                        remoteParentSampled: new AlwaysOnSampler(),
+                        remoteParentNotSampled: new AlwaysOnSampler()))
                     .AddAspNetCoreInstrumentation(options =>
                     {
                         // Filter out infrastructure requests
