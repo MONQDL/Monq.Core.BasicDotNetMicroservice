@@ -73,6 +73,8 @@ public static class OpenTelemetryExtensions
                     })
                     .AddHttpClientInstrumentation()
                     .AddGrpcClientInstrumentation()
+                    .AddEntityFrameworkCoreInstrumentation()
+                    .AddRedisInstrumentation()
                     .AddSource("RabbitMQ.Client.Publisher", "RabbitMQ.Client.Subscriber");
 
                 ConfigureOtlpExporter(tracing, options);
