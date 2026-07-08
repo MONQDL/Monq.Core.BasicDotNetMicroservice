@@ -6,11 +6,11 @@ using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
 using Monq.Core.BasicDotNetMicroservice.Middleware;
+using Monq.Core.BasicDotNetMicroservice.Telemetry;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using OpenTelemetry;
 using System.Reflection;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
@@ -67,7 +67,7 @@ public static class OpenTelemetryExtensions
                     .AddAspNetCoreInstrumentation(options =>
                     {
                         // Filter out infrastructure requests
-                        options.Filter = ctx => 
+                        options.Filter = ctx =>
                             ctx.Request.Path != "/health"
                                 && ctx.Request.Path != "/api/version"
                                 && ctx.Request.Path != "/ready"
@@ -78,7 +78,8 @@ public static class OpenTelemetryExtensions
                     .AddGrpcClientInstrumentation()
                     .AddEntityFrameworkCoreInstrumentation()
                     .AddRedisInstrumentation()
-                    .AddSource("RabbitMQ.Client.Publisher", "RabbitMQ.Client.Subscriber");
+                    .AddSource("RabbitMQ.Client.Publisher", "RabbitMQ.Client.Subscriber")
+                    .AddSource(MonqTelemetry.SourceName);
 
                 ConfigureOtlpExporter(tracing, options);
             });
