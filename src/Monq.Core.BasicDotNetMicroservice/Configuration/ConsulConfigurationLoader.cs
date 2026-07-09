@@ -55,8 +55,10 @@ internal static class ConsulConfigurationLoader
                 $"Failed to load configuration from Consul. Key: '{key}', Status: {(int)response.StatusCode} {response.ReasonPhrase}, Body: {body}");
         }
 
-        using var stream = response.Content.ReadAsStream();
-        configBuilder.AddJsonStream(stream);
+        var memoryStream = new MemoryStream();
+        response.Content.ReadAsStream().CopyTo(memoryStream);
+        memoryStream.Position = 0;
+        configBuilder.AddJsonStream(memoryStream);
     }
 
     static Uri BuildConsulUri(Uri consulAddress, string key, string? datacenter)
