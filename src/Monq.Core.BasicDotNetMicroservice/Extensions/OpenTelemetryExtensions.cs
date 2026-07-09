@@ -79,6 +79,7 @@ public static class OpenTelemetryExtensions
                     .AddEntityFrameworkCoreInstrumentation()
                     .AddRedisInstrumentation()
                     .AddSource("RabbitMQ.Client.Publisher", "RabbitMQ.Client.Subscriber")
+                    .AddSource("RabbitMQCoreClient")
                     .AddSource(MonqTelemetry.SourceName);
 
                 ConfigureOtlpExporter(tracing, options);
