@@ -20,6 +20,9 @@ public class OtelTestService : OtelTest.OtelTestBase
     {
         _log.LogInformation("gRPC OtelTest.Test called with message: {Message}", request.Message);
 
+        if (request.Fail)
+            throw new Exception("Failed");
+
         await _queueService.SendAsync($"gRPC processed: {request.Message}", "aligin-test-otel");
 
         return new TestResponse

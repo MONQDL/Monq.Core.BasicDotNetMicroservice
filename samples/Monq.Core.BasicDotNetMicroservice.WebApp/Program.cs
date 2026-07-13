@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 using Monq.Core.BasicDotNetMicroservice.GlobalExceptionFilters.Filters;
+using Monq.Core.BasicDotNetMicroservice.GrpcInterceptors;
 using Monq.Core.BasicDotNetMicroservice.WebApp.Grpc;
 using Monq.Core.BasicDotNetMicroservice.WebApp.Services;
 using Monq.Core.HttpClientExtensions.Exceptions;
@@ -48,7 +49,11 @@ builder.Services
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
-builder.Services.AddGrpc();
+builder.Services.AddGrpc(options =>
+{
+    options.Interceptors.Add<GrpcGlobalExceptionHandlerInterceptor>();
+    options.Interceptors.Add<DownstreamHttpRequestInterceptor>();
+});
 
 builder.Services.AddRabbitMQCoreClient(builder.Configuration.GetSection("RabbitMQ"));
 

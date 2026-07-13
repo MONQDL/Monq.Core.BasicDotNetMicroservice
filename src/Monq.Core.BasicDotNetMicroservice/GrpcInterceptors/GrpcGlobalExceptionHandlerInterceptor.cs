@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Microsoft.Extensions.Logging;
@@ -36,11 +37,15 @@ public class GrpcGlobalExceptionHandlerInterceptor : Interceptor
         catch (RpcException e)
         {
             _logger.LogError(e, "Grpc call exception. Error: {ErrorMessage}", e.Message);
+            Activity.Current?.SetStatus(ActivityStatusCode.Error, e.Message);
+            Activity.Current?.AddException(e);
             throw;
         }
         catch (Exception e)
         {
             _logger.LogError(e, "Grpc call exception. Error: {ErrorMessage}", e.Message);
+            Activity.Current?.SetStatus(ActivityStatusCode.Error, e.Message);
+            Activity.Current?.AddException(e);
             var rpcException = _storage.Execute(e);
             throw rpcException;
         }
