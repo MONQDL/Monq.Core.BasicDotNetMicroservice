@@ -81,7 +81,16 @@ public static class OpenTelemetryExtensions
                     .AddSource("RabbitMQ.Client.Publisher", "RabbitMQ.Client.Subscriber")
                     .AddSource("RabbitMQCoreClient")
                     .AddSource(MonqTelemetry.SourceName)
-                    .AddSource("Grpc.AspNetCore.Server");
+                    .AddSource("Grpc.AspNetCore.Server")
+                    .AddSource("Monq.ClickHouse.Client")
+                    .AddSource("Monq.Core.Authorization")
+                    .AddSource("Monq.Core.ClickHouseBuffer")
+                    .AddSource("Monq.Core.CloudShard")
+                    .AddSource("Monq.Core.DataThrottling")
+                    .AddSource("Monq.Core.EventHistoryLogger")
+                    .AddSource("Monq.Core.VictoriaMetricsClient")
+                    .AddSource("Monq.Policies")
+                    .AddSource("Monq.Core.S3Client");
 
                 ConfigureOtlpExporter(tracing, options);
             });
