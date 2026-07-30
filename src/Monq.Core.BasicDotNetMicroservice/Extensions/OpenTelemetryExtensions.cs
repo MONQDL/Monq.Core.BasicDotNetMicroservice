@@ -71,7 +71,8 @@ public static class OpenTelemetryExtensions
                             ctx.Request.Path != "/health"
                                 && ctx.Request.Path != "/api/version"
                                 && ctx.Request.Path != "/ready"
-                                && ctx.Request.Path != "/metrics";
+                                && ctx.Request.Path != "/metrics"
+                                && ctx.Request.Path != "/insert/loki/api/v1/push";
                         options.RecordException = true;
                     })
                     .AddHttpClientInstrumentation()
