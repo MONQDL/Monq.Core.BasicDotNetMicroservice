@@ -91,7 +91,8 @@ public static class OpenTelemetryExtensions
                     .AddSource("Monq.Core.EventHistoryLogger")
                     .AddSource("Monq.Core.VictoriaMetricsClient")
                     .AddSource("Monq.Policies")
-                    .AddSource("Monq.Core.S3Client");
+                    .AddSource("Monq.Core.S3Client")
+                    .AddSource("Automaton.Engine");
 
                 ConfigureOtlpExporter(tracing, options);
             });
