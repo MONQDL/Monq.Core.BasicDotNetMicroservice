@@ -7,7 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
-using Monq.Core.BasicDotNetMicroservice.Metrics;
+using Monq.Core.BasicDotNetMicroservice.Telemetry;
 using Monq.Core.BasicDotNetMicroservice.Validation;
 using Monq.Core.HttpClientExtensions;
 using System.Diagnostics.CodeAnalysis;

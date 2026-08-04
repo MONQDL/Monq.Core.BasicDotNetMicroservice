@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Microsoft.AspNetCore.Http;
@@ -89,5 +90,8 @@ public sealed class RpcDownstreamExceptionInterceptor : Interceptor
                 "Downstream gRPC call failed. Method: {Method}, Status: {StatusCode}, Detail: {Detail}",
                 methodName, exception.StatusCode, exception.Status.Detail);
         }
+
+        Activity.Current?.SetStatus(ActivityStatusCode.Error, exception.Message);
+        Activity.Current?.AddException(exception);
     }
 }

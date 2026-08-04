@@ -1,4 +1,4 @@
-using Monq.Core.BasicDotNetMicroservice.Metrics;
+using Monq.Core.BasicDotNetMicroservice.Telemetry;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 

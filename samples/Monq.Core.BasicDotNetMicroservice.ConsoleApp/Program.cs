@@ -36,6 +36,7 @@ Console.WriteLine("=== OTEL Test Console App ===");
 Console.WriteLine("Press 1 - Call REST Minimal API");
 Console.WriteLine("Press 2 - Call REST Controller");
 Console.WriteLine("Press 3 - Call gRPC Service");
+Console.WriteLine("Press 4 - Call FAILED gRPC Service");
 Console.WriteLine("Press Q - Quit");
 Console.WriteLine();
 
@@ -61,6 +62,7 @@ _ = Task.Run(() =>
             ConsoleKey.D1 => CallRestMinimalApi(baseUri),
             ConsoleKey.D2 => CallRestController(baseUri),
             ConsoleKey.D3 => CallGrpcService(grpcClient),
+            ConsoleKey.D4 => CallFailedGrpcService(grpcClient),
             _ => Task.CompletedTask
         };
     }
@@ -117,6 +119,24 @@ async Task CallGrpcService(OtelTest.OtelTestClient client)
         using var activity = new ActivitySource("ConsoleApp").StartActivity("CallGrpcService");
 
         var response = await client.TestAsync(new TestRequest { Message = "hello-from-console-grpc" });
+
+        Console.WriteLine($"[gRPC] Result: {response.Result}");
+        Console.WriteLine($"[gRPC] TraceId: {response.TraceId}");
+        Console.WriteLine();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[gRPC] Error: {ex.Message}");
+    }
+}
+
+async Task CallFailedGrpcService(OtelTest.OtelTestClient client)
+{
+    try
+    {
+        using var activity = new ActivitySource("ConsoleApp").StartActivity("CallFailedGrpcService");
+
+        var response = await client.TestAsync(new TestRequest { Fail = true, Message = "hello-from-console-grpc" });
 
         Console.WriteLine($"[gRPC] Result: {response.Result}");
         Console.WriteLine($"[gRPC] TraceId: {response.TraceId}");

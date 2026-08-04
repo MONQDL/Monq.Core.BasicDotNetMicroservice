@@ -1,6 +1,6 @@
 using System.Diagnostics.Metrics;
 
-namespace Monq.Core.BasicDotNetMicroservice.Metrics;
+namespace Monq.Core.BasicDotNetMicroservice.Telemetry;
 
 /// <summary>
 /// Provides pre-configured metrics for RabbitMQ message processing and background task execution.
@@ -10,6 +10,11 @@ namespace Monq.Core.BasicDotNetMicroservice.Metrics;
 public sealed class MonqMetrics
 {
     static readonly Meter _meter = new("Monq.Core.Metrics", "1.0");
+
+    /// <summary>
+    /// Get Monq.Core.Metrics meter.
+    /// </summary>
+    public static Meter MonqMeter => _meter;
 
     static readonly Counter<long> _rabbitMqReceived = _meter.CreateCounter<long>("rabbitmq.messages.received", "messages", "Count of received RabbitMQ messages");
     static readonly Counter<long> _rabbitMqRejected = _meter.CreateCounter<long>("rabbitmq.messages.rejected", "messages", "Count of rejected RabbitMQ messages");

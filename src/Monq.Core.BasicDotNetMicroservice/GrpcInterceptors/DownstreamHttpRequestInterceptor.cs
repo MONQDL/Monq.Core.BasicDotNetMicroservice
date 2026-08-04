@@ -1,7 +1,8 @@
-using Grpc.Core;
-using Grpc.Core.Interceptors;
+using System.Diagnostics;
 using System.Net;
 using System.Text.Json.Nodes;
+using Grpc.Core;
+using Grpc.Core.Interceptors;
 
 namespace Monq.Core.BasicDotNetMicroservice.GrpcInterceptors;
 
@@ -49,8 +50,14 @@ public class DownstreamHttpRequestInterceptor : Interceptor
                 // Such a situation may arise when the response doesn't contain serialized json message.
             }
 
-            throw new RpcException(new Status(statusCode, internalMessage?.ToString() ?? e.Message),
+            var rpcException = new RpcException(
+                new Status(statusCode, internalMessage?.ToString() ?? e.Message),
                 "Downstream request failed.");
+
+            Activity.Current?.SetStatus(ActivityStatusCode.Error, rpcException.Message);
+            Activity.Current?.AddException(rpcException);
+
+            throw rpcException;
         }
     }
 }
