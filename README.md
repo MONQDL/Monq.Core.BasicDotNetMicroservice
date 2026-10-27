@@ -319,42 +319,87 @@ The ```AddDefaultExceptionHandlers()``` method have to be added in the pipeline 
 
 ### gRPC client configuration
 
-```csharp
-builder.Services.AddGrpcPreConfiguredClient(builder.Configuration, opt =>
-{
-    opt.Name = "clientName";
-    opt.ClientOptionsAction = o => o.Address = new Uri("http://localhost");
-});
-
-builder.Services.AddGrpcPreConfiguredConsoleClient(builder.Configuration, opt =>
-{
-    opt.Name = "clientName";
-    opt.ClientOptionsAction = o => o.Address = new Uri("http://localhost");
-});
-```
-
 The library provides extensions for configuring `Grpc.AspNetCore` clients both for web API applications and for console applications with static authentication.
 
-Configuration options are defined in `GrpcClientOptions` class. Default options are:
+The legacy `IServiceCollection` overloads that accept `IConfiguration` and
+read a shared `BaseUri` are obsolete. They remain available for compatibility,
+but new registrations should use the host-builder overloads described below.
+
+The host-builder overload accepts an application name and obtains the final
+address from the selected resolver. Select the addressing strategy once before
+registering clients:
 
 ```csharp
-static readonly Action<GrpcClientOptions, IConfiguration> _configureGrpcClient = (o, configuration) =>
+if (builder.Environment.IsDevelopment())
 {
-    o.ClientOptionsAction = (clientOptions) =>
-    {
-        clientOptions.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)) ?? "http://localhost");
-    };
-    o.ChannelOptionsAction = (channelOptions) =>
-    {
-        channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
-        channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 Mb.
-    };
-    o.ContextPropagationOptionsAction = (propagationOptions) =>
-    {
-        propagationOptions.SuppressContextNotFoundErrors = true;
-    };
-};
+    builder.UseMicroserviceAddressResolver(
+        new FixedMicroserviceAddressResolver(
+            builder.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
+                ?? throw new InvalidOperationException("BaseUri not found at configuration.")));
+}
+else
+{
+    builder.UseGrpcMicroserviceAddressResolver(
+        new KubernetesServiceDiscoveryAddressResolver());
+}
+
+builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(ApplicationNames.Orders);
 ```
+
+The resolver selects the connection mode:
+
+- `FixedMicroserviceAddressResolver` sends every client to the supplied address
+- `KubernetesClusterIpAddressResolver` uses `http://{applicationName}.{environment}.svc.cluster.local:5006`
+- `KubernetesServiceDiscoveryAddressResolver` uses `dns:///{applicationName}-grpc.{environment}.svc.cluster.local:5006`
+
+When no resolver is selected explicitly, host-level registrations use
+`KubernetesClusterIpAddressResolver`.
+
+This means that local debugging can use one ingress address for every gRPC
+client. For example, place the shared address in `appsettings.Development.json`:
+
+```json
+{
+  "BaseUri": "https://api.example.com"
+}
+```
+
+All clients registered through the extension receive this address when the
+fixed resolver is selected. Because its scheme is `https`, the extension does not enable the
+gRPC DNS resolver or `round_robin`; ingress selects the target service from the
+gRPC method path.
+
+The console equivalent is `AddGrpcPreConfiguredConsoleClient`.
+
+Client-specific configuration remains available through `GrpcClientOptions`:
+
+```csharp
+builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(
+    ApplicationNames.Orders,
+    options =>
+    {
+        options.Name = "clientName";
+        options.ChannelOptionsAction = channelOptions =>
+        {
+            channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
+            channelOptions.MaxReceiveMessageSize = 64 * 1024 * 1024;
+        };
+    });
+```
+
+The final address is always supplied by the selected
+`IMicroserviceAddressResolver`. The extension applies the following defaults:
+
+```csharp
+channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
+channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 MB.
+propagationOptions.SuppressContextNotFoundErrors = true;
+```
+
+If a client replaces `ChannelOptionsAction` or
+`ContextPropagationOptionsAction`, it is responsible for preserving any
+required defaults. In the example above, the receive limit is changed to 64 MB
+while insecure call credentials remain enabled.
 
 ### Global gRPC exception handling
 
@@ -402,14 +447,199 @@ builder.Services.AddInlineValidator<YourRequest>(rules =>
 
 ### REST HTTP client configuration
 
+The library provides extensions for configuring REST HTTP clients. More info: <https://github.com/MONQDL/Monq.Core.HttpClientExtensions/blob/master/README.md>.
+
+The legacy `IServiceCollection` overload that accepts `IConfiguration` and
+reads `BaseUri` is obsolete. It remains available for compatibility, but new
+registrations should use the host-builder overload.
+
+The host-builder overload uses the configured HTTP address resolver. For a
+headless Service, select the service-discovery resolver before registering the
+client:
+
 ```csharp
-builder.Services.AddRestHttpPreConfiguredClient(builder.Configuration, client =>
-{
-    client.Timeout = TimeSpan.FromMinutes(1);
-});
+builder.UseHttpMicroserviceAddressResolver(
+    new KubernetesServiceDiscoveryAddressResolver());
+builder.Host.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(ApplicationNames.Orders);
 ```
 
-The library provides extensions for configuring REST HTTP clients. More info: <https://github.com/MONQDL/Monq.Core.HttpClientExtensions/blob/master/README.md>.
+The service-discovery resolver uses
+`http://{applicationName}-http.{environment}.svc.cluster.local:5005` and marks
+the result with `EndpointResolutionMode.ServiceDiscovery`. The extension then
+enables HTTP endpoint discovery. URI scheme alone cannot distinguish a regular
+HTTP ClusterIP Service from a headless HTTP Service.
+
+The service-discovery resolver uses application/container port `5005` by
+default because the headless Service resolves directly to pod IP addresses.
+Pass `port` to the extension only when the application uses a non-standard
+port.
+
+For a regular ClusterIP Service, select `KubernetesClusterIpAddressResolver` or
+use it implicitly as the default. It produces
+`http://{applicationName}.{environment}.svc.cluster.local:80` without
+client-side endpoint discovery:
+
+```csharp
+builder.Host.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(
+    ApplicationNames.Orders);
+```
+
+The existing `IServiceCollection` overload that accepts `IConfiguration`
+retains its previous behavior and reads `BaseUri`, but is marked obsolete so
+callers can migrate incrementally. An additional non-obsolete `Uri` overload is
+available for explicitly configured addresses.
+
+Different strategies can be used in the same application. For example, gRPC
+may use a headless Service with `round_robin`, while HTTP uses a regular
+ClusterIP Service:
+
+```csharp
+builder
+    .UseGrpcMicroserviceAddressResolver(new KubernetesServiceDiscoveryAddressResolver())
+    .UseHttpMicroserviceAddressResolver(new KubernetesClusterIpAddressResolver());
+
+builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(ApplicationNames.Orders);
+builder.Host.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(
+    ApplicationNames.Orders);
+```
+
+Individual gRPC and HTTP clients can also select different strategies. Pass a
+resolver for a particular registration when it must override the host-level
+protocol strategy:
+
+```csharp
+builder.UseGrpcMicroserviceAddressResolver(
+    new KubernetesClusterIpAddressResolver());
+
+builder.Host.AddGrpcPreConfiguredClient<OrdersClient>(
+    ApplicationNames.Orders,
+    addressResolver: new KubernetesServiceDiscoveryAddressResolver());
+
+builder.Host.AddGrpcPreConfiguredClient<NotificationsClient>(ApplicationNames.Notifications);
+
+builder.Host.AddRestHttpPreConfiguredClient<IOrdersHttpClient, OrdersHttpClient>(
+    ApplicationNames.Orders,
+    addressResolver: new KubernetesServiceDiscoveryAddressResolver());
+
+builder.Host.AddRestHttpPreConfiguredClient<INotificationsHttpClient, NotificationsHttpClient>(
+    ApplicationNames.Notifications,
+    addressResolver: new KubernetesClusterIpAddressResolver());
+```
+
+In each protocol, one client uses a headless Service and the other uses
+ClusterIP. Resolver precedence is: client registration, protocol-specific host
+resolver, common host resolver, built-in ClusterIP resolver. This also allows
+two client types targeting the same application to use different strategies.
+
+For gRPC, the standard `dns:///` scheme selects the gRPC DNS resolver. HTTP DNS
+resolution is selected by registering `AddDnsServiceEndpointProvider` inside the
+service-discovery extension; it does not require a synthetic URI scheme.
+
+`DnsResolverFactory` is registered once and is shared by all gRPC clients using
+`dns:///` addresses. Each gRPC channel still gets its own DNS resolver and
+resolved endpoint state. The shared periodic refresh interval defaults to 30
+seconds and can be changed for the application:
+
+```csharp
+builder.ConfigureGrpcServiceDiscovery(options =>
+    options.DnsRefreshInterval = TimeSpan.FromSeconds(10));
+```
+
+Address resolution strategy remains selectable per client through
+`IMicroserviceAddressResolver`; the DNS refresh interval is application-wide
+because gRPC selects one resolver factory for the `dns` URI scheme.
+
+### Microservice address resolution
+
+Clients that are not registered through the REST or gRPC extensions, such as
+SignalR or WebSocket clients, can use the same selected resolver directly:
+
+```csharp
+var address = hostBuilder.ResolveMicroserviceAddress(
+    context,
+    ApplicationNames.RealtimeProcessor,
+    MicroserviceProtocol.Http).Address;
+```
+
+Console hosts can select the resolver through a factory when the final
+configuration is only available from `HostBuilderContext`:
+
+```csharp
+hostBuilder.UseMicroserviceAddressResolver(context =>
+    context.HostingEnvironment.IsDevelopment()
+        ? new FixedMicroserviceAddressResolver(
+            context.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
+                ?? throw new InvalidOperationException("BaseUri not found at configuration."))
+        : new KubernetesClusterIpAddressResolver());
+```
+
+The default host-level resolver applies to every REST and gRPC registration.
+`UseGrpcMicroserviceAddressResolver` and `UseHttpMicroserviceAddressResolver`
+override it for one protocol. A product may also provide its own
+`IMicroserviceAddressResolver` implementation when the standard strategies are
+insufficient.
+
+For HTTP, `ResolutionMode` in the result explicitly controls whether endpoint
+discovery is enabled. For gRPC, the final address controls the mode: only the
+`dns` scheme enables the DNS resolver and `round_robin`. Therefore a custom
+resolver may safely return an explicit `http` or `https` address without
+activating gRPC client-side balancing.
+
+#### Custom microservice address resolver
+
+An application can replace the default address resolver when its namespaces,
+service names, or routing rules differ from the standard convention. For
+example, the following resolver sends local requests through one ingress,
+selects a namespace for each service, uses discovery for gRPC, and uses
+ClusterIP for HTTP:
+
+```csharp
+public sealed class ProductMicroserviceAddressResolver : IMicroserviceAddressResolver
+{
+    public ResolvedMicroserviceAddress Resolve(MicroserviceAddressContext context)
+    {
+        if (context.Environment.IsDevelopment())
+        {
+            var baseUri = context.Configuration.GetValue<Uri>("BaseUri")
+                ?? throw new InvalidOperationException(
+                    "BaseUri not found in configuration.");
+
+            return new(baseUri);
+        }
+
+        var namespaceName = context.ApplicationName switch
+        {
+            "orders-service" => "business-services",
+            "notifications-service" => "shared-services",
+            _ => context.Environment.EnvironmentName.ToLowerInvariant(),
+        };
+
+        return context.Protocol switch
+        {
+            MicroserviceProtocol.Grpc => new(
+                new Uri($"dns:///{context.ApplicationName}-grpc.{namespaceName}.svc.cluster.local:{context.PortOverride ?? 5006}"),
+                EndpointResolutionMode.ServiceDiscovery),
+
+            MicroserviceProtocol.Http => new(
+                new Uri($"http://{context.ApplicationName}.{namespaceName}.svc.cluster.local:{context.PortOverride ?? 80}")),
+
+            _ => throw new ArgumentOutOfRangeException(nameof(context.Protocol)),
+        };
+    }
+}
+```
+
+Select the resolver once, before registering clients:
+
+```csharp
+builder.UseMicroserviceAddressResolver(
+    new ProductMicroserviceAddressResolver());
+
+builder.Host.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
+    ApplicationNames.Orders);
+
+builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(ApplicationNames.Orders);
+```
 
 ### Authentication and authorization
 
@@ -749,5 +979,6 @@ public class MyBackgroundWorker : BackgroundService
 
 ## Migration guides
 
+- [Migration to Kubernetes service addressing](service-discovery-MIGRATION.md)
 - [Migration to v10](v10-MIGRATION.md)
 - [Migration to v9](v9-MIGRATION.md)

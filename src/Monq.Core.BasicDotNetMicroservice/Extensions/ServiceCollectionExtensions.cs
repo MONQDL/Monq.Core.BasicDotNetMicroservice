@@ -82,6 +82,12 @@ public static class ServiceCollectionExtensions
             clientOptions.Address = new Uri(
                 configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
                 ?? throw new Exception("BaseUri not found at configuration."));
+
+        ConfigureGrpcClientDefaults(options);
+    }
+
+    static void ConfigureGrpcClientDefaults(GrpcClientOptions options)
+    {
         options.ChannelOptionsAction = channelOptions =>
         {
             channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
@@ -100,6 +106,13 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">Configuration to read BaseUri from.</param>
     /// <param name="configureOptions">Optional delegate to customize <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
+    /// <remarks>
+    /// This overload is retained for compatibility with clients that read a shared BaseUri from configuration.
+    /// New registrations should use the IHostBuilder overload and an application name.
+    /// </remarks>
+    [Obsolete(
+        "Use AddGrpcPreConfiguredClient<TClient>(IHostBuilder, string, ...) and configure an IMicroserviceAddressResolver on the host instead.",
+        false)]
     public static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -113,6 +126,14 @@ public static class ServiceCollectionExtensions
         return services.AddGrpcPreConfiguredClient<TClient>(options);
     }
 
+    internal static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
+        this IServiceCollection services,
+        Uri address,
+        Action<GrpcClientOptions>? configureOptions)
+        where TClient : class =>
+        services.AddGrpcPreConfiguredClient<TClient>(
+            CreateGrpcClientOptions(address, configureOptions));
+
     /// <summary>
     /// Adds a pre-configured gRPC client for console/background applications with static authentication fallback.
     /// If no HttpContext is available, obtains a token via <see cref="RestHttpClient.GetAccessToken"/>.
@@ -122,6 +143,13 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">Configuration to read BaseUri from.</param>
     /// <param name="configureOptions">Optional delegate to customize <see cref="GrpcClientOptions"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
+    /// <remarks>
+    /// This overload is retained for compatibility with clients that read a shared BaseUri from configuration.
+    /// New registrations should use the IHostBuilder overload and an application name.
+    /// </remarks>
+    [Obsolete(
+        "Use AddGrpcPreConfiguredConsoleClient<TClient>(IHostBuilder, string, ...) and configure an IMicroserviceAddressResolver on the host instead.",
+        false)]
     public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -135,6 +163,14 @@ public static class ServiceCollectionExtensions
         return services.AddGrpcPreConfiguredConsoleClient<TClient>(options);
     }
 
+    internal static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
+        this IServiceCollection services,
+        Uri address,
+        Action<GrpcClientOptions>? configureOptions)
+        where TClient : class =>
+        services.AddGrpcPreConfiguredConsoleClient<TClient>(
+            CreateGrpcClientOptions(address, configureOptions));
+
     /// <summary>
     /// Adds a pre-configured REST HTTP client based on <see cref="RestHttpClient"/> with base address from configuration,
     /// infinite timeout (managed via cancellation tokens), and trailing slash normalization.
@@ -145,6 +181,13 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">Configuration to read BaseUri from.</param>
     /// <param name="configureHttpClient">Optional delegate to customize the <see cref="HttpClient"/>.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
+    /// <remarks>
+    /// This overload is retained for compatibility with clients that read a shared BaseUri from configuration.
+    /// New registrations should use the IHostBuilder overload and an application name.
+    /// </remarks>
+    [Obsolete(
+        "Use AddRestHttpPreConfiguredClient<TClient, TImplementation>(IHostBuilder, string, ...) and configure an IMicroserviceAddressResolver on the host instead.",
+        false)]
     public static IHttpClientBuilder AddRestHttpPreConfiguredClient<TClient, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -155,18 +198,67 @@ public static class ServiceCollectionExtensions
         var baseUri = new Uri(
             configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
             ?? throw new Exception("BaseUri not found at configuration."));
-        var httpClientBuilder = services.AddHttpClient<TClient, TImplementation>(
+
+        return services.AddRestHttpPreConfiguredClient<TClient, TImplementation>(
+            baseUri,
+            configureHttpClient);
+    }
+
+    /// <summary>
+    /// Adds a pre-configured REST HTTP client based on <see cref="RestHttpClient"/> with the specified base address,
+    /// infinite timeout (managed via cancellation tokens), and trailing slash normalization.
+    /// </summary>
+    /// <typeparam name="TClient">The typed client interface.</typeparam>
+    /// <typeparam name="TImplementation">The implementation type inheriting from <see cref="RestHttpClient"/>.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="baseAddress">The absolute base address.</param>
+    /// <param name="configureHttpClient">Optional delegate to customize the <see cref="HttpClient"/>.</param>
+    /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
+    public static IHttpClientBuilder AddRestHttpPreConfiguredClient<TClient, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+        this IServiceCollection services,
+        Uri baseAddress,
+        Action<HttpClient>? configureHttpClient = null)
+        where TClient : class
+        where TImplementation : RestHttpClient, TClient
+    {
+        ArgumentNullException.ThrowIfNull(baseAddress);
+
+        if (!baseAddress.IsAbsoluteUri)
+            throw new ArgumentException("The HTTP client base address must be absolute.", nameof(baseAddress));
+
+        return services.AddHttpClient<TClient, TImplementation>(
             client =>
             {
-                client.BaseAddress = baseUri;
+                client.BaseAddress = baseAddress;
 
                 client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
                 configureHttpClient?.Invoke(client);
 
                 client.AddTrailingSlash();
             });
+    }
 
-        return httpClientBuilder;
+    static GrpcClientOptions CreateGrpcClientOptions(
+        Uri address,
+        Action<GrpcClientOptions>? configureOptions)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+
+        if (!address.IsAbsoluteUri)
+            throw new ArgumentException("The gRPC client address must be absolute.", nameof(address));
+
+        var options = new GrpcClientOptions();
+        ConfigureGrpcClientDefaults(options);
+        configureOptions?.Invoke(options);
+
+        var configureClient = options.ClientOptionsAction;
+        options.ClientOptionsAction = clientOptions =>
+        {
+            configureClient?.Invoke(clientOptions);
+            clientOptions.Address = address;
+        };
+
+        return options;
     }
 
     static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
