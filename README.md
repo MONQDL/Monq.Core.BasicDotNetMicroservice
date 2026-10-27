@@ -376,7 +376,15 @@ Client-specific configuration remains available through `GrpcClientOptions`:
 ```csharp
 builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(
     ApplicationNames.Orders,
-    options => options.Name = "clientName");
+    options =>
+    {
+        options.Name = "clientName";
+        options.ChannelOptionsAction = channelOptions =>
+        {
+            channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
+            channelOptions.MaxReceiveMessageSize = 64 * 1024 * 1024;
+        };
+    });
 ```
 
 The final address is always supplied by the selected
@@ -390,7 +398,8 @@ propagationOptions.SuppressContextNotFoundErrors = true;
 
 If a client replaces `ChannelOptionsAction` or
 `ContextPropagationOptionsAction`, it is responsible for preserving any
-required defaults.
+required defaults. In the example above, the receive limit is changed to 64 MB
+while insecure call credentials remain enabled.
 
 ### Global gRPC exception handling
 
