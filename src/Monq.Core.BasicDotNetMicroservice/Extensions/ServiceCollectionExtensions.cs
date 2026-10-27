@@ -155,18 +155,44 @@ public static class ServiceCollectionExtensions
         var baseUri = new Uri(
             configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
             ?? throw new Exception("BaseUri not found at configuration."));
-        var httpClientBuilder = services.AddHttpClient<TClient, TImplementation>(
+
+        return services.AddRestHttpPreConfiguredClient<TClient, TImplementation>(
+            baseUri,
+            configureHttpClient);
+    }
+
+    /// <summary>
+    /// Adds a pre-configured REST HTTP client based on <see cref="RestHttpClient"/> with the specified base address,
+    /// infinite timeout (managed via cancellation tokens), and trailing slash normalization.
+    /// </summary>
+    /// <typeparam name="TClient">The typed client interface.</typeparam>
+    /// <typeparam name="TImplementation">The implementation type inheriting from <see cref="RestHttpClient"/>.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="baseAddress">The absolute base address.</param>
+    /// <param name="configureHttpClient">Optional delegate to customize the <see cref="HttpClient"/>.</param>
+    /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
+    public static IHttpClientBuilder AddRestHttpPreConfiguredClient<TClient, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+        this IServiceCollection services,
+        Uri baseAddress,
+        Action<HttpClient>? configureHttpClient = null)
+        where TClient : class
+        where TImplementation : RestHttpClient, TClient
+    {
+        ArgumentNullException.ThrowIfNull(baseAddress);
+
+        if (!baseAddress.IsAbsoluteUri)
+            throw new ArgumentException("The HTTP client base address must be absolute.", nameof(baseAddress));
+
+        return services.AddHttpClient<TClient, TImplementation>(
             client =>
             {
-                client.BaseAddress = baseUri;
+                client.BaseAddress = baseAddress;
 
                 client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
                 configureHttpClient?.Invoke(client);
 
                 client.AddTrailingSlash();
             });
-
-        return httpClientBuilder;
     }
 
     static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
