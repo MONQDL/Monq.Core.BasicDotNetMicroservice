@@ -1,7 +1,7 @@
 namespace Monq.Core.BasicDotNetMicroservice.Addressing;
 
 /// <summary>
-/// Resolves every microservice to the same fixed address without service discovery.
+/// Resolves every microservice to the same fixed address and endpoint resolution mode.
 /// </summary>
 public sealed class FixedMicroserviceAddressResolver : IMicroserviceAddressResolver
 {

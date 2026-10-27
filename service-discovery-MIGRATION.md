@@ -11,9 +11,10 @@ using Monq.Core.BasicDotNetMicroservice.Addressing;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
 
-The migration is optional and backward compatible. Existing
-`IServiceCollection` overloads that accept `IConfiguration` continue to read
-`BaseUri`. Applications can migrate one client at a time.
+The migration is source and binary compatible. Existing `IServiceCollection`
+overloads that accept `IConfiguration` continue to read `BaseUri`, but they are
+marked obsolete and produce a compiler warning. Applications can migrate one
+client at a time.
 
 ## When migration is needed
 
@@ -21,9 +22,11 @@ Migrate a client when it should connect directly to a Kubernetes Service or use
 client-side endpoint discovery instead of receiving its destination address
 from configuration.
 
-No changes are required when a client must continue using its configured
-`BaseUri`. Do not remove `BaseUri` until all other consumers, including
-authentication and application-specific integrations, have been checked.
+When a client must continue using its configured `BaseUri`, select a
+`FixedMicroserviceAddressResolver` and migrate its registration to the
+host-builder overload. Do not remove `BaseUri` until all other consumers,
+including authentication and application-specific integrations, have been
+checked.
 
 ## Address strategies
 
@@ -139,6 +142,20 @@ For gRPC, only a `dns:///` address enables the gRPC DNS resolver and
 `round_robin`. Direct `http://` and `https://` addresses do not enable
 client-side balancing.
 
+`DnsResolverFactory` is registered once and shared by all gRPC clients using
+`dns:///`. Each gRPC channel receives its own DNS resolver and endpoint state.
+The periodic refresh interval defaults to 30 seconds and can be configured once
+for the application:
+
+```csharp
+builder.ConfigureGrpcServiceDiscovery(options =>
+    options.DnsRefreshInterval = TimeSpan.FromSeconds(10));
+```
+
+The address strategy can still be selected per client. The DNS refresh interval
+is application-wide because gRPC selects one resolver factory for the `dns`
+URI scheme.
+
 For HTTP, the URI scheme cannot distinguish ClusterIP from a headless Service.
 `ResolvedMicroserviceAddress.ResolutionMode` explicitly controls whether HTTP
 endpoint discovery is enabled.
@@ -238,6 +255,8 @@ that are already using a pod while it terminates can still fail.
   resolver API.
 - Replace configured client addresses with verified application-name constants.
 - Select ClusterIP, service discovery, or a fixed address explicitly.
+- Configure the shared gRPC DNS refresh interval when the 30-second default is
+  not appropriate.
 - Preserve existing client configuration callbacks.
 - Confirm Kubernetes Service names, ports, `targetPort`, and headless status.
 - Verify local development through the configured `BaseUri`.

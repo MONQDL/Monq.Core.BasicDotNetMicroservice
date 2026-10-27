@@ -1,9 +1,11 @@
 using Grpc.Core;
 using Grpc.Net.Client.Balancer;
 using Grpc.Net.Client.Configuration;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Monq.Core.BasicDotNetMicroservice.Addressing;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using System.Diagnostics.CodeAnalysis;
@@ -16,6 +18,35 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 public static class GrpcClientHostBuilderExtensions
 {
     /// <summary>
+    /// Configures gRPC client-side service discovery for this application.
+    /// The DNS refresh interval is shared by all gRPC clients using <c>dns</c> addresses.
+    /// </summary>
+    public static WebApplicationBuilder ConfigureGrpcServiceDiscovery(
+        this WebApplicationBuilder builder,
+        Action<GrpcServiceDiscoveryOptions> configureOptions)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.Host.ConfigureGrpcServiceDiscovery(configureOptions);
+        return builder;
+    }
+
+    /// <summary>
+    /// Configures gRPC client-side service discovery for this host.
+    /// The DNS refresh interval is shared by all gRPC clients using <c>dns</c> addresses.
+    /// </summary>
+    public static IHostBuilder ConfigureGrpcServiceDiscovery(
+        this IHostBuilder hostBuilder,
+        Action<GrpcServiceDiscoveryOptions> configureOptions)
+    {
+        ArgumentNullException.ThrowIfNull(hostBuilder);
+        ArgumentNullException.ThrowIfNull(configureOptions);
+
+        return hostBuilder.ConfigureServices(services =>
+            services.Configure(configureOptions));
+    }
+
+    /// <summary>
     /// Adds a pre-configured gRPC client using the address returned by the configured resolver.
     /// A resolver supplied for this client takes precedence over host-level resolvers.
     /// A <c>dns</c> address automatically enables DNS resolution and round-robin balancing.
@@ -26,7 +57,6 @@ public static class GrpcClientHostBuilderExtensions
         string applicationName,
         Action<GrpcClientOptions>? configureOptions = null,
         int? port = null,
-        TimeSpan? dnsRefreshInterval = null,
         IMicroserviceAddressResolver? addressResolver = null)
         where TClient : class =>
         hostBuilder.ConfigureServices((context, services) =>
@@ -37,19 +67,10 @@ public static class GrpcClientHostBuilderExtensions
                 MicroserviceProtocol.Grpc,
                 port,
                 addressResolver).Address;
-            var clientBuilder = services.AddGrpcPreConfiguredClient<TClient>(context.Configuration, options =>
-            {
-                configureOptions?.Invoke(options);
-                var configureClient = options.ClientOptionsAction;
-                options.ClientOptionsAction = clientOptions =>
-                {
-                    configureClient?.Invoke(clientOptions);
-                    clientOptions.Address = address;
-                };
-            });
+            var clientBuilder = services.AddGrpcPreConfiguredClient<TClient>(address, configureOptions);
 
             if (IsServiceDiscoveryAddress(address))
-                ConfigureServiceDiscovery(services, clientBuilder, dnsRefreshInterval);
+                ConfigureServiceDiscovery(services, clientBuilder);
         });
 
     /// <summary>
@@ -63,7 +84,6 @@ public static class GrpcClientHostBuilderExtensions
         string applicationName,
         Action<GrpcClientOptions>? configureOptions = null,
         int? port = null,
-        TimeSpan? dnsRefreshInterval = null,
         IMicroserviceAddressResolver? addressResolver = null)
         where TClient : class =>
         hostBuilder.ConfigureServices((context, services) =>
@@ -74,19 +94,10 @@ public static class GrpcClientHostBuilderExtensions
                 MicroserviceProtocol.Grpc,
                 port,
                 addressResolver).Address;
-            var clientBuilder = services.AddGrpcPreConfiguredConsoleClient<TClient>(context.Configuration, options =>
-            {
-                configureOptions?.Invoke(options);
-                var configureClient = options.ClientOptionsAction;
-                options.ClientOptionsAction = clientOptions =>
-                {
-                    configureClient?.Invoke(clientOptions);
-                    clientOptions.Address = address;
-                };
-            });
+            var clientBuilder = services.AddGrpcPreConfiguredConsoleClient<TClient>(address, configureOptions);
 
             if (IsServiceDiscoveryAddress(address))
-                ConfigureServiceDiscovery(services, clientBuilder, dnsRefreshInterval);
+                ConfigureServiceDiscovery(services, clientBuilder);
         });
 
     static bool IsServiceDiscoveryAddress(Uri address) =>
@@ -94,8 +105,7 @@ public static class GrpcClientHostBuilderExtensions
 
     static void ConfigureServiceDiscovery(
         IServiceCollection services,
-        IHttpClientBuilder builder,
-        TimeSpan? dnsRefreshInterval)
+        IHttpClientBuilder builder)
     {
         builder.ConfigureChannel(options =>
         {
@@ -109,7 +119,29 @@ public static class GrpcClientHostBuilderExtensions
             };
         });
 
-        services.TryAddSingleton<ResolverFactory>(
-            _ => new DnsResolverFactory(dnsRefreshInterval ?? TimeSpan.FromSeconds(30)));
+        services
+            .AddOptions<GrpcServiceDiscoveryOptions>()
+            .Validate(
+                options => options.DnsRefreshInterval == Timeout.InfiniteTimeSpan
+                    || options.DnsRefreshInterval > TimeSpan.Zero,
+                $"{nameof(GrpcServiceDiscoveryOptions.DnsRefreshInterval)} must be positive or Timeout.InfiniteTimeSpan.");
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<ResolverFactory, ConfiguredDnsResolverFactory>());
+    }
+
+    sealed class ConfiguredDnsResolverFactory : ResolverFactory
+    {
+        readonly DnsResolverFactory _factory;
+
+        public ConfiguredDnsResolverFactory(IOptions<GrpcServiceDiscoveryOptions> options)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+
+            _factory = new(options.Value.DnsRefreshInterval);
+        }
+
+        public override string Name => _factory.Name;
+
+        public override Resolver Create(ResolverOptions options) => _factory.Create(options);
     }
 }

@@ -319,21 +319,11 @@ The ```AddDefaultExceptionHandlers()``` method have to be added in the pipeline 
 
 ### gRPC client configuration
 
-```csharp
-builder.Services.AddGrpcPreConfiguredClient(builder.Configuration, opt =>
-{
-    opt.Name = "clientName";
-    opt.ClientOptionsAction = o => o.Address = new Uri("http://localhost");
-});
-
-builder.Services.AddGrpcPreConfiguredConsoleClient(builder.Configuration, opt =>
-{
-    opt.Name = "clientName";
-    opt.ClientOptionsAction = o => o.Address = new Uri("http://localhost");
-});
-```
-
 The library provides extensions for configuring `Grpc.AspNetCore` clients both for web API applications and for console applications with static authentication.
+
+The legacy `IServiceCollection` overloads that accept `IConfiguration` and
+read a shared `BaseUri` are obsolete. They remain available for compatibility,
+but new registrations should use the host-builder overloads described below.
 
 The host-builder overload accepts an application name and obtains the final
 address from the selected resolver. Select the addressing strategy once before
@@ -381,26 +371,26 @@ gRPC method path.
 
 The console equivalent is `AddGrpcPreConfiguredConsoleClient`.
 
-Configuration options are defined in `GrpcClientOptions` class. Default options are:
+Client-specific configuration remains available through `GrpcClientOptions`:
 
 ```csharp
-static readonly Action<GrpcClientOptions, IConfiguration> _configureGrpcClient = (o, configuration) =>
-{
-    o.ClientOptionsAction = (clientOptions) =>
-    {
-        clientOptions.Address = new Uri(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri)) ?? "http://localhost");
-    };
-    o.ChannelOptionsAction = (channelOptions) =>
-    {
-        channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
-        channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 Mb.
-    };
-    o.ContextPropagationOptionsAction = (propagationOptions) =>
-    {
-        propagationOptions.SuppressContextNotFoundErrors = true;
-    };
-};
+builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(
+    ApplicationNames.Orders,
+    options => options.Name = "clientName");
 ```
+
+The final address is always supplied by the selected
+`IMicroserviceAddressResolver`. The extension applies the following defaults:
+
+```csharp
+channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
+channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024; // 51 MB.
+propagationOptions.SuppressContextNotFoundErrors = true;
+```
+
+If a client replaces `ChannelOptionsAction` or
+`ContextPropagationOptionsAction`, it is responsible for preserving any
+required defaults.
 
 ### Global gRPC exception handling
 
@@ -448,14 +438,11 @@ builder.Services.AddInlineValidator<YourRequest>(rules =>
 
 ### REST HTTP client configuration
 
-```csharp
-builder.Services.AddRestHttpPreConfiguredClient(builder.Configuration, client =>
-{
-    client.Timeout = TimeSpan.FromMinutes(1);
-});
-```
-
 The library provides extensions for configuring REST HTTP clients. More info: <https://github.com/MONQDL/Monq.Core.HttpClientExtensions/blob/master/README.md>.
+
+The legacy `IServiceCollection` overload that accepts `IConfiguration` and
+reads `BaseUri` is obsolete. It remains available for compatibility, but new
+registrations should use the host-builder overload.
 
 The host-builder overload uses the configured HTTP address resolver. For a
 headless Service, select the service-discovery resolver before registering the
@@ -489,9 +476,9 @@ builder.Host.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(
 ```
 
 The existing `IServiceCollection` overload that accepts `IConfiguration`
-retains its previous behavior and reads `BaseUri`. Existing callers therefore
-do not need to change. An additional `Uri` overload is available for explicitly
-configured addresses.
+retains its previous behavior and reads `BaseUri`, but is marked obsolete so
+callers can migrate incrementally. An additional non-obsolete `Uri` overload is
+available for explicitly configured addresses.
 
 Different strategies can be used in the same application. For example, gRPC
 may use a headless Service with `round_robin`, while HTTP uses a regular
@@ -538,6 +525,20 @@ two client types targeting the same application to use different strategies.
 For gRPC, the standard `dns:///` scheme selects the gRPC DNS resolver. HTTP DNS
 resolution is selected by registering `AddDnsServiceEndpointProvider` inside the
 service-discovery extension; it does not require a synthetic URI scheme.
+
+`DnsResolverFactory` is registered once and is shared by all gRPC clients using
+`dns:///` addresses. Each gRPC channel still gets its own DNS resolver and
+resolved endpoint state. The shared periodic refresh interval defaults to 30
+seconds and can be changed for the application:
+
+```csharp
+builder.ConfigureGrpcServiceDiscovery(options =>
+    options.DnsRefreshInterval = TimeSpan.FromSeconds(10));
+```
+
+Address resolution strategy remains selectable per client through
+`IMicroserviceAddressResolver`; the DNS refresh interval is application-wide
+because gRPC selects one resolver factory for the `dns` URI scheme.
 
 ### Microservice address resolution
 
