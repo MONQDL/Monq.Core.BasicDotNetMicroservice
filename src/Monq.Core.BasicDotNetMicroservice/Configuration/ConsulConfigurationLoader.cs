@@ -8,6 +8,8 @@ namespace Monq.Core.BasicDotNetMicroservice.Configuration;
 /// </summary>
 internal static class ConsulConfigurationLoader
 {
+    const int RequestTimeoutSeconds = 30;
+
     /// <summary>
     /// Loads a JSON configuration value from Consul KV store and adds it to the configuration builder.
     /// </summary>
@@ -23,7 +25,7 @@ internal static class ConsulConfigurationLoader
             throw new ConsulConfigurationException("Consul address is not configured.");
 
         using var httpClient = new HttpClient();
-        httpClient.Timeout = TimeSpan.FromSeconds(30);
+        httpClient.Timeout = TimeSpan.FromSeconds(RequestTimeoutSeconds);
 
         var uri = BuildConsulUri(consulOptions.Address, key, consulOptions.Datacenter);
         var request = new HttpRequestMessage(HttpMethod.Get, uri);
@@ -35,6 +37,11 @@ internal static class ConsulConfigurationLoader
         try
         {
             response = httpClient.Send(request);
+        }
+        catch (OperationCanceledException ex)
+        {
+            throw new ConsulConfigurationException(
+                $"Timed out while loading configuration from Consul. Key: '{key}', Address: '{consulOptions.Address}', Timeout: {RequestTimeoutSeconds} seconds.", ex);
         }
         catch (HttpRequestException ex)
         {

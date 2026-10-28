@@ -677,7 +677,7 @@ using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
 
 ```csharp
-builder.Services.ConfigureMonqAuthentication(Configuration);
+builder.ConfigureMonqAuthentication(ApplicationNames.Identity);
 
 var app = builder.Build();
 
@@ -685,6 +685,65 @@ app.UseRouting();
 app.UseAuthentication();
 app.MapControllers();
 ```
+
+The application name is resolved through the configured HTTP
+`IMicroserviceAddressResolver`. The built-in ClusterIP resolver produces an address in
+the following form:
+
+```text
+http://identity-service.<environment>.svc.cluster.local:80
+```
+
+For local development, select a fixed resolver in the same way as for other
+microservice clients:
+
+```csharp
+if (builder.Environment.IsDevelopment())
+{
+    builder.UseHttpMicroserviceAddressResolver(
+        new FixedMicroserviceAddressResolver(
+            new Uri(builder.Configuration["BaseUri"]
+                ?? throw new InvalidOperationException("BaseUri is not configured."))));
+}
+
+builder.ConfigureMonqAuthentication(ApplicationNames.Identity);
+```
+
+Console and worker applications that use static client-credentials authentication can
+resolve the same application name:
+
+```csharp
+builder.ConfigureStaticAuthentication(ApplicationNames.Identity);
+```
+
+The static authentication request uses a dedicated `HttpClient` with a default timeout
+of 10 seconds and therefore does not inherit service discovery handlers from a
+downstream REST client. Custom certificates, proxy settings, or timeouts can be
+configured explicitly:
+
+```csharp
+builder.ConfigureStaticAuthentication(
+    ApplicationNames.Identity,
+    clientBuilder =>
+    {
+        clientBuilder.ConfigureHttpClient(client =>
+            client.Timeout = TimeSpan.FromSeconds(30));
+
+        clientBuilder.ConfigurePrimaryHttpMessageHandler(() =>
+        {
+            var handler = new HttpClientHandler
+            {
+                Proxy = authenticationProxy,
+                UseProxy = authenticationProxy is not null
+            };
+            handler.ClientCertificates.Add(authenticationClientCertificate);
+            return handler;
+        });
+    });
+```
+
+The configuration-based `IServiceCollection.ConfigureMonqAuthentication` overload is
+retained for backward compatibility.
 
 The example of the configuration in JSON format:
 

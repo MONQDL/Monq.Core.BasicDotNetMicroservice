@@ -29,6 +29,47 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection ConfigureMonqAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var authConfig = configuration.GetSection("Authentication");
+        return ConfigureMonqAuthentication(
+            services,
+            configuration,
+            authConfig[AuthConstants.AuthenticationConfiguration.Authority]);
+    }
+
+    /// <summary>
+    /// Configures OAuth2 introspection authentication using an explicitly resolved authentication endpoint.
+    /// </summary>
+    /// <param name="services">The service collection to add authentication to.</param>
+    /// <param name="configuration">The configuration containing authentication credentials and settings.</param>
+    /// <param name="authenticationEndpoint">The absolute authentication authority URI.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection ConfigureMonqAuthentication(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        Uri authenticationEndpoint)
+    {
+        ArgumentNullException.ThrowIfNull(authenticationEndpoint);
+        if (!authenticationEndpoint.IsAbsoluteUri)
+            throw new ArgumentException(
+                "The authentication endpoint must be an absolute URI.",
+                nameof(authenticationEndpoint));
+
+        return ConfigureMonqAuthentication(
+            services,
+            configuration,
+            authenticationEndpoint.AbsoluteUri);
+    }
+
+    static IServiceCollection ConfigureMonqAuthentication(
+        IServiceCollection services,
+        IConfiguration configuration,
+        string? authenticationEndpoint)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
         var authConfig = configuration.GetSection("Authentication");
 
         if (!bool.TryParse(authConfig[AuthConstants.AuthenticationConfiguration.RequireHttpsMetadata], out var requireHttps))
@@ -37,7 +78,7 @@ public static class ServiceCollectionExtensions
         services.AddAuthentication(AuthConstants.AuthenticationScheme)
             .AddOAuth2Introspection(AuthConstants.AuthenticationScheme, x =>
             {
-                x.Authority = authConfig[AuthConstants.AuthenticationConfiguration.Authority];
+                x.Authority = authenticationEndpoint;
                 x.ClientId = authConfig[AuthConstants.AuthenticationConfiguration.ScopeName];
                 x.ClientSecret = authConfig[AuthConstants.AuthenticationConfiguration.ScopeSecret];
                 x.CacheDuration = TimeSpan.FromMinutes(5);
