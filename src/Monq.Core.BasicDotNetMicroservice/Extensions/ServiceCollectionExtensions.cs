@@ -75,13 +75,18 @@ public static class ServiceCollectionExtensions
         if (!bool.TryParse(authConfig[AuthConstants.AuthenticationConfiguration.RequireHttpsMetadata], out var requireHttps))
             requireHttps = false;
 
+        if (!int.TryParse(authConfig[AuthConstants.AuthenticationConfiguration.CacheDurationSeconds],
+                out var cacheDurationSeconds)
+            || cacheDurationSeconds <= 0)
+            cacheDurationSeconds = 300;
+
         services.AddAuthentication(AuthConstants.AuthenticationScheme)
             .AddOAuth2Introspection(AuthConstants.AuthenticationScheme, x =>
             {
                 x.Authority = authenticationEndpoint;
                 x.ClientId = authConfig[AuthConstants.AuthenticationConfiguration.ScopeName];
                 x.ClientSecret = authConfig[AuthConstants.AuthenticationConfiguration.ScopeSecret];
-                x.CacheDuration = TimeSpan.FromMinutes(5);
+                x.CacheDuration = TimeSpan.FromSeconds(cacheDurationSeconds);
                 x.NameClaimType = "fullName";
                 x.DiscoveryPolicy.RequireHttps = requireHttps;
             });

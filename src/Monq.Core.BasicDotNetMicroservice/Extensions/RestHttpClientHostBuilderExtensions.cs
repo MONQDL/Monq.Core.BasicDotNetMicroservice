@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Monq.Core.BasicDotNetMicroservice.Addressing;
 using Monq.Core.HttpClientExtensions;
+using Monq.Core.MicroserviceAddressing.Addressing;
+using Monq.Core.MicroserviceAddressing.DependencyInjection;
+using Monq.Core.MicroserviceAddressing.Hosting;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
@@ -27,6 +29,7 @@ public static class RestHttpClientHostBuilderExtensions
         where TImplementation : RestHttpClient, TClient =>
         hostBuilder.ConfigureServices((context, services) =>
         {
+            services.AddMicroserviceAddressing();
             var resolvedAddress = hostBuilder.ResolveMicroserviceAddress(
                 context,
                 applicationName,
@@ -44,4 +47,26 @@ public static class RestHttpClientHostBuilderExtensions
             services.AddDnsServiceEndpointProvider();
             clientBuilder.AddServiceDiscovery();
         });
+
+    /// <summary>
+    /// Adds a pre-configured REST HTTP client using an explicit absolute address.
+    /// The address is used as is, without consulting the configured resolvers.
+    /// </summary>
+    public static IHostBuilder AddRestHttpPreConfiguredClient<
+        TClient,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+        this IHostBuilder hostBuilder,
+        Uri address,
+        Action<HttpClient>? configureHttpClient = null)
+        where TClient : class
+        where TImplementation : RestHttpClient, TClient
+    {
+        ArgumentNullException.ThrowIfNull(hostBuilder);
+        ArgumentNullException.ThrowIfNull(address);
+        if (!address.IsAbsoluteUri)
+            throw new ArgumentException("The HTTP client base address must be absolute.", nameof(address));
+
+        return hostBuilder.ConfigureServices((_, services) =>
+            services.AddRestHttpPreConfiguredClient<TClient, TImplementation>(address, configureHttpClient));
+    }
 }
