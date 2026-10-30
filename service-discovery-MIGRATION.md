@@ -7,14 +7,23 @@ The addressing types and host-builder extensions are provided by separate
 namespaces:
 
 ```csharp
-using Monq.Core.BasicDotNetMicroservice.Addressing;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
+using Monq.Core.MicroserviceAddressing.Addressing;
+using Monq.Core.MicroserviceAddressing.Hosting;
 ```
 
-The migration is source and binary compatible. Existing `IServiceCollection`
-overloads that accept `IConfiguration` continue to read `BaseUri`, but they are
-marked obsolete and produce a compiler warning. Applications can migrate one
-client at a time.
+Existing `IServiceCollection` overloads that accept `IConfiguration` continue
+to read `BaseUri`, but they are marked obsolete and produce a compiler warning.
+The new resolver API was moved to `Monq.Core.MicroserviceAddressing` before it
+was adopted by consumers; therefore no compatibility wrappers are retained for
+the temporary Basic.NET resolver namespaces.
+
+Breaking change in 11.0.0: the temporary resolver types that shipped in the
+published `Monq.Core.BasicDotNetMicroservice` 10.1.1 package under
+`Monq.Core.BasicDotNetMicroservice.Addressing` were removed without
+compatibility wrappers. Update usings to
+`Monq.Core.MicroserviceAddressing.Addressing` and
+`Monq.Core.MicroserviceAddressing.Hosting`.
 
 ## When migration is needed
 
@@ -36,10 +45,15 @@ checked.
 | `KubernetesClusterIpAddressResolver` | `http://{application}.{namespace}.svc.cluster.local:5006` | `http://{application}.{namespace}.svc.cluster.local:80` | No |
 | `KubernetesServiceDiscoveryAddressResolver` | `dns:///{application}-grpc.{namespace}.svc.cluster.local:5006` | `http://{application}-http.{namespace}.svc.cluster.local:5005` | Yes |
 
-When no resolver is selected, host-level client registrations use
-`KubernetesClusterIpAddressResolver`. Development mode does not implicitly read
-`BaseUri`; select `FixedMicroserviceAddressResolver` explicitly when that
-behavior is required.
+`ConfigureBasicMicroservice` and `ConfigureBasicConsoleMicroservice` install the
+standard policy as a fallback: HTTP uses `KubernetesClusterIpAddressResolver`,
+while gRPC uses `KubernetesServiceDiscoveryAddressResolver`. A resolver
+registered before the call is preserved, and a resolver registered after it
+overrides the policy. Development mode does not
+implicitly read `BaseUri`; the application must select
+`FixedMicroserviceAddressResolver` explicitly when that behavior is required.
+Applications that do not use a Basic.NET configuration extension retain the
+addressing library's built-in ClusterIP fallback.
 
 The Kubernetes namespace is derived from `IHostEnvironment.EnvironmentName`
 and converted to lower case. Do not pass the namespace separately.
@@ -75,10 +89,12 @@ The examples below use neutral placeholder constants such as
 
 ## Web application migration
 
-Select the resolver before registering clients. The following example keeps a
-shared ingress address for local development and uses ClusterIP in Kubernetes:
+The following example keeps a shared ingress address for local development and
+uses the standard Basic.NET policies in Kubernetes:
 
 ```csharp
+builder.Host.ConfigureBasicMicroservice();
+
 if (builder.Environment.IsDevelopment())
 {
     builder.UseMicroserviceAddressResolver(
@@ -86,11 +102,6 @@ if (builder.Environment.IsDevelopment())
             builder.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
                 ?? throw new InvalidOperationException(
                     "BaseUri not found at configuration.")));
-}
-else
-{
-    builder.UseMicroserviceAddressResolver(
-        new KubernetesClusterIpAddressResolver());
 }
 
 builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(
@@ -138,8 +149,9 @@ builder.Host.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
     ApplicationNames.Orders);
 ```
 
-For gRPC, only a `dns:///` address enables the gRPC DNS resolver and
-`round_robin`. Direct `http://` and `https://` addresses do not enable
+For gRPC, an address resolved in `EndpointResolutionMode.ServiceDiscovery` mode
+or using the `dns:///` scheme enables the gRPC DNS resolver and `round_robin`.
+Direct `http://` and `https://` addresses in `Direct` mode do not enable
 client-side balancing.
 
 `DnsResolverFactory` is registered once and shared by all gRPC clients using
@@ -189,13 +201,16 @@ factory can use the final host configuration and environment:
 
 ```csharp
 using var host = Host.CreateDefaultBuilder(args)
+    .ConfigureBasicConsoleMicroservice()
     .UseMicroserviceAddressResolver(context =>
         context.HostingEnvironment.IsDevelopment()
             ? new FixedMicroserviceAddressResolver(
                 context.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
                     ?? throw new InvalidOperationException(
                         "BaseUri not found at configuration."))
-            : new KubernetesClusterIpAddressResolver())
+            : new ProtocolMicroserviceAddressResolver(
+                httpResolver: new KubernetesClusterIpAddressResolver(),
+                grpcResolver: new KubernetesServiceDiscoveryAddressResolver()))
     .AddGrpcPreConfiguredConsoleClient<MyGrpcClient>(
         ApplicationNames.Orders)
     .AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
@@ -247,14 +262,19 @@ Keep application-specific routing rules outside
 
 A headless Service must publish ready pod endpoints. Client-side discovery does
 not replace readiness probes, graceful shutdown, or retry policies. Requests
-that are already using a pod while it terminates can still fail.
+that are already using a pod while it terminates can still fail. Discovery has
+no ClusterIP fallback: while a required headless Service is missing or publishes
+no ready endpoints, gRPC calls fail with `UNAVAILABLE` and HTTP endpoint
+discovery fails the request.
 
 ## Migration checklist
 
 - Update `Monq.Core.BasicDotNetMicroservice` to a version containing the address
   resolver API.
 - Replace configured client addresses with verified application-name constants.
-- Select ClusterIP, service discovery, or a fixed address explicitly.
+- Override the standard Basic.NET policy only when the application requires a
+  different protocol or fixed-address strategy. The override works whether it
+  is registered before or after the Basic.NET configuration call.
 - Configure the shared gRPC DNS refresh interval when the 30-second default is
   not appropriate.
 - Preserve existing client configuration callbacks.

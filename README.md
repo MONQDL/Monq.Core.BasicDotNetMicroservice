@@ -326,21 +326,22 @@ read a shared `BaseUri` are obsolete. They remain available for compatibility,
 but new registrations should use the host-builder overloads described below.
 
 The host-builder overload accepts an application name and obtains the final
-address from the selected resolver. Select the addressing strategy once before
-registering clients:
+address from the selected resolver. `ConfigureBasicMicroservice` installs the
+standard policy as a fallback: HTTP uses ClusterIP and gRPC uses Service
+Discovery. A resolver registered before the call is preserved, and a resolver
+registered after it overrides the policy, so the application can replace both
+defaults with one common resolver in either order. For example, local
+development can keep using a shared ingress address:
 
 ```csharp
+builder.Host.ConfigureBasicMicroservice();
+
 if (builder.Environment.IsDevelopment())
 {
     builder.UseMicroserviceAddressResolver(
         new FixedMicroserviceAddressResolver(
             builder.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
                 ?? throw new InvalidOperationException("BaseUri not found at configuration.")));
-}
-else
-{
-    builder.UseGrpcMicroserviceAddressResolver(
-        new KubernetesServiceDiscoveryAddressResolver());
 }
 
 builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(ApplicationNames.Orders);
@@ -349,11 +350,11 @@ builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(ApplicationNames.Orders);
 The resolver selects the connection mode:
 
 - `FixedMicroserviceAddressResolver` sends every client to the supplied address
-- `KubernetesClusterIpAddressResolver` uses `http://{applicationName}.{environment}.svc.cluster.local:5006`
-- `KubernetesServiceDiscoveryAddressResolver` uses `dns:///{applicationName}-grpc.{environment}.svc.cluster.local:5006`
+- `KubernetesClusterIpAddressResolver` uses `http://{applicationName}.{namespace}.svc.cluster.local:5006`
+- `KubernetesServiceDiscoveryAddressResolver` uses `dns:///{applicationName}-grpc.{namespace}.svc.cluster.local:5006`
 
-When no resolver is selected explicitly, host-level registrations use
-`KubernetesClusterIpAddressResolver`.
+Applications that do not call a Basic.NET configuration extension retain the
+addressing library's built-in ClusterIP fallback.
 
 This means that local debugging can use one ingress address for every gRPC
 client. For example, place the shared address in `appsettings.Development.json`:
@@ -464,7 +465,7 @@ builder.Host.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(ApplicationName
 ```
 
 The service-discovery resolver uses
-`http://{applicationName}-http.{environment}.svc.cluster.local:5005` and marks
+`http://{applicationName}-http.{namespace}.svc.cluster.local:5005` and marks
 the result with `EndpointResolutionMode.ServiceDiscovery`. The extension then
 enables HTTP endpoint discovery. URI scheme alone cannot distinguish a regular
 HTTP ClusterIP Service from a headless HTTP Service.
@@ -476,7 +477,7 @@ port.
 
 For a regular ClusterIP Service, select `KubernetesClusterIpAddressResolver` or
 use it implicitly as the default. It produces
-`http://{applicationName}.{environment}.svc.cluster.local:80` without
+`http://{applicationName}.{namespace}.svc.cluster.local:80` without
 client-side endpoint discovery:
 
 ```csharp
@@ -531,9 +532,15 @@ ClusterIP. Resolver precedence is: client registration, protocol-specific host
 resolver, common host resolver, built-in ClusterIP resolver. This also allows
 two client types targeting the same application to use different strategies.
 
-For gRPC, the standard `dns:///` scheme selects the gRPC DNS resolver. HTTP DNS
-resolution is selected by registering `AddDnsServiceEndpointProvider` inside the
-service-discovery extension; it does not require a synthetic URI scheme.
+For gRPC, the DNS resolver and `round_robin` are enabled when the resolved
+address uses `EndpointResolutionMode.ServiceDiscovery` or the standard
+`dns:///` scheme. HTTP DNS resolution is selected by registering
+`AddDnsServiceEndpointProvider` inside the service-discovery extension; it does
+not require a synthetic URI scheme.
+
+Client-side discovery has no ClusterIP fallback: while the headless Service is
+missing or publishes no ready endpoints, gRPC calls fail with `UNAVAILABLE` and
+HTTP endpoint discovery fails the request.
 
 `DnsResolverFactory` is registered once and is shared by all gRPC clients using
 `dns:///` addresses. Each gRPC channel still gets its own DNS resolver and
@@ -551,6 +558,21 @@ because gRPC selects one resolver factory for the `dns` URI scheme.
 
 ### Microservice address resolution
 
+Select the addressing mechanism by scenario:
+
+| Scenario | Mechanism |
+|---|---|
+| Standard Kubernetes addressing | Application name plus the standard policy from `ConfigureBasicMicroservice()` or `ConfigureBasicConsoleMicroservice()` |
+| Every client through one ingress or gateway | `UseMicroserviceAddressResolver` (or `UseHttpMicroserviceAddressResolver` / `UseGrpcMicroserviceAddressResolver`) with `FixedMicroserviceAddressResolver` on the host builder |
+| A single client or authentication against an explicit URL | `Uri` overloads: `AddGrpcPreConfiguredClient`, `AddGrpcPreConfiguredConsoleClient`, `AddRestHttpPreConfiguredClient`, `ConfigureMonqAuthentication`, `ConfigureStaticAuthentication` |
+| A non-standard rule for a single client | `addressResolver` parameter of the application-name overloads |
+
+Do not register `FixedMicroserviceAddressResolver` together with a placeholder
+application name when an explicit URL is enough: use the `Uri` overload instead.
+The `addressResolver` parameter is reserved for resolvers that require the
+resolution context: configuration, environment, application name, protocol,
+or port.
+
 Clients that are not registered through the REST or gRPC extensions, such as
 SignalR or WebSocket clients, can use the same selected resolver directly:
 
@@ -562,15 +584,21 @@ var address = hostBuilder.ResolveMicroserviceAddress(
 ```
 
 Console hosts can select the resolver through a factory when the final
-configuration is only available from `HostBuilderContext`:
+configuration is only available from `HostBuilderContext`. The application owns
+the environment check; the non-development branch repeats the standard Basic.NET
+policy because the factory must return one resolver:
 
 ```csharp
-hostBuilder.UseMicroserviceAddressResolver(context =>
-    context.HostingEnvironment.IsDevelopment()
-        ? new FixedMicroserviceAddressResolver(
-            context.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
-                ?? throw new InvalidOperationException("BaseUri not found at configuration."))
-        : new KubernetesClusterIpAddressResolver());
+hostBuilder
+    .ConfigureBasicConsoleMicroservice()
+    .UseMicroserviceAddressResolver(context =>
+        context.HostingEnvironment.IsDevelopment()
+            ? new FixedMicroserviceAddressResolver(
+                context.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
+                    ?? throw new InvalidOperationException("BaseUri not found at configuration."))
+            : new ProtocolMicroserviceAddressResolver(
+                httpResolver: new KubernetesClusterIpAddressResolver(),
+                grpcResolver: new KubernetesServiceDiscoveryAddressResolver()));
 ```
 
 The default host-level resolver applies to every REST and gRPC registration.
@@ -580,10 +608,10 @@ override it for one protocol. A product may also provide its own
 insufficient.
 
 For HTTP, `ResolutionMode` in the result explicitly controls whether endpoint
-discovery is enabled. For gRPC, the final address controls the mode: only the
-`dns` scheme enables the DNS resolver and `round_robin`. Therefore a custom
-resolver may safely return an explicit `http` or `https` address without
-activating gRPC client-side balancing.
+discovery is enabled. For gRPC, `EndpointResolutionMode.ServiceDiscovery` or a
+`dns` scheme address enables the DNS resolver and `round_robin`. Therefore a
+custom resolver may safely return an explicit `http` or `https` address in
+`Direct` mode without activating gRPC client-side balancing.
 
 #### Custom microservice address resolver
 
@@ -607,7 +635,7 @@ public sealed class ProductMicroserviceAddressResolver : IMicroserviceAddressRes
             return new(baseUri);
         }
 
-        var namespaceName = context.ApplicationName switch
+        var namespaceName = context.TargetApplicationName switch
         {
             "orders-service" => "business-services",
             "notifications-service" => "shared-services",
@@ -617,11 +645,11 @@ public sealed class ProductMicroserviceAddressResolver : IMicroserviceAddressRes
         return context.Protocol switch
         {
             MicroserviceProtocol.Grpc => new(
-                new Uri($"dns:///{context.ApplicationName}-grpc.{namespaceName}.svc.cluster.local:{context.PortOverride ?? 5006}"),
+                new Uri($"dns:///{context.TargetApplicationName}-grpc.{namespaceName}.svc.cluster.local:{context.PortOverride ?? 5006}"),
                 EndpointResolutionMode.ServiceDiscovery),
 
             MicroserviceProtocol.Http => new(
-                new Uri($"http://{context.ApplicationName}.{namespaceName}.svc.cluster.local:{context.PortOverride ?? 80}")),
+                new Uri($"http://{context.TargetApplicationName}.{namespaceName}.svc.cluster.local:{context.PortOverride ?? 80}")),
 
             _ => throw new ArgumentOutOfRangeException(nameof(context.Protocol)),
         };
@@ -691,7 +719,7 @@ The application name is resolved through the configured HTTP
 the following form:
 
 ```text
-http://identity-service.<environment>.svc.cluster.local:80
+http://identity-service.<namespace>.svc.cluster.local:80
 ```
 
 For local development, select a fixed resolver in the same way as for other
@@ -714,6 +742,13 @@ resolve the same application name:
 
 ```csharp
 builder.ConfigureStaticAuthentication(ApplicationNames.Identity);
+```
+
+The parameterless overload uses the default authentication service
+(`pl-identity-service`):
+
+```csharp
+builder.ConfigureStaticAuthentication();
 ```
 
 The static authentication request uses a dedicated `HttpClient` with a default timeout
@@ -747,6 +782,12 @@ retained for backward compatibility.
 
 The example of the configuration in JSON format:
 
+> [!NOTE]
+> The `AuthenticationEndpoint` key is read only by this deprecated overload. After all
+> consumers are migrated to `ConfigureMonqAuthentication(applicationName)` (see above),
+> remove `Authentication:AuthenticationEndpoint` from Consul and application
+> configuration; `Monq.Core.HttpClientExtensions` 8.0.0 no longer reads it.
+
 ```json
 {
   "Authentication": {
@@ -756,7 +797,7 @@ The example of the configuration in JSON format:
       "Password": "RIHY1vsevEO7WEVC"
     },
     "RequireHttpsMetadata": false,
-    "EnableCaching": true
+    "CacheDurationSeconds": 300
   }
 }
 ```
@@ -765,11 +806,13 @@ The example of the configuration in JSON format:
 
 Optional. By default is false.
 
-#### EnableCaching
+#### CacheDurationSeconds
 
-Optional. By default is true.
-
-Data cache duration: 5 minutes.
+Optional. By default is 300 (5 minutes). Lifetime of a Duende introspection
+cache entry. Since the Duende OAuth2 introspection handler always caches
+validation results, the legacy `EnableCaching` key (and the old
+`IdentityModel.AspNetCore.OAuth2Introspection` handler's ability to disable
+caching) is no longer supported.
 
 ### Metrics sending
 
