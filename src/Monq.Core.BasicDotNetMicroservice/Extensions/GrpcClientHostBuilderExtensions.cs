@@ -1,21 +1,20 @@
-using Grpc.Core;
-using Grpc.Net.Client.Balancer;
-using Grpc.Net.Client.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.MicroserviceAddressing.Addressing;
 using Monq.Core.MicroserviceAddressing.DependencyInjection;
 using Monq.Core.MicroserviceAddressing.Hosting;
 using System.Diagnostics.CodeAnalysis;
+using GrpcServiceDiscoveryOptions = Monq.Core.GrpcClientExtensions.GrpcServiceDiscoveryOptions;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
 /// <summary>
 /// Extension methods for registering pre-configured gRPC clients on a host builder.
+/// Channel credentials and load balancing rules are applied by
+/// <see cref="Monq.Core.GrpcClientExtensions"/>; this class adds the host-level API, eager
+/// address resolution and the Basic microservice policies (headers interceptor, credentials).
 /// </summary>
 public static class GrpcClientHostBuilderExtensions
 {
@@ -44,8 +43,8 @@ public static class GrpcClientHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(hostBuilder);
         ArgumentNullException.ThrowIfNull(configureOptions);
 
-        return hostBuilder.ConfigureServices(services =>
-            services.Configure(configureOptions));
+        return hostBuilder.ConfigureServices((_, services) =>
+            services.ConfigureMonqGrpcServiceDiscovery(configureOptions));
     }
 
     /// <summary>
@@ -71,13 +70,8 @@ public static class GrpcClientHostBuilderExtensions
                 MicroserviceProtocol.Grpc,
                 port,
                 addressResolver);
-            var clientBuilder =
-                services.AddGrpcPreConfiguredClient<TClient>(resolvedAddress.Address, configureOptions);
 
-            ConfigureChannelCredentials(clientBuilder, resolvedAddress.Address);
-
-            if (UsesServiceDiscovery(resolvedAddress))
-                ConfigureServiceDiscovery(services, clientBuilder);
+            services.AddGrpcPreConfiguredClient<TClient>(resolvedAddress, configureOptions);
         });
 
     /// <summary>
@@ -99,15 +93,8 @@ public static class GrpcClientHostBuilderExtensions
             throw new ArgumentException("The gRPC client address must be absolute.", nameof(address));
 
         return hostBuilder.ConfigureServices((_, services) =>
-        {
-            var clientBuilder =
-                services.AddGrpcPreConfiguredClient<TClient>(address, configureOptions);
-
-            ConfigureChannelCredentials(clientBuilder, address);
-
-            if (UsesServiceDiscovery(new(address, EndpointResolutionMode.Direct)))
-                ConfigureServiceDiscovery(services, clientBuilder);
-        });
+            services.AddGrpcPreConfiguredClient<TClient>(
+                new ResolvedMicroserviceAddress(address), configureOptions));
     }
 
     /// <summary>
@@ -134,13 +121,8 @@ public static class GrpcClientHostBuilderExtensions
                 MicroserviceProtocol.Grpc,
                 port,
                 addressResolver);
-            var clientBuilder = services.AddGrpcPreConfiguredConsoleClient<TClient>(
-                resolvedAddress.Address, configureOptions);
 
-            ConfigureChannelCredentials(clientBuilder, resolvedAddress.Address);
-
-            if (UsesServiceDiscovery(resolvedAddress))
-                ConfigureServiceDiscovery(services, clientBuilder);
+            services.AddGrpcPreConfiguredConsoleClient<TClient>(resolvedAddress, configureOptions);
         });
 
     /// <summary>
@@ -162,78 +144,7 @@ public static class GrpcClientHostBuilderExtensions
             throw new ArgumentException("The gRPC client address must be absolute.", nameof(address));
 
         return hostBuilder.ConfigureServices((_, services) =>
-        {
-            var clientBuilder = services.AddGrpcPreConfiguredConsoleClient<TClient>(
-                address, configureOptions);
-
-            ConfigureChannelCredentials(clientBuilder, address);
-
-            if (UsesServiceDiscovery(new(address, EndpointResolutionMode.Direct)))
-                ConfigureServiceDiscovery(services, clientBuilder);
-        });
-    }
-
-    static bool UsesServiceDiscovery(ResolvedMicroserviceAddress resolvedAddress) =>
-        resolvedAddress.ResolutionMode == EndpointResolutionMode.ServiceDiscovery
-        || resolvedAddress.Address.Scheme.Equals("dns", StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// grpc-dotnet requires explicit channel credentials for every address scheme other than
-    /// http/https: dns:/// (Service Discovery), but also ipv4:///, unix:/ and any custom resolver
-    /// scheme. Checking only "dns" would leave such addresses to fail channel creation with
-    /// "Credentials must be specified". In-cluster endpoints work without TLS, so Insecure is used.
-    /// Applied to every registered client regardless of the endpoint resolution mode; http/https
-    /// addresses keep TLS inferred from the scheme.
-    /// </summary>
-    static void ConfigureChannelCredentials(IHttpClientBuilder builder, Uri address)
-    {
-        if (!address.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase)
-            && !address.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
-        {
-            builder.ConfigureChannel(options => options.Credentials = ChannelCredentials.Insecure);
-        }
-    }
-
-    static void ConfigureServiceDiscovery(
-        IServiceCollection services,
-        IHttpClientBuilder builder)
-    {
-        // Channel credentials are set scheme-agnostically by ConfigureChannelCredentials;
-        // this method only enables DNS resolution and round-robin balancing for load-balanced schemes.
-        builder.ConfigureChannel(options =>
-        {
-            options.ServiceConfig = new ServiceConfig
-            {
-                LoadBalancingConfigs =
-                {
-                    new RoundRobinConfig(),
-                },
-            };
-        });
-
-        services
-            .AddOptions<GrpcServiceDiscoveryOptions>()
-            .Validate(
-                options => options.DnsRefreshInterval == Timeout.InfiniteTimeSpan
-                    || options.DnsRefreshInterval > TimeSpan.Zero,
-                $"{nameof(GrpcServiceDiscoveryOptions.DnsRefreshInterval)} must be positive or Timeout.InfiniteTimeSpan.");
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ResolverFactory, ConfiguredDnsResolverFactory>());
-    }
-
-    sealed class ConfiguredDnsResolverFactory : ResolverFactory
-    {
-        readonly DnsResolverFactory _factory;
-
-        public ConfiguredDnsResolverFactory(IOptions<GrpcServiceDiscoveryOptions> options)
-        {
-            ArgumentNullException.ThrowIfNull(options);
-
-            _factory = new(options.Value.DnsRefreshInterval);
-        }
-
-        public override string Name => _factory.Name;
-
-        public override Resolver Create(ResolverOptions options) => _factory.Create(options);
+            services.AddGrpcPreConfiguredConsoleClient<TClient>(
+                new ResolvedMicroserviceAddress(address), configureOptions));
     }
 }

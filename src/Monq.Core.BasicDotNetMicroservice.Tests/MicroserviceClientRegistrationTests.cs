@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
+using Monq.Core.GrpcClientExtensions;
 using Monq.Core.HttpClientExtensions;
 using Monq.Core.MicroserviceAddressing.Addressing;
 using Monq.Core.MicroserviceAddressing.Hosting;

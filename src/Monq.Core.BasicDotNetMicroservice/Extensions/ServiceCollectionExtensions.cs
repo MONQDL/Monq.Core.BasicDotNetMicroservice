@@ -10,9 +10,11 @@ using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Telemetry;
 using Monq.Core.BasicDotNetMicroservice.Validation;
 using Monq.Core.HttpClientExtensions;
+using Monq.Core.MicroserviceAddressing.Addressing;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Headers;
+using MonqGrpcClientOptions = Monq.Core.GrpcClientExtensions.GrpcClientOptions;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
@@ -120,17 +122,9 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    static void ConfigureGrpcClient(
-        GrpcClientOptions options,
-        IConfiguration configuration)
-    {
-        options.ClientOptionsAction = clientOptions =>
-            clientOptions.Address = new Uri(
-                configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
-                ?? throw new Exception("BaseUri not found at configuration."));
-
-        ConfigureGrpcClientDefaults(options);
-    }
+    static Uri GetBaseUri(IConfiguration configuration) =>
+        new(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
+            ?? throw new Exception("BaseUri not found at configuration."));
 
     static void ConfigureGrpcClientDefaults(GrpcClientOptions options)
     {
@@ -163,22 +157,16 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration,
         Action<GrpcClientOptions>? configureOptions = null)
-        where TClient : class
-    {
-        var options = new GrpcClientOptions();
-        ConfigureGrpcClient(options, configuration);
-        configureOptions?.Invoke(options);
-
-        return services.AddGrpcPreConfiguredClient<TClient>(options);
-    }
+        where TClient : class =>
+        services.AddGrpcPreConfiguredClient<TClient>(
+            new ResolvedMicroserviceAddress(GetBaseUri(configuration)), configureOptions);
 
     internal static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
-        Uri address,
+        ResolvedMicroserviceAddress resolvedAddress,
         Action<GrpcClientOptions>? configureOptions)
         where TClient : class =>
-        services.AddGrpcPreConfiguredClient<TClient>(
-            CreateGrpcClientOptions(address, configureOptions));
+        services.AddGrpcPreConfiguredClientCore<TClient>(resolvedAddress, configureOptions, console: false);
 
     /// <summary>
     /// Adds a pre-configured gRPC client for console/background applications with static authentication fallback.
@@ -200,22 +188,16 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration,
         Action<GrpcClientOptions>? configureOptions = null)
-        where TClient : class
-    {
-        var options = new GrpcClientOptions();
-        ConfigureGrpcClient(options, configuration);
-        configureOptions?.Invoke(options);
-
-        return services.AddGrpcPreConfiguredConsoleClient<TClient>(options);
-    }
+        where TClient : class =>
+        services.AddGrpcPreConfiguredConsoleClient<TClient>(
+            new ResolvedMicroserviceAddress(GetBaseUri(configuration)), configureOptions);
 
     internal static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
-        Uri address,
+        ResolvedMicroserviceAddress resolvedAddress,
         Action<GrpcClientOptions>? configureOptions)
         where TClient : class =>
-        services.AddGrpcPreConfiguredConsoleClient<TClient>(
-            CreateGrpcClientOptions(address, configureOptions));
+        services.AddGrpcPreConfiguredClientCore<TClient>(resolvedAddress, configureOptions, console: true);
 
     /// <summary>
     /// Adds a pre-configured REST HTTP client based on <see cref="RestHttpClient"/> with base address from configuration,
@@ -284,40 +266,45 @@ public static class ServiceCollectionExtensions
             });
     }
 
-    static GrpcClientOptions CreateGrpcClientOptions(
-        Uri address,
-        Action<GrpcClientOptions>? configureOptions)
+    static IHttpClientBuilder AddGrpcPreConfiguredClientCore<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
+        this IServiceCollection services,
+        ResolvedMicroserviceAddress resolvedAddress,
+        Action<GrpcClientOptions>? configureOptions,
+        bool console)
+        where TClient : class
     {
-        ArgumentNullException.ThrowIfNull(address);
-
-        if (!address.IsAbsoluteUri)
-            throw new ArgumentException("The gRPC client address must be absolute.", nameof(address));
-
         var options = new GrpcClientOptions();
         ConfigureGrpcClientDefaults(options);
         configureOptions?.Invoke(options);
 
-        var configureClient = options.ClientOptionsAction;
-        options.ClientOptionsAction = clientOptions =>
+        var monqOptions = new MonqGrpcClientOptions
         {
-            configureClient?.Invoke(clientOptions);
-            clientOptions.Address = address;
+            ClientOptionsAction = options.ClientOptionsAction,
+            ChannelOptionsAction = options.ChannelOptionsAction,
+            ContextPropagationOptionsAction = options.ContextPropagationOptionsAction,
         };
 
-        return options;
-    }
+        var builder = options.Name is not null
+            ? console
+                ? services.AddMonqGrpcConsoleClient<TClient>(
+                    options.Name, resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions)
+                : services.AddMonqGrpcClient<TClient>(
+                    options.Name, resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions)
+            : console
+                ? services.AddMonqGrpcConsoleClient<TClient>(
+                    resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions)
+                : services.AddMonqGrpcClient<TClient>(
+                    resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions);
 
-    static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
-        this IServiceCollection services,
-        GrpcClientOptions? options = null)
-        where TClient : class
-    {
         services.TryAddTransient<AdditionalHeadersInterceptor>();
+        builder = builder.AddInterceptor<AdditionalHeadersInterceptor>();
 
-        return services
-            .AddGrpcClient<TClient>(options)
-            .AddInterceptor<AdditionalHeadersInterceptor>()
-            .AddCallCredentials((context, metadata, provider) =>
+        // Console clients receive forward-with-static-token-fallback call credentials
+        // from Monq.Core.GrpcClientExtensions; interactive clients only forward the
+        // incoming Authorization header.
+        if (!console)
+        {
+            builder = builder.AddCallCredentials((context, metadata, provider) =>
             {
                 var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
                 if (httpContext.HttpContext?.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) == true
@@ -326,42 +313,9 @@ public static class ServiceCollectionExtensions
 
                 return Task.CompletedTask;
             });
-    }
+        }
 
-    static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
-        this IServiceCollection services,
-        GrpcClientOptions? options = null)
-        where TClient : class
-    {
-        services.AddHttpClient<RestHttpClient>();
-
-        services.TryAddTransient<AdditionalHeadersInterceptor>();
-
-        return services
-            .AddGrpcClient<TClient>(options)
-            .AddInterceptor<AdditionalHeadersInterceptor>()
-            .AddCallCredentials(async (context, metadata, provider) =>
-            {
-                var httpContextAccessor = provider.GetService<IHttpContextAccessor>();
-                if (httpContextAccessor?.HttpContext?.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) == true
-                    && !string.IsNullOrEmpty(token))
-                {
-                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token!);
-                }
-                else
-                {
-                    var client = provider.GetService<RestHttpClient>();
-                    if (client is not null)
-                    {
-                        var tokenResponse = await client.GetAccessToken(false);
-                        if (tokenResponse is null)
-                            return;
-                        const string scheme = "Bearer";
-                        var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
-                        metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
-                    }
-                }
-            });
+        return builder;
     }
 
     /// <summary>
@@ -458,25 +412,5 @@ public static class ServiceCollectionExtensions
                 newOptions);
             return newContext;
         }
-    }
-
-    static IHttpClientBuilder AddGrpcClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
-        this IServiceCollection services,
-        GrpcClientOptions? options = null)
-        where TClient : class
-    {
-        IHttpClientBuilder builder;
-        if (string.IsNullOrWhiteSpace(options?.Name))
-            builder = services.AddGrpcClient<TClient>(o => options?.ClientOptionsAction?.Invoke(o));
-        else
-            builder = services.AddGrpcClient<TClient>(options.Name, o => options?.ClientOptionsAction?.Invoke(o));
-
-        if (options?.ChannelOptionsAction != null)
-            builder = builder.ConfigureChannel(options.ChannelOptionsAction);
-
-        if (options?.ContextPropagationOptionsAction != null)
-            builder.EnableCallContextPropagation(options.ContextPropagationOptionsAction);
-
-        return builder;
     }
 }
