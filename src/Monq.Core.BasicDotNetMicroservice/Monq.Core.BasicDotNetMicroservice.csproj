@@ -32,12 +32,6 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
-  <!-- Local development reference: replace with a Monq.Core.GrpcClientExtensions package
-       reference (0.1.0-rev-* / release) once the repository is published. -->
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\Monq.Core.GrpcClientExtensions\src\Monq.Core.GrpcClientExtensions\Monq.Core.GrpcClientExtensions.csproj" />
-  </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Duende.AspNetCore.Authentication.OAuth2Introspection" Version="7.0.1" />
     <PackageReference Include="Grpc.AspNetCore.Server" Version="2.83.0" />
@@ -45,6 +39,7 @@
     <PackageReference Include="Grpc.Net.ClientFactory" Version="2.83.0" />
     <PackageReference Include="Google.Protobuf" Version="3.35.1" />
     <PackageReference Include="Microsoft.Extensions.ServiceDiscovery.Dns" Version="10.0.0" />
+    <PackageReference Include="Monq.Core.GrpcClientExtensions" Version="0.1.0-rev-41116107820" />
     <!--Serilog-->
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.1" />
