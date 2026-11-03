@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <Version>11.0.0</Version>
@@ -39,7 +39,7 @@
     <PackageReference Include="Grpc.Net.ClientFactory" Version="2.83.0" />
     <PackageReference Include="Google.Protobuf" Version="3.35.1" />
     <PackageReference Include="Microsoft.Extensions.ServiceDiscovery.Dns" Version="10.0.0" />
-    <PackageReference Include="Monq.Core.GrpcClientExtensions" Version="0.1.0-rev-41116107820" />
+    <PackageReference Include="Monq.Core.GrpcClientExtensions" Version="0.1.0-rev-41620895905" />
     <!--Serilog-->
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.1" />
