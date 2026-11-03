@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.MicroserviceAddressing.Addressing;
-using Monq.Core.MicroserviceAddressing.DependencyInjection;
 using Monq.Core.MicroserviceAddressing.Hosting;
 using System.Diagnostics.CodeAnalysis;
 using GrpcServiceDiscoveryOptions = Monq.Core.GrpcClientExtensions.GrpcServiceDiscoveryOptions;
@@ -12,9 +11,9 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
 /// <summary>
 /// Extension methods for registering pre-configured gRPC clients on a host builder.
-/// Channel credentials and load balancing rules are applied by
-/// <see cref="Monq.Core.GrpcClientExtensions"/>; this class adds the host-level API, eager
-/// address resolution and the Basic microservice policies (headers interceptor, credentials).
+/// Channel credentials, header propagation and load balancing rules are applied by
+/// <see cref="Monq.Core.GrpcClientExtensions"/>; this class adds the host-level API and eager
+/// address resolution through the host resolver registry.
 /// </summary>
 public static class GrpcClientHostBuilderExtensions
 {
@@ -63,7 +62,6 @@ public static class GrpcClientHostBuilderExtensions
         where TClient : class =>
         hostBuilder.ConfigureServices((context, services) =>
         {
-            services.AddMicroserviceAddressing();
             var resolvedAddress = hostBuilder.ResolveMicroserviceAddress(
                 context,
                 applicationName,
@@ -114,7 +112,6 @@ public static class GrpcClientHostBuilderExtensions
         where TClient : class =>
         hostBuilder.ConfigureServices((context, services) =>
         {
-            services.AddMicroserviceAddressing();
             var resolvedAddress = hostBuilder.ResolveMicroserviceAddress(
                 context,
                 applicationName,
