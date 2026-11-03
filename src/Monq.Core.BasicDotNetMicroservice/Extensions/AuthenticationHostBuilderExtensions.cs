@@ -38,7 +38,6 @@ public static class AuthenticationHostBuilderExtensions
 
         return hostBuilder.ConfigureServices((context, services) =>
         {
-            services.AddMicroserviceAddressing();
             var authenticationEndpoint = hostBuilder.ResolveMicroserviceAddress(
                 context,
                 applicationName,

@@ -1,6 +1,6 @@
-namespace Monq.Core.BasicDotNetMicroservice;
-
 using Monq.Core.GrpcClientExtensions;
+
+namespace Monq.Core.BasicDotNetMicroservice;
 
 /// <summary>
 /// Unified microservice constants.
