@@ -1,8 +1,5 @@
 using Calzolari.Grpc.AspNetCore.Validation;
 using Duende.AspNetCore.Authentication.OAuth2Introspection;
-using Grpc.Core;
-using Grpc.Core.Interceptors;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
@@ -124,8 +121,9 @@ public static class ServiceCollectionExtensions
             ?? throw new Exception("BaseUri not found at configuration."));
 
     /// <summary>
-    /// Adds a pre-configured gRPC client with address from configuration, insecure channel, 
-    /// max message size of 51MB, context propagation, authorization header forwarding, and additional headers interceptor.
+    /// Adds a pre-configured gRPC client with an address from configuration. Channel defaults,
+    /// header propagation and authorization forwarding are applied by
+    /// Monq.Core.GrpcClientExtensions.
     /// </summary>
     /// <typeparam name="TClient">The gRPC client type to register as transient.</typeparam>
     /// <param name="services">The service collection.</param>
@@ -285,101 +283,5 @@ public static class ServiceCollectionExtensions
         // call context propagation and Authorization forwarding (with static token fallback for
         // console clients) are applied by Monq.Core.GrpcClientExtensions for every client.
         return builder;
-    }
-
-    /// <summary>
-    /// gRPC client interceptor that propagates <c>userspace-id</c> and <c>culture</c> headers
-    /// from the current HTTP request to outgoing gRPC calls.
-    /// </summary>
-    public class AdditionalHeadersInterceptor : Interceptor
-    {
-        readonly IHttpContextAccessor _httpContextAccessor;
-
-        /// <summary>
-        /// Creates a new instance of <see cref="AdditionalHeadersInterceptor"/>.
-        /// </summary>
-        /// <param name="httpContextAccessor">The HTTP context accessor to read incoming headers from.</param>
-        public AdditionalHeadersInterceptor(IHttpContextAccessor httpContextAccessor)
-        {
-            _httpContextAccessor = httpContextAccessor;
-        }
-
-        /// <inheritdoc />
-        public override AsyncServerStreamingCall<TResponse> AsyncServerStreamingCall<TRequest, TResponse>(
-            TRequest request,
-            ClientInterceptorContext<TRequest, TResponse> context,
-            AsyncServerStreamingCallContinuation<TRequest, TResponse> continuation)
-        {
-            var newContext = CreateModifiedInterceptorContext(context);
-
-            return base.AsyncServerStreamingCall(request, newContext, continuation);
-        }
-
-        /// <inheritdoc />
-        public override AsyncClientStreamingCall<TRequest, TResponse> AsyncClientStreamingCall<TRequest, TResponse>(
-            ClientInterceptorContext<TRequest, TResponse> context,
-            AsyncClientStreamingCallContinuation<TRequest, TResponse> continuation)
-        {
-            var newContext = CreateModifiedInterceptorContext(context);
-
-            return base.AsyncClientStreamingCall(newContext, continuation);
-        }
-
-        /// <inheritdoc />
-        public override AsyncDuplexStreamingCall<TRequest, TResponse> AsyncDuplexStreamingCall<TRequest, TResponse>(
-            ClientInterceptorContext<TRequest, TResponse> context,
-            AsyncDuplexStreamingCallContinuation<TRequest, TResponse> continuation)
-        {
-            var newContext = CreateModifiedInterceptorContext(context);
-
-            return base.AsyncDuplexStreamingCall(newContext, continuation);
-        }
-
-        /// <inheritdoc />
-        public override AsyncUnaryCall<TResponse> AsyncUnaryCall<TRequest, TResponse>(
-            TRequest request,
-            ClientInterceptorContext<TRequest, TResponse> context,
-            AsyncUnaryCallContinuation<TRequest, TResponse> continuation)
-        {
-            var newContext = CreateModifiedInterceptorContext(context);
-
-            return base.AsyncUnaryCall(request, newContext, continuation);
-        }
-
-        /// <inheritdoc />
-        public override TResponse BlockingUnaryCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, BlockingUnaryCallContinuation<TRequest, TResponse> continuation)
-        {
-            var newContext = CreateModifiedInterceptorContext(context);
-
-            return base.BlockingUnaryCall(request, newContext, continuation);
-        }
-
-        ClientInterceptorContext<TRequest, TResponse> CreateModifiedInterceptorContext<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context)
-            where TRequest : class
-            where TResponse : class
-        {
-            var headers = new Metadata();
-            if (context.Options.Headers is not null)
-                foreach (var header in context.Options.Headers)
-                    headers.Add(header);
-
-            if (!headers.Any(x => x.Key.Equals(MicroserviceConstants.UserspaceIdHeader, StringComparison.OrdinalIgnoreCase))
-                    && _httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId) == true
-                    && !string.IsNullOrEmpty(userspaceId))
-                headers.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId!);
-
-            if (!headers.Any(x => x.Key.Equals(MicroserviceConstants.CultureHeader, StringComparison.OrdinalIgnoreCase))
-                && _httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.CultureHeader, out var culture) == true
-                && !string.IsNullOrEmpty(culture))
-                headers.Add(MicroserviceConstants.CultureHeader, culture!);
-
-            var newOptions = context.Options.WithHeaders(headers);
-
-            var newContext = new ClientInterceptorContext<TRequest, TResponse>(
-                context.Method,
-                context.Host,
-                newOptions);
-            return newContext;
-        }
     }
 }
