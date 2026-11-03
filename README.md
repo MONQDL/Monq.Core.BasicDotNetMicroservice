@@ -323,7 +323,14 @@ The library provides extensions for configuring `Grpc.AspNetCore` clients both f
 
 The legacy `IServiceCollection` overloads that accepted `IConfiguration` and
 read a shared `BaseUri` were removed in 11.0.0. Use the host-builder overloads
-described below, which obtain the address from a resolver by application name.
+described below, which obtain the address from a resolver by application name,
+or pass an explicit absolute `Uri` that is used as is, without consulting any
+resolver:
+
+```csharp
+builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(
+    new Uri("https://api.example.com"));
+```
 
 The host-builder overload accepts an application name and obtains the final
 address from the selected resolver. `ConfigureBasicMicroservice` installs the
@@ -451,8 +458,13 @@ builder.Services.AddInlineValidator<YourRequest>(rules =>
 The library provides extensions for configuring REST HTTP clients. More info: <https://github.com/MONQDL/Monq.Core.HttpClientExtensions/blob/master/README.md>.
 
 The legacy `IServiceCollection` overload that accepted `IConfiguration` and
-read `BaseUri` was removed in 11.0.0. Use the host-builder overload or the
-`Uri` overload.
+read `BaseUri` was removed in 11.0.0. Use the host-builder overload, or pass
+an explicit absolute `Uri`:
+
+```csharp
+builder.Host.AddRestHttpPreConfiguredClient<IMyClient, MyHttpClient>(
+    new Uri("https://api.example.com"));
+```
 
 The host-builder overload uses the configured HTTP address resolver. For a
 headless Service, select the service-discovery resolver before registering the
@@ -484,10 +496,6 @@ client-side endpoint discovery:
 builder.Host.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(
     ApplicationNames.Orders);
 ```
-
-The `IServiceCollection` overload that accepted `IConfiguration` was removed
-in 11.0.0 along with the other `BaseUri`-based overloads. A non-obsolete `Uri`
-overload remains available for explicitly configured addresses.
 
 Different strategies can be used in the same application. For example, gRPC
 may use a headless Service with `round_robin`, while HTTP uses a regular
@@ -1080,6 +1088,6 @@ public class MyBackgroundWorker : BackgroundService
 
 ## Migration guides
 
-- [Migration to Kubernetes service addressing](service-discovery-MIGRATION.md)
+- [Migration to v11](v11-MIGRATION.md)
 - [Migration to v10](v10-MIGRATION.md)
 - [Migration to v9](v9-MIGRATION.md)
