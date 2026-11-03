@@ -44,7 +44,7 @@ public static class GrpcClientHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(configureOptions);
 
         return hostBuilder.ConfigureServices((_, services) =>
-            services.ConfigureMonqGrpcServiceDiscovery(configureOptions));
+            services.ConfigureGrpcServiceDiscovery(configureOptions));
     }
 
     /// <summary>

@@ -12,8 +12,6 @@ using Monq.Core.BasicDotNetMicroservice.Validation;
 using Monq.Core.HttpClientExtensions;
 using Monq.Core.MicroserviceAddressing.Addressing;
 using System.Diagnostics.CodeAnalysis;
-using System.Net;
-using System.Net.Http.Headers;
 using MonqGrpcClientOptions = Monq.Core.GrpcClientExtensions.GrpcClientOptions;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
@@ -125,17 +123,6 @@ public static class ServiceCollectionExtensions
     static Uri GetBaseUri(IConfiguration configuration) =>
         new(configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
             ?? throw new Exception("BaseUri not found at configuration."));
-
-    static void ConfigureGrpcClientDefaults(GrpcClientOptions options)
-    {
-        options.ChannelOptionsAction = channelOptions =>
-        {
-            channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
-            channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024;
-        };
-        options.ContextPropagationOptionsAction = propagationOptions =>
-            propagationOptions.SuppressContextNotFoundErrors = true;
-    }
 
     /// <summary>
     /// Adds a pre-configured gRPC client with address from configuration, insecure channel, 
@@ -274,7 +261,6 @@ public static class ServiceCollectionExtensions
         where TClient : class
     {
         var options = new GrpcClientOptions();
-        ConfigureGrpcClientDefaults(options);
         configureOptions?.Invoke(options);
 
         var monqOptions = new MonqGrpcClientOptions
@@ -286,35 +272,19 @@ public static class ServiceCollectionExtensions
 
         var builder = options.Name is not null
             ? console
-                ? services.AddMonqGrpcConsoleClient<TClient>(
+                ? services.AddMicroserviceGrpcConsoleClient<TClient>(
                     options.Name, resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions)
-                : services.AddMonqGrpcClient<TClient>(
+                : services.AddMicroserviceGrpcClient<TClient>(
                     options.Name, resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions)
             : console
-                ? services.AddMonqGrpcConsoleClient<TClient>(
+                ? services.AddMicroserviceGrpcConsoleClient<TClient>(
                     resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions)
-                : services.AddMonqGrpcClient<TClient>(
+                : services.AddMicroserviceGrpcClient<TClient>(
                     resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions);
 
-        services.TryAddTransient<AdditionalHeadersInterceptor>();
-        builder = builder.AddInterceptor<AdditionalHeadersInterceptor>();
-
-        // Console clients receive forward-with-static-token-fallback call credentials
-        // from Monq.Core.GrpcClientExtensions; interactive clients only forward the
-        // incoming Authorization header.
-        if (!console)
-        {
-            builder = builder.AddCallCredentials((context, metadata, provider) =>
-            {
-                var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
-                if (httpContext.HttpContext?.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) == true
-                    && !string.IsNullOrEmpty(token))
-                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token!);
-
-                return Task.CompletedTask;
-            });
-        }
-
+        // Header propagation, channel defaults (unsafe call credentials, 51 MB receive limit),
+        // call context propagation and Authorization forwarding (with static token fallback for
+        // console clients) are applied by Monq.Core.GrpcClientExtensions for every client.
         return builder;
     }
 
