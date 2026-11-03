@@ -2,7 +2,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.HttpClientExtensions;
 using Monq.Core.MicroserviceAddressing.Addressing;
-using Monq.Core.MicroserviceAddressing.DependencyInjection;
 using Monq.Core.MicroserviceAddressing.Hosting;
 using System.Diagnostics.CodeAnalysis;
 
@@ -29,7 +28,6 @@ public static class RestHttpClientHostBuilderExtensions
         where TImplementation : RestHttpClient, TClient =>
         hostBuilder.ConfigureServices((context, services) =>
         {
-            services.AddMicroserviceAddressing();
             var resolvedAddress = hostBuilder.ResolveMicroserviceAddress(
                 context,
                 applicationName,
