@@ -17,6 +17,7 @@ using var host = Host.CreateDefaultBuilder(args)
     {
         AppsettingsFileName = "appsettings-async.json"
     })
+    .AddGrpcPreConfiguredConsoleClient<OtelTest.OtelTestClient>(new Uri("http://localhost:5006"))
     .ConfigureServices((builder, services) =>
     {
         Console.WriteLine("HostName" + builder.Configuration.GetSection("RabbitMQ")["HostName"]);
@@ -24,11 +25,6 @@ using var host = Host.CreateDefaultBuilder(args)
 
         services.AddRabbitMQCoreClientConsumer(builder.Configuration.GetSection("RabbitMQ"))
             .AddHandler<OtelTestMessageHandler>(["aligin-test-otel"]);
-
-        services.AddGrpcPreConfiguredConsoleClient<OtelTest.OtelTestClient>(builder.Configuration, opt =>
-        {
-            opt.ClientOptionsAction = o => o.Address = new Uri("http://localhost:5006");
-        });
     })
     .Build();
 

@@ -1,3 +1,5 @@
+using Monq.Core.GrpcClientExtensions;
+
 namespace Monq.Core.BasicDotNetMicroservice;
 
 /// <summary>
@@ -16,9 +18,10 @@ public static class MicroserviceConstants
     public const string EventIdPropertyName = "XTraceEventId";
 
     /// <summary>
-    /// Http header containing userspace Id.
+    /// Http header containing userspace Id. The canonical value lives in
+    /// Monq.Core.GrpcClientExtensions, where gRPC clients propagate it.
     /// </summary>
-    public const string UserspaceIdHeader = "X-Smon-Userspace-Id";
+    public const string UserspaceIdHeader = HeaderPropagationInterceptor.UserspaceIdHeader;
 
     /// <summary>
     /// Loki UserspaceId name.
@@ -26,9 +29,10 @@ public static class MicroserviceConstants
     public const string UserspaceIdPropertyName = "XSmonUserspaceId";
 
     /// <summary>
-    /// Http header containing culture info.
+    /// Http header containing culture info. The canonical value lives in
+    /// Monq.Core.GrpcClientExtensions, where gRPC clients propagate it.
     /// </summary>
-    public const string CultureHeader = "Accept-Language";
+    public const string CultureHeader = HeaderPropagationInterceptor.CultureHeader;
 
     /// <summary>
     /// Certificates directory environment variable name.

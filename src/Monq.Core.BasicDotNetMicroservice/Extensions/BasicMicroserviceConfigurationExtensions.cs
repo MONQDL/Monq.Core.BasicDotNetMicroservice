@@ -10,6 +10,8 @@ using Monq.Core.BasicDotNetMicroservice.Enrichers.User;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
 using Monq.Core.BasicDotNetMicroservice.Middleware;
 using Monq.Core.HttpClientExtensions;
+using Monq.Core.MicroserviceAddressing.Addressing;
+using Monq.Core.MicroserviceAddressing.Hosting;
 using Serilog;
 using System.Security.Cryptography.X509Certificates;
 using static Monq.Core.BasicDotNetMicroservice.MicroserviceConstants.HostConfiguration;
@@ -190,6 +192,10 @@ public static class BasicMicroserviceConfigurationExtensions
     {
         hostBuilder.ConfigureCustomCertificates();
         hostBuilder.ConfigureConsul(consulConfigurationOptions);
+        hostBuilder.TryUseMicroserviceAddressResolver(
+            new ProtocolMicroserviceAddressResolver(
+                httpResolver: new KubernetesClusterIpAddressResolver(),
+                grpcResolver: new KubernetesServiceDiscoveryAddressResolver()));
         hostBuilder.ConfigureSerilogLogging();
         hostBuilder.ConfigBasicHttpService(opts =>
         {

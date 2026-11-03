@@ -1,18 +1,14 @@
 using Calzolari.Grpc.AspNetCore.Validation;
 using Duende.AspNetCore.Authentication.OAuth2Introspection;
-using Grpc.Core;
-using Grpc.Core.Interceptors;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Telemetry;
 using Monq.Core.BasicDotNetMicroservice.Validation;
 using Monq.Core.HttpClientExtensions;
+using Monq.Core.MicroserviceAddressing.Addressing;
 using System.Diagnostics.CodeAnalysis;
-using System.Net;
-using System.Net.Http.Headers;
+using MonqGrpcClientOptions = Monq.Core.GrpcClientExtensions.GrpcClientOptions;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
@@ -29,18 +25,64 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection ConfigureMonqAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var authConfig = configuration.GetSection("Authentication");
+        return ConfigureMonqAuthentication(
+            services,
+            configuration,
+            authConfig[AuthConstants.AuthenticationConfiguration.Authority]);
+    }
+
+    /// <summary>
+    /// Configures OAuth2 introspection authentication using an explicitly resolved authentication endpoint.
+    /// </summary>
+    /// <param name="services">The service collection to add authentication to.</param>
+    /// <param name="configuration">The configuration containing authentication credentials and settings.</param>
+    /// <param name="authenticationEndpoint">The absolute authentication authority URI.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection ConfigureMonqAuthentication(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        Uri authenticationEndpoint)
+    {
+        ArgumentNullException.ThrowIfNull(authenticationEndpoint);
+        if (!authenticationEndpoint.IsAbsoluteUri)
+            throw new ArgumentException(
+                "The authentication endpoint must be an absolute URI.",
+                nameof(authenticationEndpoint));
+
+        return ConfigureMonqAuthentication(
+            services,
+            configuration,
+            authenticationEndpoint.AbsoluteUri);
+    }
+
+    static IServiceCollection ConfigureMonqAuthentication(
+        IServiceCollection services,
+        IConfiguration configuration,
+        string? authenticationEndpoint)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
         var authConfig = configuration.GetSection("Authentication");
 
         if (!bool.TryParse(authConfig[AuthConstants.AuthenticationConfiguration.RequireHttpsMetadata], out var requireHttps))
             requireHttps = false;
 
+        if (!int.TryParse(authConfig[AuthConstants.AuthenticationConfiguration.CacheDurationSeconds],
+                out var cacheDurationSeconds)
+            || cacheDurationSeconds <= 0)
+            cacheDurationSeconds = 300;
+
         services.AddAuthentication(AuthConstants.AuthenticationScheme)
             .AddOAuth2Introspection(AuthConstants.AuthenticationScheme, x =>
             {
-                x.Authority = authConfig[AuthConstants.AuthenticationConfiguration.Authority];
+                x.Authority = authenticationEndpoint;
                 x.ClientId = authConfig[AuthConstants.AuthenticationConfiguration.ScopeName];
                 x.ClientSecret = authConfig[AuthConstants.AuthenticationConfiguration.ScopeSecret];
-                x.CacheDuration = TimeSpan.FromMinutes(5);
+                x.CacheDuration = TimeSpan.FromSeconds(cacheDurationSeconds);
                 x.NameClaimType = "fullName";
                 x.DiscoveryPolicy.RequireHttps = requireHttps;
             });
@@ -74,135 +116,28 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    static void ConfigureGrpcClient(
-        GrpcClientOptions options,
-        IConfiguration configuration)
-    {
-        options.ClientOptionsAction = clientOptions =>
-            clientOptions.Address = new Uri(
-                configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
-                ?? throw new Exception("BaseUri not found at configuration."));
-
-        ConfigureGrpcClientDefaults(options);
-    }
-
-    static void ConfigureGrpcClientDefaults(GrpcClientOptions options)
-    {
-        options.ChannelOptionsAction = channelOptions =>
-        {
-            channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
-            channelOptions.MaxReceiveMessageSize = 51 * 1024 * 1024;
-        };
-        options.ContextPropagationOptionsAction = propagationOptions =>
-            propagationOptions.SuppressContextNotFoundErrors = true;
-    }
-
     /// <summary>
-    /// Adds a pre-configured gRPC client with address from configuration, insecure channel, 
-    /// max message size of 51MB, context propagation, authorization header forwarding, and additional headers interceptor.
+    /// Adds a pre-configured gRPC client. Channel defaults, header propagation and
+    /// authorization forwarding are applied by Monq.Core.GrpcClientExtensions.
     /// </summary>
-    /// <typeparam name="TClient">The gRPC client type to register as transient.</typeparam>
-    /// <param name="services">The service collection.</param>
-    /// <param name="configuration">Configuration to read BaseUri from.</param>
-    /// <param name="configureOptions">Optional delegate to customize <see cref="GrpcClientOptions"/>.</param>
-    /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
-    /// <remarks>
-    /// This overload is retained for compatibility with clients that read a shared BaseUri from configuration.
-    /// New registrations should use the IHostBuilder overload and an application name.
-    /// </remarks>
-    [Obsolete(
-        "Use AddGrpcPreConfiguredClient<TClient>(IHostBuilder, string, ...) and configure an IMicroserviceAddressResolver on the host instead.",
-        false)]
-    public static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
-        this IServiceCollection services,
-        IConfiguration configuration,
-        Action<GrpcClientOptions>? configureOptions = null)
-        where TClient : class
-    {
-        var options = new GrpcClientOptions();
-        ConfigureGrpcClient(options, configuration);
-        configureOptions?.Invoke(options);
-
-        return services.AddGrpcPreConfiguredClient<TClient>(options);
-    }
-
     internal static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
-        Uri address,
+        ResolvedMicroserviceAddress resolvedAddress,
         Action<GrpcClientOptions>? configureOptions)
         where TClient : class =>
-        services.AddGrpcPreConfiguredClient<TClient>(
-            CreateGrpcClientOptions(address, configureOptions));
+        services.AddGrpcPreConfiguredClientCore<TClient>(resolvedAddress, configureOptions, console: false);
 
     /// <summary>
-    /// Adds a pre-configured gRPC client for console/background applications with static authentication fallback.
-    /// If no HttpContext is available, obtains a token via <see cref="RestHttpClient.GetAccessToken"/>.
+    /// Adds a pre-configured gRPC client for console/background applications with static
+    /// authentication fallback. If no HttpContext is available, obtains a token via
+    /// <see cref="RestHttpClient.GetAccessToken"/>.
     /// </summary>
-    /// <typeparam name="TClient">The gRPC client type to register as transient.</typeparam>
-    /// <param name="services">The service collection.</param>
-    /// <param name="configuration">Configuration to read BaseUri from.</param>
-    /// <param name="configureOptions">Optional delegate to customize <see cref="GrpcClientOptions"/>.</param>
-    /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
-    /// <remarks>
-    /// This overload is retained for compatibility with clients that read a shared BaseUri from configuration.
-    /// New registrations should use the IHostBuilder overload and an application name.
-    /// </remarks>
-    [Obsolete(
-        "Use AddGrpcPreConfiguredConsoleClient<TClient>(IHostBuilder, string, ...) and configure an IMicroserviceAddressResolver on the host instead.",
-        false)]
-    public static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
-        this IServiceCollection services,
-        IConfiguration configuration,
-        Action<GrpcClientOptions>? configureOptions = null)
-        where TClient : class
-    {
-        var options = new GrpcClientOptions();
-        ConfigureGrpcClient(options, configuration);
-        configureOptions?.Invoke(options);
-
-        return services.AddGrpcPreConfiguredConsoleClient<TClient>(options);
-    }
-
     internal static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
         this IServiceCollection services,
-        Uri address,
+        ResolvedMicroserviceAddress resolvedAddress,
         Action<GrpcClientOptions>? configureOptions)
         where TClient : class =>
-        services.AddGrpcPreConfiguredConsoleClient<TClient>(
-            CreateGrpcClientOptions(address, configureOptions));
-
-    /// <summary>
-    /// Adds a pre-configured REST HTTP client based on <see cref="RestHttpClient"/> with base address from configuration,
-    /// infinite timeout (managed via cancellation tokens), and trailing slash normalization.
-    /// </summary>
-    /// <typeparam name="TClient">The typed client interface.</typeparam>
-    /// <typeparam name="TImplementation">The implementation type inheriting from <see cref="RestHttpClient"/>.</typeparam>
-    /// <param name="services">The service collection.</param>
-    /// <param name="configuration">Configuration to read BaseUri from.</param>
-    /// <param name="configureHttpClient">Optional delegate to customize the <see cref="HttpClient"/>.</param>
-    /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
-    /// <remarks>
-    /// This overload is retained for compatibility with clients that read a shared BaseUri from configuration.
-    /// New registrations should use the IHostBuilder overload and an application name.
-    /// </remarks>
-    [Obsolete(
-        "Use AddRestHttpPreConfiguredClient<TClient, TImplementation>(IHostBuilder, string, ...) and configure an IMicroserviceAddressResolver on the host instead.",
-        false)]
-    public static IHttpClientBuilder AddRestHttpPreConfiguredClient<TClient, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
-        this IServiceCollection services,
-        IConfiguration configuration,
-        Action<HttpClient>? configureHttpClient = null)
-        where TClient : class
-        where TImplementation : RestHttpClient, TClient
-    {
-        var baseUri = new Uri(
-            configuration.GetValue<string>(nameof(AppConfiguration.BaseUri))
-            ?? throw new Exception("BaseUri not found at configuration."));
-
-        return services.AddRestHttpPreConfiguredClient<TClient, TImplementation>(
-            baseUri,
-            configureHttpClient);
-    }
+        services.AddGrpcPreConfiguredClientCore<TClient>(resolvedAddress, configureOptions, console: true);
 
     /// <summary>
     /// Adds a pre-configured REST HTTP client based on <see cref="RestHttpClient"/> with the specified base address,
@@ -231,206 +166,45 @@ public static class ServiceCollectionExtensions
             {
                 client.BaseAddress = baseAddress;
 
-                client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+                client.Timeout = Timeout.InfiniteTimeSpan;
                 configureHttpClient?.Invoke(client);
 
                 client.AddTrailingSlash();
             });
     }
 
-    static GrpcClientOptions CreateGrpcClientOptions(
-        Uri address,
-        Action<GrpcClientOptions>? configureOptions)
+    static IHttpClientBuilder AddGrpcPreConfiguredClientCore<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
+        this IServiceCollection services,
+        ResolvedMicroserviceAddress resolvedAddress,
+        Action<GrpcClientOptions>? configureOptions,
+        bool console)
+        where TClient : class
     {
-        ArgumentNullException.ThrowIfNull(address);
-
-        if (!address.IsAbsoluteUri)
-            throw new ArgumentException("The gRPC client address must be absolute.", nameof(address));
-
         var options = new GrpcClientOptions();
-        ConfigureGrpcClientDefaults(options);
         configureOptions?.Invoke(options);
 
-        var configureClient = options.ClientOptionsAction;
-        options.ClientOptionsAction = clientOptions =>
+        var monqOptions = new MonqGrpcClientOptions
         {
-            configureClient?.Invoke(clientOptions);
-            clientOptions.Address = address;
+            ClientOptionsAction = options.ClientOptionsAction,
+            ChannelOptionsAction = options.ChannelOptionsAction,
+            ContextPropagationOptionsAction = options.ContextPropagationOptionsAction,
         };
 
-        return options;
-    }
+        var builder = options.Name is not null
+            ? console
+                ? services.AddMicroserviceGrpcConsoleClient<TClient>(
+                    options.Name, resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions)
+                : services.AddMicroserviceGrpcClient<TClient>(
+                    options.Name, resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions)
+            : console
+                ? services.AddMicroserviceGrpcConsoleClient<TClient>(
+                    resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions)
+                : services.AddMicroserviceGrpcClient<TClient>(
+                    resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions);
 
-    static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
-        this IServiceCollection services,
-        GrpcClientOptions? options = null)
-        where TClient : class
-    {
-        services.TryAddTransient<AdditionalHeadersInterceptor>();
-
-        return services
-            .AddGrpcClient<TClient>(options)
-            .AddInterceptor<AdditionalHeadersInterceptor>()
-            .AddCallCredentials((context, metadata, provider) =>
-            {
-                var httpContext = provider.GetRequiredService<IHttpContextAccessor>();
-                if (httpContext.HttpContext?.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) == true
-                    && !string.IsNullOrEmpty(token))
-                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token!);
-
-                return Task.CompletedTask;
-            });
-    }
-
-    static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
-        this IServiceCollection services,
-        GrpcClientOptions? options = null)
-        where TClient : class
-    {
-        services.AddHttpClient<RestHttpClient>();
-
-        services.TryAddTransient<AdditionalHeadersInterceptor>();
-
-        return services
-            .AddGrpcClient<TClient>(options)
-            .AddInterceptor<AdditionalHeadersInterceptor>()
-            .AddCallCredentials(async (context, metadata, provider) =>
-            {
-                var httpContextAccessor = provider.GetService<IHttpContextAccessor>();
-                if (httpContextAccessor?.HttpContext?.Request.Headers.TryGetValue(HttpRequestHeader.Authorization.ToString(), out var token) == true
-                    && !string.IsNullOrEmpty(token))
-                {
-                    metadata.Add(HttpRequestHeader.Authorization.ToString(), token!);
-                }
-                else
-                {
-                    var client = provider.GetService<RestHttpClient>();
-                    if (client is not null)
-                    {
-                        var tokenResponse = await client.GetAccessToken(false);
-                        if (tokenResponse is null)
-                            return;
-                        const string scheme = "Bearer";
-                        var authorizationHeaderValue = new AuthenticationHeaderValue(scheme, tokenResponse.AccessToken);
-                        metadata.Add(HttpRequestHeader.Authorization.ToString(), authorizationHeaderValue.ToString());
-                    }
-                }
-            });
-    }
-
-    /// <summary>
-    /// gRPC client interceptor that propagates <c>userspace-id</c> and <c>culture</c> headers
-    /// from the current HTTP request to outgoing gRPC calls.
-    /// </summary>
-    public class AdditionalHeadersInterceptor : Interceptor
-    {
-        readonly IHttpContextAccessor _httpContextAccessor;
-
-        /// <summary>
-        /// Creates a new instance of <see cref="AdditionalHeadersInterceptor"/>.
-        /// </summary>
-        /// <param name="httpContextAccessor">The HTTP context accessor to read incoming headers from.</param>
-        public AdditionalHeadersInterceptor(IHttpContextAccessor httpContextAccessor)
-        {
-            _httpContextAccessor = httpContextAccessor;
-        }
-
-        /// <inheritdoc />
-        public override AsyncServerStreamingCall<TResponse> AsyncServerStreamingCall<TRequest, TResponse>(
-            TRequest request,
-            ClientInterceptorContext<TRequest, TResponse> context,
-            AsyncServerStreamingCallContinuation<TRequest, TResponse> continuation)
-        {
-            var newContext = CreateModifiedInterceptorContext(context);
-
-            return base.AsyncServerStreamingCall(request, newContext, continuation);
-        }
-
-        /// <inheritdoc />
-        public override AsyncClientStreamingCall<TRequest, TResponse> AsyncClientStreamingCall<TRequest, TResponse>(
-            ClientInterceptorContext<TRequest, TResponse> context,
-            AsyncClientStreamingCallContinuation<TRequest, TResponse> continuation)
-        {
-            var newContext = CreateModifiedInterceptorContext(context);
-
-            return base.AsyncClientStreamingCall(newContext, continuation);
-        }
-
-        /// <inheritdoc />
-        public override AsyncDuplexStreamingCall<TRequest, TResponse> AsyncDuplexStreamingCall<TRequest, TResponse>(
-            ClientInterceptorContext<TRequest, TResponse> context,
-            AsyncDuplexStreamingCallContinuation<TRequest, TResponse> continuation)
-        {
-            var newContext = CreateModifiedInterceptorContext(context);
-
-            return base.AsyncDuplexStreamingCall(newContext, continuation);
-        }
-
-        /// <inheritdoc />
-        public override AsyncUnaryCall<TResponse> AsyncUnaryCall<TRequest, TResponse>(
-            TRequest request,
-            ClientInterceptorContext<TRequest, TResponse> context,
-            AsyncUnaryCallContinuation<TRequest, TResponse> continuation)
-        {
-            var newContext = CreateModifiedInterceptorContext(context);
-
-            return base.AsyncUnaryCall(request, newContext, continuation);
-        }
-
-        /// <inheritdoc />
-        public override TResponse BlockingUnaryCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, BlockingUnaryCallContinuation<TRequest, TResponse> continuation)
-        {
-            var newContext = CreateModifiedInterceptorContext(context);
-
-            return base.BlockingUnaryCall(request, newContext, continuation);
-        }
-
-        ClientInterceptorContext<TRequest, TResponse> CreateModifiedInterceptorContext<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context)
-            where TRequest : class
-            where TResponse : class
-        {
-            var headers = new Metadata();
-            if (context.Options.Headers is not null)
-                foreach (var header in context.Options.Headers)
-                    headers.Add(header);
-
-            if (!headers.Any(x => x.Key.Equals(MicroserviceConstants.UserspaceIdHeader, StringComparison.OrdinalIgnoreCase))
-                    && _httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.UserspaceIdHeader, out var userspaceId) == true
-                    && !string.IsNullOrEmpty(userspaceId))
-                headers.Add(MicroserviceConstants.UserspaceIdHeader, userspaceId!);
-
-            if (!headers.Any(x => x.Key.Equals(MicroserviceConstants.CultureHeader, StringComparison.OrdinalIgnoreCase))
-                && _httpContextAccessor?.HttpContext?.Request?.Headers?.TryGetValue(MicroserviceConstants.CultureHeader, out var culture) == true
-                && !string.IsNullOrEmpty(culture))
-                headers.Add(MicroserviceConstants.CultureHeader, culture!);
-
-            var newOptions = context.Options.WithHeaders(headers);
-
-            var newContext = new ClientInterceptorContext<TRequest, TResponse>(
-                context.Method,
-                context.Host,
-                newOptions);
-            return newContext;
-        }
-    }
-
-    static IHttpClientBuilder AddGrpcClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
-        this IServiceCollection services,
-        GrpcClientOptions? options = null)
-        where TClient : class
-    {
-        IHttpClientBuilder builder;
-        if (string.IsNullOrWhiteSpace(options?.Name))
-            builder = services.AddGrpcClient<TClient>(o => options?.ClientOptionsAction?.Invoke(o));
-        else
-            builder = services.AddGrpcClient<TClient>(options.Name, o => options?.ClientOptionsAction?.Invoke(o));
-
-        if (options?.ChannelOptionsAction != null)
-            builder = builder.ConfigureChannel(options.ChannelOptionsAction);
-
-        if (options?.ContextPropagationOptionsAction != null)
-            builder.EnableCallContextPropagation(options.ContextPropagationOptionsAction);
-
+        // Header propagation, channel defaults (unsafe call credentials, 51 MB receive limit),
+        // call context propagation and Authorization forwarding (with static token fallback for
+        // console clients) are applied by Monq.Core.GrpcClientExtensions for every client.
         return builder;
     }
 }

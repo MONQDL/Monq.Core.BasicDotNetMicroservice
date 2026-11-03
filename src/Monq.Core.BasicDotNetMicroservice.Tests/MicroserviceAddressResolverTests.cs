@@ -1,7 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Monq.Core.BasicDotNetMicroservice.Addressing;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
+using Monq.Core.MicroserviceAddressing.Addressing;
+using Monq.Core.MicroserviceAddressing.Hosting;
 using Moq;
 using Xunit;
 
@@ -117,6 +118,66 @@ public class MicroserviceAddressResolverTests
             protocol);
 
         Assert.Equal(new Uri(expectedAddress), result.Address);
+    }
+
+    [Theory]
+    [InlineData(
+        MicroserviceProtocol.Grpc,
+        "dns:///test-service-grpc.integration.svc.cluster.local:5006")]
+    [InlineData(
+        MicroserviceProtocol.Http,
+        "http://test-service.integration.svc.cluster.local:80")]
+    public void ConfigureBasicMicroservice_UsesStandardProtocolPolicy(
+        MicroserviceProtocol protocol,
+        string expectedAddress)
+    {
+        var hostBuilder = new HostBuilder()
+            .ConfigureBasicMicroservice();
+
+        var result = hostBuilder.ResolveMicroserviceAddress(
+            CreateHostBuilderContext("Integration"),
+            "test-service",
+            protocol);
+
+        Assert.Equal(new Uri(expectedAddress), result.Address);
+    }
+
+    [Theory]
+    [InlineData(MicroserviceProtocol.Grpc)]
+    [InlineData(MicroserviceProtocol.Http)]
+    public void CommonResolverConfiguredAfterBasicMicroservice_OverridesStandardPolicy(
+        MicroserviceProtocol protocol)
+    {
+        var hostBuilder = new HostBuilder()
+            .ConfigureBasicMicroservice()
+            .UseMicroserviceAddressResolver(
+                new FixedMicroserviceAddressResolver(new Uri("https://local.example.com")));
+
+        var result = hostBuilder.ResolveMicroserviceAddress(
+            CreateHostBuilderContext(Environments.Development),
+            "test-service",
+            protocol);
+
+        Assert.Equal(new Uri("https://local.example.com"), result.Address);
+    }
+
+    [Theory]
+    [InlineData(MicroserviceProtocol.Grpc)]
+    [InlineData(MicroserviceProtocol.Http)]
+    public void CommonResolverConfiguredBeforeBasicMicroservice_IsPreserved(
+        MicroserviceProtocol protocol)
+    {
+        var hostBuilder = new HostBuilder()
+            .UseMicroserviceAddressResolver(
+                new FixedMicroserviceAddressResolver(new Uri("https://local.example.com")))
+            .ConfigureBasicMicroservice();
+
+        var result = hostBuilder.ResolveMicroserviceAddress(
+            CreateHostBuilderContext("Integration"),
+            "test-service",
+            protocol);
+
+        Assert.Equal(new Uri("https://local.example.com"), result.Address);
     }
 
     static MicroserviceAddressContext CreateContext(

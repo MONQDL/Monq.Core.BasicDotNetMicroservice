@@ -1,19 +1,19 @@
-using Grpc.Core;
-using Grpc.Net.Client.Balancer;
-using Grpc.Net.Client.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
-using Monq.Core.BasicDotNetMicroservice.Addressing;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
+using Monq.Core.MicroserviceAddressing.Addressing;
+using Monq.Core.MicroserviceAddressing.Hosting;
 using System.Diagnostics.CodeAnalysis;
+using GrpcServiceDiscoveryOptions = Monq.Core.GrpcClientExtensions.GrpcServiceDiscoveryOptions;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
 /// <summary>
 /// Extension methods for registering pre-configured gRPC clients on a host builder.
+/// Channel credentials, header propagation and load balancing rules are applied by
+/// <see cref="Monq.Core.GrpcClientExtensions"/>; this class adds the host-level API and eager
+/// address resolution through the host resolver registry.
 /// </summary>
 public static class GrpcClientHostBuilderExtensions
 {
@@ -42,14 +42,15 @@ public static class GrpcClientHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(hostBuilder);
         ArgumentNullException.ThrowIfNull(configureOptions);
 
-        return hostBuilder.ConfigureServices(services =>
-            services.Configure(configureOptions));
+        return hostBuilder.ConfigureServices((_, services) =>
+            services.ConfigureGrpcServiceDiscovery(configureOptions));
     }
 
     /// <summary>
     /// Adds a pre-configured gRPC client using the address returned by the configured resolver.
     /// A resolver supplied for this client takes precedence over host-level resolvers.
-    /// A <c>dns</c> address automatically enables DNS resolution and round-robin balancing.
+    /// An address resolved in Service Discovery mode or using the <c>dns</c> scheme
+    /// automatically enables DNS resolution and round-robin balancing.
     /// </summary>
     public static IHostBuilder AddGrpcPreConfiguredClient<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
@@ -61,22 +62,45 @@ public static class GrpcClientHostBuilderExtensions
         where TClient : class =>
         hostBuilder.ConfigureServices((context, services) =>
         {
-            var address = hostBuilder.ResolveMicroserviceAddress(
+            var resolvedAddress = hostBuilder.ResolveMicroserviceAddress(
                 context,
                 applicationName,
                 MicroserviceProtocol.Grpc,
                 port,
-                addressResolver).Address;
-            var clientBuilder = services.AddGrpcPreConfiguredClient<TClient>(address, configureOptions);
+                addressResolver);
 
-            if (IsServiceDiscoveryAddress(address))
-                ConfigureServiceDiscovery(services, clientBuilder);
+            services.AddGrpcPreConfiguredClient<TClient>(resolvedAddress, configureOptions);
         });
 
     /// <summary>
-    /// Adds a pre-configured console/background gRPC client using the address returned by the configured resolver.
+    /// Adds a pre-configured gRPC client using an explicit absolute address.
+    /// The address is used as is, without consulting the configured resolvers.
+    /// An address using the <c>dns</c> scheme automatically enables DNS resolution
+    /// and round-robin balancing.
+    /// </summary>
+    public static IHostBuilder AddGrpcPreConfiguredClient<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
+        this IHostBuilder hostBuilder,
+        Uri address,
+        Action<GrpcClientOptions>? configureOptions = null)
+        where TClient : class
+    {
+        ArgumentNullException.ThrowIfNull(hostBuilder);
+        ArgumentNullException.ThrowIfNull(address);
+        if (!address.IsAbsoluteUri)
+            throw new ArgumentException("The gRPC client address must be absolute.", nameof(address));
+
+        return hostBuilder.ConfigureServices((_, services) =>
+            services.AddGrpcPreConfiguredClient<TClient>(
+                new ResolvedMicroserviceAddress(address), configureOptions));
+    }
+
+    /// <summary>
+    /// Adds a pre-configured console/background gRPC client using the address returned
+    /// by the configured resolver.
     /// A resolver supplied for this client takes precedence over host-level resolvers.
-    /// A <c>dns</c> address automatically enables DNS resolution and round-robin balancing.
+    /// An address resolved in Service Discovery mode or using the <c>dns</c> scheme
+    /// automatically enables DNS resolution and round-robin balancing.
     /// </summary>
     public static IHostBuilder AddGrpcPreConfiguredConsoleClient<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
@@ -88,60 +112,36 @@ public static class GrpcClientHostBuilderExtensions
         where TClient : class =>
         hostBuilder.ConfigureServices((context, services) =>
         {
-            var address = hostBuilder.ResolveMicroserviceAddress(
+            var resolvedAddress = hostBuilder.ResolveMicroserviceAddress(
                 context,
                 applicationName,
                 MicroserviceProtocol.Grpc,
                 port,
-                addressResolver).Address;
-            var clientBuilder = services.AddGrpcPreConfiguredConsoleClient<TClient>(address, configureOptions);
+                addressResolver);
 
-            if (IsServiceDiscoveryAddress(address))
-                ConfigureServiceDiscovery(services, clientBuilder);
+            services.AddGrpcPreConfiguredConsoleClient<TClient>(resolvedAddress, configureOptions);
         });
 
-    static bool IsServiceDiscoveryAddress(Uri address) =>
-        address.Scheme.Equals("dns", StringComparison.OrdinalIgnoreCase);
-
-    static void ConfigureServiceDiscovery(
-        IServiceCollection services,
-        IHttpClientBuilder builder)
+    /// <summary>
+    /// Adds a pre-configured console/background gRPC client using an explicit absolute address.
+    /// The address is used as is, without consulting the configured resolvers.
+    /// An address using the <c>dns</c> scheme automatically enables DNS resolution
+    /// and round-robin balancing.
+    /// </summary>
+    public static IHostBuilder AddGrpcPreConfiguredConsoleClient<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
+        this IHostBuilder hostBuilder,
+        Uri address,
+        Action<GrpcClientOptions>? configureOptions = null)
+        where TClient : class
     {
-        builder.ConfigureChannel(options =>
-        {
-            options.Credentials = ChannelCredentials.Insecure;
-            options.ServiceConfig = new ServiceConfig
-            {
-                LoadBalancingConfigs =
-                {
-                    new RoundRobinConfig(),
-                },
-            };
-        });
+        ArgumentNullException.ThrowIfNull(hostBuilder);
+        ArgumentNullException.ThrowIfNull(address);
+        if (!address.IsAbsoluteUri)
+            throw new ArgumentException("The gRPC client address must be absolute.", nameof(address));
 
-        services
-            .AddOptions<GrpcServiceDiscoveryOptions>()
-            .Validate(
-                options => options.DnsRefreshInterval == Timeout.InfiniteTimeSpan
-                    || options.DnsRefreshInterval > TimeSpan.Zero,
-                $"{nameof(GrpcServiceDiscoveryOptions.DnsRefreshInterval)} must be positive or Timeout.InfiniteTimeSpan.");
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ResolverFactory, ConfiguredDnsResolverFactory>());
-    }
-
-    sealed class ConfiguredDnsResolverFactory : ResolverFactory
-    {
-        readonly DnsResolverFactory _factory;
-
-        public ConfiguredDnsResolverFactory(IOptions<GrpcServiceDiscoveryOptions> options)
-        {
-            ArgumentNullException.ThrowIfNull(options);
-
-            _factory = new(options.Value.DnsRefreshInterval);
-        }
-
-        public override string Name => _factory.Name;
-
-        public override Resolver Create(ResolverOptions options) => _factory.Create(options);
+        return hostBuilder.ConfigureServices((_, services) =>
+            services.AddGrpcPreConfiguredConsoleClient<TClient>(
+                new ResolvedMicroserviceAddress(address), configureOptions));
     }
 }

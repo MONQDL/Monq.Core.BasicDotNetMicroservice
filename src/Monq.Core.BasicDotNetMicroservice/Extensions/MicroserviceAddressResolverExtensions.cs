@@ -1,112 +1,72 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Hosting;
-using Monq.Core.BasicDotNetMicroservice.Addressing;
+using Monq.Core.MicroserviceAddressing.Addressing;
+using Monq.Core.MicroserviceAddressing.Hosting;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
 /// <summary>
-/// Extension methods for selecting and invoking microservice address resolvers.
+/// Extension methods for configuring microservice address resolution on web applications.
 /// </summary>
 public static class MicroserviceAddressResolverExtensions
 {
-    /// <summary>
-    /// Replaces the default microservice address resolver used by registrations on this web application builder.
-    /// </summary>
+    /// <summary>Sets the default resolver.</summary>
     public static WebApplicationBuilder UseMicroserviceAddressResolver(
         this WebApplicationBuilder builder,
         IMicroserviceAddressResolver resolver)
     {
         ArgumentNullException.ThrowIfNull(builder);
-
         builder.Host.UseMicroserviceAddressResolver(resolver);
         return builder;
     }
 
-    /// <summary>
-    /// Replaces the address resolver used by gRPC client registrations on this web application builder.
-    /// </summary>
-    public static WebApplicationBuilder UseGrpcMicroserviceAddressResolver(
+    /// <summary>Sets the default resolver using the final host context.</summary>
+    public static WebApplicationBuilder UseMicroserviceAddressResolver(
         this WebApplicationBuilder builder,
-        IMicroserviceAddressResolver resolver)
+        Func<HostBuilderContext, IMicroserviceAddressResolver> resolverFactory)
     {
         ArgumentNullException.ThrowIfNull(builder);
-
-        builder.Host.UseGrpcMicroserviceAddressResolver(resolver);
+        builder.Host.UseMicroserviceAddressResolver(resolverFactory);
         return builder;
     }
 
-    /// <summary>
-    /// Replaces the address resolver used by HTTP client registrations on this web application builder.
-    /// </summary>
+    /// <summary>Sets the HTTP resolver.</summary>
     public static WebApplicationBuilder UseHttpMicroserviceAddressResolver(
         this WebApplicationBuilder builder,
         IMicroserviceAddressResolver resolver)
     {
         ArgumentNullException.ThrowIfNull(builder);
-
         builder.Host.UseHttpMicroserviceAddressResolver(resolver);
         return builder;
     }
 
-    /// <summary>
-    /// Replaces the default microservice address resolver used by registrations on this host builder.
-    /// </summary>
-    public static IHostBuilder UseMicroserviceAddressResolver(
-        this IHostBuilder hostBuilder,
-        IMicroserviceAddressResolver resolver) =>
-        MicroserviceAddressResolverRegistry.SetDefault(hostBuilder, resolver);
-
-    /// <summary>
-    /// Replaces the default microservice address resolver using the final host context.
-    /// </summary>
-    public static IHostBuilder UseMicroserviceAddressResolver(
-        this IHostBuilder hostBuilder,
-        Func<HostBuilderContext, IMicroserviceAddressResolver> resolverFactory) =>
-        MicroserviceAddressResolverRegistry.SetDefault(hostBuilder, resolverFactory);
-
-    /// <summary>
-    /// Replaces the address resolver used by gRPC client registrations.
-    /// </summary>
-    public static IHostBuilder UseGrpcMicroserviceAddressResolver(
-        this IHostBuilder hostBuilder,
-        IMicroserviceAddressResolver resolver) =>
-        MicroserviceAddressResolverRegistry.SetGrpc(hostBuilder, resolver);
-
-    /// <summary>
-    /// Replaces the address resolver used by HTTP client registrations.
-    /// </summary>
-    public static IHostBuilder UseHttpMicroserviceAddressResolver(
-        this IHostBuilder hostBuilder,
-        IMicroserviceAddressResolver resolver) =>
-        MicroserviceAddressResolverRegistry.SetHttp(hostBuilder, resolver);
-
-    /// <summary>
-    /// Resolves a microservice address using the supplied client resolver, protocol-specific resolver,
-    /// default host resolver, or built-in ClusterIP resolver, in that order.
-    /// </summary>
-    public static ResolvedMicroserviceAddress ResolveMicroserviceAddress(
-        this IHostBuilder hostBuilder,
-        HostBuilderContext context,
-        string applicationName,
-        MicroserviceProtocol protocol,
-        int? port = null,
-        IMicroserviceAddressResolver? addressResolver = null)
+    /// <summary>Sets the HTTP resolver using the final host context.</summary>
+    public static WebApplicationBuilder UseHttpMicroserviceAddressResolver(
+        this WebApplicationBuilder builder,
+        Func<HostBuilderContext, IMicroserviceAddressResolver> resolverFactory)
     {
-        ArgumentNullException.ThrowIfNull(hostBuilder);
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.Host.UseHttpMicroserviceAddressResolver(resolverFactory);
+        return builder;
+    }
 
-        var resolver = MicroserviceAddressResolverRegistry.Get(
-            hostBuilder,
-            context,
-            protocol,
-            addressResolver);
+    /// <summary>Sets the gRPC resolver.</summary>
+    public static WebApplicationBuilder UseGrpcMicroserviceAddressResolver(
+        this WebApplicationBuilder builder,
+        IMicroserviceAddressResolver resolver)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.Host.UseGrpcMicroserviceAddressResolver(resolver);
+        return builder;
+    }
 
-        return resolver.Resolve(new(
-            context.Configuration,
-            context.HostingEnvironment,
-            applicationName,
-            protocol,
-            port));
+    /// <summary>Sets the gRPC resolver using the final host context.</summary>
+    public static WebApplicationBuilder UseGrpcMicroserviceAddressResolver(
+        this WebApplicationBuilder builder,
+        Func<HostBuilderContext, IMicroserviceAddressResolver> resolverFactory)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.Host.UseGrpcMicroserviceAddressResolver(resolverFactory);
+        return builder;
     }
 }
