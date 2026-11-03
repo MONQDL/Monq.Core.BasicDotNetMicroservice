@@ -5,7 +5,6 @@ using Grpc.Core.Interceptors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Telemetry;
 using Monq.Core.BasicDotNetMicroservice.Validation;
@@ -246,7 +245,7 @@ public static class ServiceCollectionExtensions
             {
                 client.BaseAddress = baseAddress;
 
-                client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+                client.Timeout = Timeout.InfiniteTimeSpan;
                 configureHttpClient?.Invoke(client);
 
                 client.AddTrailingSlash();
