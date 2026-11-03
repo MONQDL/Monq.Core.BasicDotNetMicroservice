@@ -321,9 +321,9 @@ The ```AddDefaultExceptionHandlers()``` method have to be added in the pipeline 
 
 The library provides extensions for configuring `Grpc.AspNetCore` clients both for web API applications and for console applications with static authentication.
 
-The legacy `IServiceCollection` overloads that accept `IConfiguration` and
-read a shared `BaseUri` are obsolete. They remain available for compatibility,
-but new registrations should use the host-builder overloads described below.
+The legacy `IServiceCollection` overloads that accepted `IConfiguration` and
+read a shared `BaseUri` were removed in 11.0.0. Use the host-builder overloads
+described below, which obtain the address from a resolver by application name.
 
 The host-builder overload accepts an application name and obtains the final
 address from the selected resolver. `ConfigureBasicMicroservice` installs the
@@ -450,9 +450,9 @@ builder.Services.AddInlineValidator<YourRequest>(rules =>
 
 The library provides extensions for configuring REST HTTP clients. More info: <https://github.com/MONQDL/Monq.Core.HttpClientExtensions/blob/master/README.md>.
 
-The legacy `IServiceCollection` overload that accepts `IConfiguration` and
-reads `BaseUri` is obsolete. It remains available for compatibility, but new
-registrations should use the host-builder overload.
+The legacy `IServiceCollection` overload that accepted `IConfiguration` and
+read `BaseUri` was removed in 11.0.0. Use the host-builder overload or the
+`Uri` overload.
 
 The host-builder overload uses the configured HTTP address resolver. For a
 headless Service, select the service-discovery resolver before registering the
@@ -485,10 +485,9 @@ builder.Host.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(
     ApplicationNames.Orders);
 ```
 
-The existing `IServiceCollection` overload that accepts `IConfiguration`
-retains its previous behavior and reads `BaseUri`, but is marked obsolete so
-callers can migrate incrementally. An additional non-obsolete `Uri` overload is
-available for explicitly configured addresses.
+The `IServiceCollection` overload that accepted `IConfiguration` was removed
+in 11.0.0 along with the other `BaseUri`-based overloads. A non-obsolete `Uri`
+overload remains available for explicitly configured addresses.
 
 Different strategies can be used in the same application. For example, gRPC
 may use a headless Service with `round_robin`, while HTTP uses a regular
