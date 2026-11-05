@@ -129,6 +129,15 @@ An explicit `Uri` with the `dns:///` scheme enables the gRPC DNS resolver and
 `round_robin`; other schemes such as `https://` through an ingress are used
 directly.
 
+To pin one client to a fixed address while the rest of the application is
+addressed by name, pass the fixed resolver to that registration:
+
+```csharp
+builder.Host.AddGrpcPreConfiguredClient<MyThresholdsServiceClient>(
+    ApplicationNames.Thresholds,
+    addressResolver: new FixedMicroserviceAddressResolver(new Uri("https://api.example.com")));
+```
+
 ### Web application migration
 
 The following example keeps a shared ingress address for local development and
