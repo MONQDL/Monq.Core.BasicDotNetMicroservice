@@ -321,19 +321,20 @@ The ```AddDefaultExceptionHandlers()``` method have to be added in the pipeline 
 
 The library provides extensions for configuring `Grpc.AspNetCore` clients both for web API applications and for console applications with static authentication.
 
-The legacy `IServiceCollection` overloads that accepted `IConfiguration` and
-read a shared `BaseUri` were removed in 11.0.0. Use the host-builder overloads
-described below, which obtain the address from a resolver by application name,
-or pass an explicit absolute `Uri` that is used as is, without consulting any
-resolver:
+Client registration is provided by `Monq.Core.GrpcClientExtensions` as
+`IServiceCollection` extensions (available transitively with this package). The
+legacy `IServiceCollection` overloads that accepted `IConfiguration` and read a
+shared `BaseUri` were removed in 11.0.0. Register clients by application name,
+which obtains the address from a resolver, or pass an explicit absolute `Uri`
+that is used as is, without consulting any resolver:
 
 ```csharp
-builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(
+builder.Services.AddGrpcPreConfiguredClient<MyGrpcClient>(
     new Uri("https://api.example.com"));
 ```
 
-The host-builder overload accepts an application name and obtains the final
-address from the selected resolver. `ConfigureBasicMicroservice` installs the
+The application-name overload obtains the final address from the selected
+resolver when the client is created for the first time. `ConfigureBasicMicroservice` installs the
 standard policy as a fallback: HTTP uses ClusterIP and gRPC uses Service
 Discovery. A resolver registered before the call is preserved, and a resolver
 registered after it overrides the policy, so the application can replace both
@@ -345,13 +346,13 @@ builder.Host.ConfigureBasicMicroservice();
 
 if (builder.Environment.IsDevelopment())
 {
-    builder.UseMicroserviceAddressResolver(
+    builder.Services.UseMicroserviceAddressResolver(
         new FixedMicroserviceAddressResolver(
             builder.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
                 ?? throw new InvalidOperationException("BaseUri not found at configuration.")));
 }
 
-builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(ApplicationNames.Orders);
+builder.Services.AddGrpcPreConfiguredClient<MyGrpcClient>(ApplicationNames.Orders);
 ```
 
 The resolver selects the connection mode:
@@ -379,19 +380,20 @@ gRPC method path.
 
 The console equivalent is `AddGrpcPreConfiguredConsoleClient`.
 
-Client-specific configuration remains available through `GrpcClientOptions`:
+Client-specific configuration remains available through the named overloads and
+the `GrpcClientOptions` object:
 
 ```csharp
-builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(
-    ApplicationNames.Orders,
-    options =>
+builder.Services.AddGrpcPreConfiguredClient<MyGrpcClient>(
+    name: "clientName",
+    applicationName: ApplicationNames.Orders,
+    options: new GrpcClientOptions
     {
-        options.Name = "clientName";
-        options.ChannelOptionsAction = channelOptions =>
+        ChannelOptionsAction = channelOptions =>
         {
             channelOptions.UnsafeUseInsecureChannelCallCredentials = true;
             channelOptions.MaxReceiveMessageSize = 64 * 1024 * 1024;
-        };
+        },
     });
 ```
 
@@ -458,29 +460,29 @@ builder.Services.AddInlineValidator<YourRequest>(rules =>
 The library provides extensions for configuring REST HTTP clients. More info: <https://github.com/MONQDL/Monq.Core.HttpClientExtensions/blob/master/README.md>.
 
 The legacy `IServiceCollection` overload that accepted `IConfiguration` and
-read `BaseUri` was removed in 11.0.0. Use the host-builder overload, or pass
-an explicit absolute `Uri`:
+read `BaseUri` was removed in 11.0.0. Use the application-name overload, or
+pass an explicit absolute `Uri`:
 
 ```csharp
-builder.Host.AddRestHttpPreConfiguredClient<IMyClient, MyHttpClient>(
+builder.Services.AddRestHttpPreConfiguredClient<IMyClient, MyHttpClient>(
     new Uri("https://api.example.com"));
 ```
 
-The host-builder overload uses the configured HTTP address resolver. For a
-headless Service, select the service-discovery resolver before registering the
-client:
+The application-name overload resolves the address with the configured HTTP
+address resolver when the client is created. For a headless Service, select
+the service-discovery resolver before registering the client:
 
 ```csharp
-builder.UseHttpMicroserviceAddressResolver(
+builder.Services.UseHttpMicroserviceAddressResolver(
     new KubernetesServiceDiscoveryAddressResolver());
-builder.Host.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(ApplicationNames.Orders);
+builder.Services.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(ApplicationNames.Orders);
 ```
 
 The service-discovery resolver uses
-`http://{applicationName}-http.{namespace}.svc.cluster.local:5005` and marks
-the result with `EndpointResolutionMode.ServiceDiscovery`. The extension then
-enables HTTP endpoint discovery. URI scheme alone cannot distinguish a regular
-HTTP ClusterIP Service from a headless HTTP Service.
+`http://{applicationName}-http.{namespace}.svc.cluster.local:5005`. Every
+name-based REST registration always enables HTTP endpoint discovery through
+the DNS endpoint provider, so URI schemes do not need to distinguish a
+regular HTTP ClusterIP Service from a headless HTTP Service.
 
 The service-discovery resolver uses application/container port `5005` by
 default because the headless Service resolves directly to pod IP addresses.
@@ -489,11 +491,11 @@ port.
 
 For a regular ClusterIP Service, select `KubernetesClusterIpAddressResolver` or
 use it implicitly as the default. It produces
-`http://{applicationName}.{namespace}.svc.cluster.local:80` without
-client-side endpoint discovery:
+`http://{applicationName}.{namespace}.svc.cluster.local:80`; the DNS endpoint
+provider watches that name and resolves it to the single Service endpoint:
 
 ```csharp
-builder.Host.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(
+builder.Services.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(
     ApplicationNames.Orders);
 ```
 
@@ -502,34 +504,34 @@ may use a headless Service with `round_robin`, while HTTP uses a regular
 ClusterIP Service:
 
 ```csharp
-builder
+builder.Services
     .UseGrpcMicroserviceAddressResolver(new KubernetesServiceDiscoveryAddressResolver())
     .UseHttpMicroserviceAddressResolver(new KubernetesClusterIpAddressResolver());
 
-builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(ApplicationNames.Orders);
-builder.Host.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(
+builder.Services.AddGrpcPreConfiguredClient<MyGrpcClient>(ApplicationNames.Orders);
+builder.Services.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(
     ApplicationNames.Orders);
 ```
 
 Individual gRPC and HTTP clients can also select different strategies. Pass a
-resolver for a particular registration when it must override the host-level
+resolver for a particular registration when it must override the application-level
 protocol strategy:
 
 ```csharp
-builder.UseGrpcMicroserviceAddressResolver(
+builder.Services.UseGrpcMicroserviceAddressResolver(
     new KubernetesClusterIpAddressResolver());
 
-builder.Host.AddGrpcPreConfiguredClient<OrdersClient>(
+builder.Services.AddGrpcPreConfiguredClient<OrdersClient>(
     ApplicationNames.Orders,
     addressResolver: new KubernetesServiceDiscoveryAddressResolver());
 
-builder.Host.AddGrpcPreConfiguredClient<NotificationsClient>(ApplicationNames.Notifications);
+builder.Services.AddGrpcPreConfiguredClient<NotificationsClient>(ApplicationNames.Notifications);
 
-builder.Host.AddRestHttpPreConfiguredClient<IOrdersHttpClient, OrdersHttpClient>(
+builder.Services.AddRestHttpPreConfiguredClient<IOrdersHttpClient, OrdersHttpClient>(
     ApplicationNames.Orders,
     addressResolver: new KubernetesServiceDiscoveryAddressResolver());
 
-builder.Host.AddRestHttpPreConfiguredClient<INotificationsHttpClient, NotificationsHttpClient>(
+builder.Services.AddRestHttpPreConfiguredClient<INotificationsHttpClient, NotificationsHttpClient>(
     ApplicationNames.Notifications,
     addressResolver: new KubernetesClusterIpAddressResolver());
 ```
@@ -541,9 +543,9 @@ two client types targeting the same application to use different strategies.
 
 For gRPC, the DNS resolver and `round_robin` are enabled when the resolved
 address uses `EndpointResolutionMode.ServiceDiscovery` or the standard
-`dns:///` scheme. HTTP DNS resolution is selected by registering
-`AddDnsServiceEndpointProvider` inside the service-discovery extension; it does
-not require a synthetic URI scheme.
+`dns:///` scheme. For REST, the DNS endpoint provider is registered by
+`AddRestHttpPreConfiguredClient` for every name-based client, so no synthetic
+URI scheme or extra registration is required.
 
 Client-side discovery has no ClusterIP fallback: while the headless Service is
 missing or publishes no ready endpoints, gRPC calls fail with `UNAVAILABLE` and
@@ -555,7 +557,7 @@ resolved endpoint state. The shared periodic refresh interval defaults to 30
 seconds and can be changed for the application:
 
 ```csharp
-builder.ConfigureGrpcServiceDiscovery(options =>
+builder.Services.ConfigureGrpcServiceDiscovery(options =>
     options.DnsRefreshInterval = TimeSpan.FromSeconds(10));
 ```
 
@@ -570,7 +572,7 @@ Select the addressing mechanism by scenario:
 | Scenario | Mechanism |
 |---|---|
 | Standard Kubernetes addressing | Application name plus the standard policy from `ConfigureBasicMicroservice()` or `ConfigureBasicConsoleMicroservice()` |
-| Every client through one ingress or gateway | `UseMicroserviceAddressResolver` (or `UseHttpMicroserviceAddressResolver` / `UseGrpcMicroserviceAddressResolver`) with `FixedMicroserviceAddressResolver` on the host builder |
+| Every client through one ingress or gateway | `UseMicroserviceAddressResolver` (or `UseHttpMicroserviceAddressResolver` / `UseGrpcMicroserviceAddressResolver`) with `FixedMicroserviceAddressResolver` on the service collection |
 | A single client or authentication against an explicit URL | `Uri` overloads: `AddGrpcPreConfiguredClient`, `AddGrpcPreConfiguredConsoleClient`, `AddRestHttpPreConfiguredClient`, `ConfigureMonqAuthentication`, `ConfigureStaticAuthentication` |
 | A non-standard rule for a single client | `addressResolver` parameter of the application-name overloads |
 
@@ -581,34 +583,38 @@ resolution context: configuration, environment, application name, protocol,
 or port.
 
 Clients that are not registered through the REST or gRPC extensions, such as
-SignalR or WebSocket clients, can use the same selected resolver directly:
+SignalR or WebSocket clients, can use the same selected resolver through the
+address provider registered in DI:
 
 ```csharp
-var address = hostBuilder.ResolveMicroserviceAddress(
-    context,
-    ApplicationNames.RealtimeProcessor,
-    MicroserviceProtocol.Http).Address;
+public sealed class RealtimeClientFactory(IMicroserviceAddressProvider addresses)
+{
+    public Uri ResolveAddress() =>
+        addresses.Resolve(
+            ApplicationNames.RealtimeProcessor,
+            MicroserviceProtocol.Http).Address;
+}
 ```
 
-Console hosts can select the resolver through a factory when the final
+Console hosts can select the resolver inside `ConfigureServices` when the final
 configuration is only available from `HostBuilderContext`. The application owns
 the environment check; the non-development branch repeats the standard Basic.NET
-policy because the factory must return one resolver:
+policy because a single resolver must be selected:
 
 ```csharp
 hostBuilder
     .ConfigureBasicConsoleMicroservice()
-    .UseMicroserviceAddressResolver(context =>
+    .ConfigureServices((context, services) => services.UseMicroserviceAddressResolver(
         context.HostingEnvironment.IsDevelopment()
             ? new FixedMicroserviceAddressResolver(
                 context.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
                     ?? throw new InvalidOperationException("BaseUri not found at configuration."))
             : new ProtocolMicroserviceAddressResolver(
                 httpResolver: new KubernetesClusterIpAddressResolver(),
-                grpcResolver: new KubernetesServiceDiscoveryAddressResolver()));
+                grpcResolver: new KubernetesServiceDiscoveryAddressResolver())));
 ```
 
-The default host-level resolver applies to every REST and gRPC registration.
+The default resolver applies to every REST and gRPC registration.
 `UseGrpcMicroserviceAddressResolver` and `UseHttpMicroserviceAddressResolver`
 override it for one protocol. A product may also provide its own
 `IMicroserviceAddressResolver` implementation when the standard strategies are
@@ -667,13 +673,13 @@ public sealed class ProductMicroserviceAddressResolver : IMicroserviceAddressRes
 Select the resolver once, before registering clients:
 
 ```csharp
-builder.UseMicroserviceAddressResolver(
+builder.Services.UseMicroserviceAddressResolver(
     new ProductMicroserviceAddressResolver());
 
-builder.Host.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
+builder.Services.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
     ApplicationNames.Orders);
 
-builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(ApplicationNames.Orders);
+builder.Services.AddGrpcPreConfiguredClient<MyGrpcClient>(ApplicationNames.Orders);
 ```
 
 ### Authentication and authorization
@@ -712,7 +718,7 @@ using Monq.Core.BasicDotNetMicroservice.Extensions;
 ```
 
 ```csharp
-builder.ConfigureMonqAuthentication(ApplicationNames.Identity);
+builder.Services.ConfigureMonqAuthentication(builder.Configuration, ApplicationNames.Identity);
 
 var app = builder.Build();
 
@@ -735,27 +741,27 @@ microservice clients:
 ```csharp
 if (builder.Environment.IsDevelopment())
 {
-    builder.UseHttpMicroserviceAddressResolver(
+    builder.Services.UseHttpMicroserviceAddressResolver(
         new FixedMicroserviceAddressResolver(
             new Uri(builder.Configuration["BaseUri"]
                 ?? throw new InvalidOperationException("BaseUri is not configured."))));
 }
 
-builder.ConfigureMonqAuthentication(ApplicationNames.Identity);
+builder.Services.ConfigureMonqAuthentication(builder.Configuration, ApplicationNames.Identity);
 ```
 
-Console and worker applications that use static client-credentials authentication can
-resolve the same application name:
+Console and worker applications that use static client-credentials authentication resolve
+the same application name on the host builder (provided by `Monq.Core.HttpClientExtensions`):
 
 ```csharp
-builder.ConfigureStaticAuthentication(ApplicationNames.Identity);
+builder.Host.ConfigureStaticAuthentication(ApplicationNames.Identity);
 ```
 
 The parameterless overload uses the default authentication service
 (`pl-identity-service`):
 
 ```csharp
-builder.ConfigureStaticAuthentication();
+builder.Host.ConfigureStaticAuthentication();
 ```
 
 The static authentication request uses a dedicated `HttpClient` with a default timeout
@@ -764,7 +770,7 @@ downstream REST client. Custom certificates, proxy settings, or timeouts can be
 configured explicitly:
 
 ```csharp
-builder.ConfigureStaticAuthentication(
+builder.Host.ConfigureStaticAuthentication(
     ApplicationNames.Identity,
     clientBuilder =>
     {

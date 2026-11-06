@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 using Monq.Core.MicroserviceAddressing.Addressing;
-using Monq.Core.MicroserviceAddressing.Hosting;
 using Moq;
 using Xunit;
 
@@ -80,18 +80,21 @@ public class MicroserviceAddressResolverTests
     [InlineData(MicroserviceProtocol.Http)]
     public void ClientResolver_OverridesProtocolAndDefaultResolvers(MicroserviceProtocol protocol)
     {
-        var hostBuilder = new HostBuilder()
-            .UseMicroserviceAddressResolver(
-                new FixedMicroserviceAddressResolver(new Uri("https://default.example")))
-            .UseGrpcMicroserviceAddressResolver(
-                new FixedMicroserviceAddressResolver(new Uri("https://grpc.example")));
-        var context = CreateHostBuilderContext("Integration");
+        using var host = new HostBuilder()
+            .ConfigureServices((_, services) =>
+            {
+                services.UseMicroserviceAddressResolver(
+                    new FixedMicroserviceAddressResolver(new Uri("https://default.example")));
+                services.UseGrpcMicroserviceAddressResolver(
+                    new FixedMicroserviceAddressResolver(new Uri("https://grpc.example")));
+            })
+            .Build();
+        var provider = host.Services.GetRequiredService<IMicroserviceAddressProvider>();
 
-        var result = hostBuilder.ResolveMicroserviceAddress(
-            context,
+        var result = provider.Resolve(
             "test-service",
             protocol,
-            addressResolver: new FixedMicroserviceAddressResolver(
+            clientResolver: new FixedMicroserviceAddressResolver(
                 new Uri("https://client.example")));
 
         Assert.Equal(new Uri("https://client.example"), result.Address);
@@ -104,18 +107,20 @@ public class MicroserviceAddressResolverTests
         MicroserviceProtocol protocol,
         string expectedAddress)
     {
-        var hostBuilder = new HostBuilder()
-            .UseMicroserviceAddressResolver(
-                new FixedMicroserviceAddressResolver(new Uri("https://default.example")))
-            .UseGrpcMicroserviceAddressResolver(
-                new FixedMicroserviceAddressResolver(new Uri("https://grpc.example")))
-            .UseHttpMicroserviceAddressResolver(
-                new FixedMicroserviceAddressResolver(new Uri("https://http.example")));
+        using var host = new HostBuilder()
+            .ConfigureServices((_, services) =>
+            {
+                services.UseMicroserviceAddressResolver(
+                    new FixedMicroserviceAddressResolver(new Uri("https://default.example")));
+                services.UseGrpcMicroserviceAddressResolver(
+                    new FixedMicroserviceAddressResolver(new Uri("https://grpc.example")));
+                services.UseHttpMicroserviceAddressResolver(
+                    new FixedMicroserviceAddressResolver(new Uri("https://http.example")));
+            })
+            .Build();
+        var provider = host.Services.GetRequiredService<IMicroserviceAddressProvider>();
 
-        var result = hostBuilder.ResolveMicroserviceAddress(
-            CreateHostBuilderContext("Integration"),
-            "test-service",
-            protocol);
+        var result = provider.Resolve("test-service", protocol);
 
         Assert.Equal(new Uri(expectedAddress), result.Address);
     }
@@ -123,21 +128,21 @@ public class MicroserviceAddressResolverTests
     [Theory]
     [InlineData(
         MicroserviceProtocol.Grpc,
-        "dns:///test-service-grpc.integration.svc.cluster.local:5006")]
+        "dns:///test-service-grpc.development.svc.cluster.local:5006")]
     [InlineData(
         MicroserviceProtocol.Http,
-        "http://test-service.integration.svc.cluster.local:80")]
+        "http://test-service.development.svc.cluster.local:80")]
     public void ConfigureBasicMicroservice_UsesStandardProtocolPolicy(
         MicroserviceProtocol protocol,
         string expectedAddress)
     {
-        var hostBuilder = new HostBuilder()
-            .ConfigureBasicMicroservice();
+        using var host = new HostBuilder()
+            .UseTestEnvironment(Environments.Development)
+            .ConfigureBasicMicroservice()
+            .Build();
+        var provider = host.Services.GetRequiredService<IMicroserviceAddressProvider>();
 
-        var result = hostBuilder.ResolveMicroserviceAddress(
-            CreateHostBuilderContext("Integration"),
-            "test-service",
-            protocol);
+        var result = provider.Resolve("test-service", protocol);
 
         Assert.Equal(new Uri(expectedAddress), result.Address);
     }
@@ -148,15 +153,15 @@ public class MicroserviceAddressResolverTests
     public void CommonResolverConfiguredAfterBasicMicroservice_OverridesStandardPolicy(
         MicroserviceProtocol protocol)
     {
-        var hostBuilder = new HostBuilder()
+        using var host = new HostBuilder()
+            .UseTestEnvironment(Environments.Development)
             .ConfigureBasicMicroservice()
-            .UseMicroserviceAddressResolver(
-                new FixedMicroserviceAddressResolver(new Uri("https://local.example.com")));
+            .ConfigureServices(services => services.UseMicroserviceAddressResolver(
+                new FixedMicroserviceAddressResolver(new Uri("https://local.example.com"))))
+            .Build();
+        var provider = host.Services.GetRequiredService<IMicroserviceAddressProvider>();
 
-        var result = hostBuilder.ResolveMicroserviceAddress(
-            CreateHostBuilderContext(Environments.Development),
-            "test-service",
-            protocol);
+        var result = provider.Resolve("test-service", protocol);
 
         Assert.Equal(new Uri("https://local.example.com"), result.Address);
     }
@@ -167,15 +172,15 @@ public class MicroserviceAddressResolverTests
     public void CommonResolverConfiguredBeforeBasicMicroservice_IsPreserved(
         MicroserviceProtocol protocol)
     {
-        var hostBuilder = new HostBuilder()
-            .UseMicroserviceAddressResolver(
-                new FixedMicroserviceAddressResolver(new Uri("https://local.example.com")))
-            .ConfigureBasicMicroservice();
+        using var host = new HostBuilder()
+            .UseTestEnvironment(Environments.Development)
+            .ConfigureServices(services => services.UseMicroserviceAddressResolver(
+                new FixedMicroserviceAddressResolver(new Uri("https://local.example.com"))))
+            .ConfigureBasicMicroservice()
+            .Build();
+        var provider = host.Services.GetRequiredService<IMicroserviceAddressProvider>();
 
-        var result = hostBuilder.ResolveMicroserviceAddress(
-            CreateHostBuilderContext("Integration"),
-            "test-service",
-            protocol);
+        var result = provider.Resolve("test-service", protocol);
 
         Assert.Equal(new Uri("https://local.example.com"), result.Address);
     }
@@ -195,14 +200,22 @@ public class MicroserviceAddressResolverTests
 
         return new(configuration, environment, "test-service", protocol, portOverride);
     }
+}
 
-    static HostBuilderContext CreateHostBuilderContext(string environmentName)
-    {
-        var addressContext = CreateContext(environmentName, MicroserviceProtocol.Grpc);
-        return new(new Dictionary<object, object>())
-        {
-            Configuration = addressContext.Configuration,
-            HostingEnvironment = addressContext.Environment,
-        };
-    }
+static class TestHostBuilderEnvironmentExtensions
+{
+    public static IHostBuilder UseTestEnvironment(
+        this IHostBuilder hostBuilder,
+        string environmentName) =>
+        hostBuilder
+            .UseDefaultServiceProvider(options =>
+            {
+                options.ValidateScopes = false;
+                options.ValidateOnBuild = false;
+            })
+            .ConfigureHostConfiguration(config =>
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    [HostDefaults.EnvironmentKey] = environmentName,
+                }));
 }

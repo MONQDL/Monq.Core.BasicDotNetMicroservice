@@ -6,8 +6,10 @@ The primary changes are:
 1. **`BaseUri`-based client overloads removed** — the `IServiceCollection`
    overloads of `AddGrpcPreConfiguredClient`, `AddGrpcPreConfiguredConsoleClient`
    and `AddRestHttpPreConfiguredClient` that read a shared `BaseUri` were
-   removed. Use the host-builder overloads that resolve an address from an
-   application name, or pass an explicit absolute `Uri`
+   removed. gRPC client registration now comes from
+   `Monq.Core.GrpcClientExtensions` as `IServiceCollection` extensions that
+   resolve an address from an application name; alternatively pass an explicit
+   absolute `Uri`
    (see [Keeping a fixed address](#keeping-a-fixed-address)).
 2. **`AdditionalHeadersInterceptor` removed** — `userspace-id` and `culture`
    header propagation and `Authorization` forwarding are now applied by
@@ -20,13 +22,14 @@ The primary changes are:
 New in 11.0.0:
 
 - **Microservice addressing** — application-name based client registration
-  through host-builder extensions. The resolver API lives in the separate
+  through `IServiceCollection` extensions. The resolver API lives in the separate
   `Monq.Core.MicroserviceAddressing` package, in the
   `Monq.Core.MicroserviceAddressing.Addressing` and
-  `Monq.Core.MicroserviceAddressing.Hosting` namespaces.
-- **Authentication endpoint resolution** — `ConfigureMonqAuthentication` and
-  `ConfigureStaticAuthentication` host-builder overloads resolve the
-  authentication address from an application name or accept an explicit `Uri`;
+  `Microsoft.Extensions.DependencyInjection` namespaces.
+- **Authentication endpoint resolution** — `ConfigureMonqAuthentication` service-collection
+  overloads and the `ConfigureStaticAuthentication` host-builder overloads (from
+  `Monq.Core.HttpClientExtensions`) resolve the authentication address lazily from an
+  application name or accept an explicit `Uri`;
   the introspection cache is configured with
   `Authentication:CacheDurationSeconds` (default 300 seconds).
 
@@ -43,7 +46,9 @@ client-side endpoint discovery instead of receiving its destination address
 from configuration.
 
 When a client must continue using its configured `BaseUri`, pass the address
-as an explicit `Uri` to the host-builder overload. Select a
+as an explicit `Uri` (to the `Uri` overload of `AddGrpcPreConfiguredClient`,
+`AddGrpcPreConfiguredConsoleClient`, or `AddRestHttpPreConfiguredClient`).
+Select a
 `FixedMicroserviceAddressResolver` only when the fixed address should be the
 default for all clients of the application. Do not remove `BaseUri` until all
 other consumers, including authentication and application-specific
@@ -102,24 +107,24 @@ The examples below use neutral placeholder constants such as
 ### Keeping a fixed address
 
 When migration is not needed yet, keep the old single-address behavior by
-passing an explicit absolute `Uri` to the host-builder overload. The address is
+passing an explicit absolute `Uri`. The address is
 used as is, without consulting any resolver:
 
 ```csharp
-builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(
+builder.Services.AddGrpcPreConfiguredClient<MyGrpcClient>(
     new Uri("https://api.example.com"));
 
-builder.Host.AddGrpcPreConfiguredConsoleClient<MyGrpcClient>(
+builder.Services.AddGrpcPreConfiguredConsoleClient<MyGrpcClient>(
     new Uri("https://api.example.com"));
 
-builder.Host.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
+builder.Services.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
     new Uri("https://api.example.com"));
 ```
 
 The address can still come from the existing `BaseUri` setting:
 
 ```csharp
-builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(
+builder.Services.AddGrpcPreConfiguredClient<MyGrpcClient>(
     builder.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
         ?? throw new InvalidOperationException(
             "BaseUri not found at configuration."));
@@ -133,7 +138,7 @@ To pin one client to a fixed address while the rest of the application is
 addressed by name, pass the fixed resolver to that registration:
 
 ```csharp
-builder.Host.AddGrpcPreConfiguredClient<MyThresholdsServiceClient>(
+builder.Services.AddGrpcPreConfiguredClient<MyThresholdsServiceClient>(
     ApplicationNames.Thresholds,
     addressResolver: new FixedMicroserviceAddressResolver(new Uri("https://api.example.com")));
 ```
@@ -148,17 +153,17 @@ builder.Host.ConfigureBasicMicroservice();
 
 if (builder.Environment.IsDevelopment())
 {
-    builder.UseMicroserviceAddressResolver(
+    builder.Services.UseMicroserviceAddressResolver(
         new FixedMicroserviceAddressResolver(
             builder.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
                 ?? throw new InvalidOperationException(
                     "BaseUri not found at configuration.")));
 }
 
-builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(
+builder.Services.AddGrpcPreConfiguredClient<MyGrpcClient>(
     ApplicationNames.Orders);
 
-builder.Host.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
+builder.Services.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
     ApplicationNames.Orders);
 ```
 
@@ -171,32 +176,32 @@ An example development setting can use a reserved documentation domain:
 ```
 
 In application code, registrations can be grouped into local startup
-extensions while the library calls remain on `builder.Host`:
+extensions while the library calls remain unchanged:
 
 ```csharp
 // gRPC Clients.
-builder.AddGrpcClients();
+builder.Services.AddGrpcClients();
 
 // Http Clients
-builder.AddHttpClients();
+builder.Services.AddHttpClients();
 ```
 
 ### Different strategies for gRPC and HTTP
 
-A host can use different resolvers for each protocol. For example, gRPC can use
+An application can use different resolvers for each protocol. For example, gRPC can use
 a headless Service while HTTP uses a regular ClusterIP Service:
 
 ```csharp
-builder
+builder.Services
     .UseGrpcMicroserviceAddressResolver(
         new KubernetesServiceDiscoveryAddressResolver())
     .UseHttpMicroserviceAddressResolver(
         new KubernetesClusterIpAddressResolver());
 
-builder.Host.AddGrpcPreConfiguredClient<MyGrpcClient>(
+builder.Services.AddGrpcPreConfiguredClient<MyGrpcClient>(
     ApplicationNames.Orders);
 
-builder.Host.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
+builder.Services.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
     ApplicationNames.Orders);
 ```
 
@@ -211,7 +216,7 @@ The periodic refresh interval defaults to 30 seconds and can be configured once
 for the application:
 
 ```csharp
-builder.ConfigureGrpcServiceDiscovery(options =>
+builder.Services.ConfigureGrpcServiceDiscovery(options =>
     options.DnsRefreshInterval = TimeSpan.FromSeconds(10));
 ```
 
@@ -219,21 +224,22 @@ The address strategy can still be selected per client. The DNS refresh interval
 is application-wide because gRPC selects one resolver factory for the `dns`
 URI scheme.
 
-For HTTP, the URI scheme cannot distinguish ClusterIP from a headless Service.
-`ResolvedMicroserviceAddress.ResolutionMode` explicitly controls whether HTTP
-endpoint discovery is enabled.
+For REST clients, name-based registrations always enable HTTP endpoint discovery
+through the DNS endpoint provider, so `ResolutionMode` does not need to be used
+to distinguish ClusterIP from a headless Service.
 
 ### Per-client strategy
 
-A resolver passed to a client registration overrides host-level resolvers. This
+A resolver passed to a client registration overrides the resolvers registered
+for the application. This
 allows clients in the same application to use different strategies:
 
 ```csharp
-builder.Host.AddGrpcPreConfiguredClient<OrdersClient>(
+builder.Services.AddGrpcPreConfiguredClient<OrdersClient>(
     ApplicationNames.Orders,
     addressResolver: new KubernetesServiceDiscoveryAddressResolver());
 
-builder.Host.AddGrpcPreConfiguredClient<NotificationsClient>(
+builder.Services.AddGrpcPreConfiguredClient<NotificationsClient>(
     ApplicationNames.Notifications,
     addressResolver: new KubernetesClusterIpAddressResolver());
 ```
@@ -247,25 +253,31 @@ Resolver precedence is:
 
 ### Console and background application migration
 
-Console applications register clients directly on `IHostBuilder`. A resolver
-factory can use the final host configuration and environment:
+Console applications configure the host builder and register gRPC and REST
+clients on `IServiceCollection`. Select the resolver inside `ConfigureServices` to
+use the final host configuration and environment:
 
 ```csharp
 using var host = Host.CreateDefaultBuilder(args)
     .ConfigureBasicConsoleMicroservice()
-    .UseMicroserviceAddressResolver(context =>
-        context.HostingEnvironment.IsDevelopment()
-            ? new FixedMicroserviceAddressResolver(
-                context.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
-                    ?? throw new InvalidOperationException(
-                        "BaseUri not found at configuration."))
-            : new ProtocolMicroserviceAddressResolver(
-                httpResolver: new KubernetesClusterIpAddressResolver(),
-                grpcResolver: new KubernetesServiceDiscoveryAddressResolver()))
-    .AddGrpcPreConfiguredConsoleClient<MyGrpcClient>(
-        ApplicationNames.Orders)
-    .AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
-        ApplicationNames.Orders)
+    .ConfigureServices((context, services) =>
+    {
+        services.UseMicroserviceAddressResolver(
+            context.HostingEnvironment.IsDevelopment()
+                ? new FixedMicroserviceAddressResolver(
+                    context.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
+                        ?? throw new InvalidOperationException(
+                            "BaseUri not found at configuration."))
+                : new ProtocolMicroserviceAddressResolver(
+                    httpResolver: new KubernetesClusterIpAddressResolver(),
+                    grpcResolver: new KubernetesServiceDiscoveryAddressResolver()));
+
+        services.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
+            ApplicationNames.Orders);
+
+        services.AddGrpcPreConfiguredConsoleClient<MyGrpcClient>(
+            ApplicationNames.Orders);
+    })
     .Build();
 ```
 

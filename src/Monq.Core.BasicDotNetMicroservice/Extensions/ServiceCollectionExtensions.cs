@@ -2,13 +2,15 @@ using Calzolari.Grpc.AspNetCore.Validation;
 using Duende.AspNetCore.Authentication.OAuth2Introspection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Telemetry;
 using Monq.Core.BasicDotNetMicroservice.Validation;
 using Monq.Core.HttpClientExtensions;
 using Monq.Core.MicroserviceAddressing.Addressing;
+using Monq.Core.MicroserviceAddressing.DependencyInjection;
 using System.Diagnostics.CodeAnalysis;
-using MonqGrpcClientOptions = Monq.Core.GrpcClientExtensions.GrpcClientOptions;
 
 namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 
@@ -31,7 +33,7 @@ public static class ServiceCollectionExtensions
         return ConfigureMonqAuthentication(
             services,
             configuration,
-            authConfig[AuthConstants.AuthenticationConfiguration.Authority]);
+            configureEndpoint: x => x.Authority = authConfig[AuthConstants.AuthenticationConfiguration.Authority]);
     }
 
     /// <summary>
@@ -55,13 +57,54 @@ public static class ServiceCollectionExtensions
         return ConfigureMonqAuthentication(
             services,
             configuration,
-            authenticationEndpoint.AbsoluteUri);
+            configureEndpoint: x => x.Authority = authenticationEndpoint.AbsoluteUri);
+    }
+
+    /// <summary>
+    /// Configures OAuth2 introspection authentication for an authentication service addressed by
+    /// application name. The authority is resolved from the registered
+    /// <see cref="IMicroserviceAddressProvider"/> when the authentication options are created,
+    /// using the HTTP address resolver selected for the application.
+    /// </summary>
+    /// <param name="services">The service collection to add authentication to.</param>
+    /// <param name="configuration">The configuration containing authentication credentials and settings.</param>
+    /// <param name="applicationName">The authentication service application name.</param>
+    /// <param name="port">Port for address resolution. When <see langword="null"/>, the resolver selects the port.</param>
+    /// <param name="addressResolver">Resolver that takes precedence over the registered resolvers.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection ConfigureMonqAuthentication(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string applicationName,
+        int? port = null,
+        IMicroserviceAddressResolver? addressResolver = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
+
+        services.AddMicroserviceAddressing();
+
+        ConfigureMonqAuthentication(
+            services,
+            configuration,
+            configureEndpoint: null);
+
+        services.AddOptions<OAuth2IntrospectionOptions>(AuthConstants.AuthenticationScheme)
+            .Configure<IServiceProvider>((options, provider) =>
+                options.Authority = provider
+                    .GetRequiredService<IMicroserviceAddressProvider>()
+                    .Resolve(applicationName, MicroserviceProtocol.Http, port, addressResolver)
+                    .Address
+                    .AbsoluteUri);
+
+        return services;
     }
 
     static IServiceCollection ConfigureMonqAuthentication(
         IServiceCollection services,
         IConfiguration configuration,
-        string? authenticationEndpoint)
+        Action<OAuth2IntrospectionOptions>? configureEndpoint)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -79,12 +122,13 @@ public static class ServiceCollectionExtensions
         services.AddAuthentication(AuthConstants.AuthenticationScheme)
             .AddOAuth2Introspection(AuthConstants.AuthenticationScheme, x =>
             {
-                x.Authority = authenticationEndpoint;
                 x.ClientId = authConfig[AuthConstants.AuthenticationConfiguration.ScopeName];
                 x.ClientSecret = authConfig[AuthConstants.AuthenticationConfiguration.ScopeSecret];
                 x.CacheDuration = TimeSpan.FromSeconds(cacheDurationSeconds);
                 x.NameClaimType = "fullName";
                 x.DiscoveryPolicy.RequireHttps = requireHttps;
+
+                configureEndpoint?.Invoke(x);
             });
 
         return services;
@@ -117,27 +161,59 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Adds a pre-configured gRPC client. Channel defaults, header propagation and
-    /// authorization forwarding are applied by Monq.Core.GrpcClientExtensions.
+    /// Adds a pre-configured REST HTTP client whose base address is resolved by application name when
+    /// the typed client is created, using the addressing configured on the host. Service discovery is
+    /// enabled for the client: Kubernetes Service names are watched through the DNS endpoint provider,
+    /// so ClusterIP addresses resolve to the single service endpoint and headless Service names to the
+    /// ready pod endpoints.
     /// </summary>
-    internal static IHttpClientBuilder AddGrpcPreConfiguredClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
+    /// <typeparam name="TClient">The typed client interface.</typeparam>
+    /// <typeparam name="TImplementation">The implementation type inheriting from <see cref="RestHttpClient"/>.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="applicationName">The Kubernetes application name to resolve the address from.</param>
+    /// <param name="configureHttpClient">Optional delegate to customize the <see cref="HttpClient"/>.</param>
+    /// <param name="port">Port for address resolution. When <see langword="null"/>, the resolver selects the port.</param>
+    /// <param name="addressResolver">Resolver that takes precedence over host-level resolvers.</param>
+    /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
+    public static IHttpClientBuilder AddRestHttpPreConfiguredClient<
+        TClient,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
         this IServiceCollection services,
-        ResolvedMicroserviceAddress resolvedAddress,
-        Action<GrpcClientOptions>? configureOptions)
-        where TClient : class =>
-        services.AddGrpcPreConfiguredClientCore<TClient>(resolvedAddress, configureOptions, console: false);
+        string applicationName,
+        Action<HttpClient>? configureHttpClient = null,
+        int? port = null,
+        IMicroserviceAddressResolver? addressResolver = null)
+        where TClient : class
+        where TImplementation : RestHttpClient, TClient
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
 
-    /// <summary>
-    /// Adds a pre-configured gRPC client for console/background applications with static
-    /// authentication fallback. If no HttpContext is available, obtains a token via
-    /// <see cref="RestHttpClient.GetAccessToken"/>.
-    /// </summary>
-    internal static IHttpClientBuilder AddGrpcPreConfiguredConsoleClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
-        this IServiceCollection services,
-        ResolvedMicroserviceAddress resolvedAddress,
-        Action<GrpcClientOptions>? configureOptions)
-        where TClient : class =>
-        services.AddGrpcPreConfiguredClientCore<TClient>(resolvedAddress, configureOptions, console: true);
+        services.AddServiceDiscoveryCore();
+
+        if (!services.Any(descriptor =>
+                descriptor.ServiceType.Name == "IServiceEndpointProviderFactory"
+                && descriptor.ImplementationType?.Name == "DnsServiceEndpointProviderFactory"))
+        {
+            services.AddDnsServiceEndpointProvider();
+        }
+
+        return services
+            .AddHttpClient<TClient, TImplementation>()
+            .ConfigureHttpClient((provider, client) =>
+            {
+                var resolvedAddress = provider
+                    .GetRequiredService<IMicroserviceAddressProvider>()
+                    .Resolve(applicationName, MicroserviceProtocol.Http, port, addressResolver);
+
+                client.BaseAddress = resolvedAddress.Address;
+                client.Timeout = Timeout.InfiniteTimeSpan;
+
+                client.AddTrailingSlash();
+                configureHttpClient?.Invoke(client);
+            })
+            .AddServiceDiscovery();
+    }
 
     /// <summary>
     /// Adds a pre-configured REST HTTP client based on <see cref="RestHttpClient"/> with the specified base address,
@@ -171,40 +247,5 @@ public static class ServiceCollectionExtensions
 
                 client.AddTrailingSlash();
             });
-    }
-
-    static IHttpClientBuilder AddGrpcPreConfiguredClientCore<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClient>(
-        this IServiceCollection services,
-        ResolvedMicroserviceAddress resolvedAddress,
-        Action<GrpcClientOptions>? configureOptions,
-        bool console)
-        where TClient : class
-    {
-        var options = new GrpcClientOptions();
-        configureOptions?.Invoke(options);
-
-        var monqOptions = new MonqGrpcClientOptions
-        {
-            ClientOptionsAction = options.ClientOptionsAction,
-            ChannelOptionsAction = options.ChannelOptionsAction,
-            ContextPropagationOptionsAction = options.ContextPropagationOptionsAction,
-        };
-
-        var builder = options.Name is not null
-            ? console
-                ? services.AddMicroserviceGrpcConsoleClient<TClient>(
-                    options.Name, resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions)
-                : services.AddMicroserviceGrpcClient<TClient>(
-                    options.Name, resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions)
-            : console
-                ? services.AddMicroserviceGrpcConsoleClient<TClient>(
-                    resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions)
-                : services.AddMicroserviceGrpcClient<TClient>(
-                    resolvedAddress.Address, resolvedAddress.ResolutionMode, monqOptions);
-
-        // Header propagation, channel defaults (unsafe call credentials, 51 MB receive limit),
-        // call context propagation and Authorization forwarding (with static token fallback for
-        // console clients) are applied by Monq.Core.GrpcClientExtensions for every client.
-        return builder;
     }
 }

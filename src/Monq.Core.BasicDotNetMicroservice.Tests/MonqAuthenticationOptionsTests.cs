@@ -76,33 +76,38 @@ public class MonqAuthenticationOptionsTests
         Assert.Equal(TimeSpan.FromSeconds(300), options.CacheDuration);
     }
 
-    [Fact(DisplayName = "Configure authority from an explicit endpoint on the host builder.")]
-    public void ShouldConfigureAuthorityFromHostBuilderEndpoint()
+    [Fact(DisplayName = "Configure authority from an explicit endpoint on the service collection.")]
+    public void ShouldConfigureAuthorityFromServiceCollectionEndpoint()
     {
-        var host = new HostBuilder()
-            .ConfigureAppConfiguration(builder => builder.AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                    ["Authentication:ApiResource:Login"] = "login",
-                    ["Authentication:ApiResource:Password"] = "password"
-                }))
-            .ConfigureMonqAuthentication(new Uri("https://identity.example.com"))
-            .Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.ConfigureMonqAuthentication(
+            new ConfigurationBuilder()
+                .AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["Authentication:ApiResource:Login"] = "login",
+                        ["Authentication:ApiResource:Password"] = "password"
+                    })
+                .Build(),
+            new Uri("https://identity.example.com"));
 
-        var options = host.Services
+        using var provider = services.BuildServiceProvider();
+        var options = provider
             .GetRequiredService<IOptionsMonitor<OAuth2IntrospectionOptions>>()
             .Get("Bearer");
 
         Assert.Equal("https://identity.example.com/", options.Authority);
     }
 
-    [Fact(DisplayName = "Reject a relative authentication endpoint on the host builder.")]
+    [Fact(DisplayName = "Reject a relative authentication endpoint on the service collection.")]
     public void ShouldRejectRelativeAuthenticationEndpoint()
     {
-        var hostBuilder = new HostBuilder();
+        var services = new ServiceCollection();
 
         Assert.Throws<ArgumentException>(
-            () => hostBuilder.ConfigureMonqAuthentication(
+            () => services.ConfigureMonqAuthentication(
+                new ConfigurationBuilder().Build(),
                 new Uri("identity.example.com", UriKind.Relative)));
     }
 }

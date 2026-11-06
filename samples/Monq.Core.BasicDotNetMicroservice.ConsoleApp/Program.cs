@@ -17,9 +17,10 @@ using var host = Host.CreateDefaultBuilder(args)
     {
         AppsettingsFileName = "appsettings-async.json"
     })
-    .AddGrpcPreConfiguredConsoleClient<OtelTest.OtelTestClient>(new Uri("http://localhost:5006"))
     .ConfigureServices((builder, services) =>
     {
+        services.AddGrpcPreConfiguredConsoleClient<OtelTest.OtelTestClient>(new Uri("http://localhost:5006"));
+
         Console.WriteLine("HostName" + builder.Configuration.GetSection("RabbitMQ")["HostName"]);
         Console.WriteLine("BaseUri" + builder.Configuration["BaseUri"]);
 
