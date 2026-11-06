@@ -11,6 +11,7 @@
     <Title>Monq.Core.BasicDotNetMicroservice</Title>
     <PackageId>Monq.Core.BasicDotNetMicroservice</PackageId>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageTags>library microservice consul aspnet</PackageTags>
     <PackageProjectUrl>https://github.com/MONQDL/Monq.Core.BasicDotNetMicroservice</PackageProjectUrl>
@@ -33,13 +34,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Duende.AspNetCore.Authentication.OAuth2Introspection" Version="7.0.1" />
     <PackageReference Include="Grpc.AspNetCore.Server" Version="2.83.0" />
     <PackageReference Include="Grpc.AspNetCore.Server.ClientFactory" Version="2.83.0" />
     <PackageReference Include="Grpc.Net.ClientFactory" Version="2.83.0" />
     <PackageReference Include="Google.Protobuf" Version="3.35.1" />
     <PackageReference Include="Microsoft.Extensions.ServiceDiscovery.Dns" Version="10.0.0" />
-    <PackageReference Include="Monq.Core.GrpcClientExtensions" Version="0.1.0-rev-41620895905" />
+    <PackageReference Include="Monq.Core.GrpcClientExtensions" Version="0.1.0-rev-42261845383" />
     <!--Serilog-->
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.1" />
@@ -58,13 +63,10 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.StackExchangeRedis" Version="1.16.0-beta.1" />
   </ItemGroup>
 
-  <!-- Published as a CI prerelease; switch to the stable 8.0.0 once tagged. -->
+  <!-- Published as CI prereleases; switch to the stable versions once tagged. -->
   <ItemGroup>
-    <PackageReference Include="Monq.Core.HttpClientExtensions" Version="8.0.0-rev-41050814772" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Monq.Core.MicroserviceAddressing" Version="0.1.0" />
+    <PackageReference Include="Monq.Core.HttpClientExtensions" Version="8.0.0-rev-42260357548" />
+    <PackageReference Include="Monq.Core.MicroserviceAddressing" Version="0.2.0-rev-42252065267" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">

@@ -1,4 +1,4 @@
-using Grpc.Core;
+﻿using Grpc.Core;
 using Grpc.Net.Client;
 using Grpc.Net.Client.Balancer;
 using Grpc.Net.ClientFactory;
@@ -7,12 +7,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Monq.Core.BasicDotNetMicroservice.Configuration;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
 using Monq.Core.GrpcClientExtensions;
 using Monq.Core.HttpClientExtensions;
 using Monq.Core.MicroserviceAddressing.Addressing;
-using Monq.Core.MicroserviceAddressing.Hosting;
 using Xunit;
 
 namespace Monq.Core.BasicDotNetMicroservice.Tests;
@@ -22,21 +20,24 @@ public class MicroserviceClientRegistrationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void GrpcHostRegistration_DoesNotRequireBaseUri(bool consoleClient)
+    public void GrpcRegistration_DoesNotRequireBaseUri(bool consoleClient)
     {
         var configureClientInvoked = false;
         var hostBuilder = CreateHostBuilder()
-            .UseMicroserviceAddressResolver(
-                new FixedMicroserviceAddressResolver(new Uri("http://localhost:5006")));
+            .ConfigureServices(services => services.UseMicroserviceAddressResolver(
+                new FixedMicroserviceAddressResolver(new Uri("http://localhost:5006"))))
+            .ConfigureServices(services =>
+            {
+                var options = new GrpcClientOptions
+                {
+                    ClientOptionsAction = _ => configureClientInvoked = true,
+                };
 
-        if (consoleClient)
-            hostBuilder.AddGrpcPreConfiguredConsoleClient<TestGrpcClient>(
-                "test-service",
-                options => options.ClientOptionsAction = _ => configureClientInvoked = true);
-        else
-            hostBuilder.AddGrpcPreConfiguredClient<TestGrpcClient>(
-                "test-service",
-                options => options.ClientOptionsAction = _ => configureClientInvoked = true);
+                if (consoleClient)
+                    services.AddGrpcPreConfiguredConsoleClient<TestGrpcClient>("test-service", options: options);
+                else
+                    services.AddGrpcPreConfiguredClient<TestGrpcClient>("test-service", options: options);
+            });
 
         using var host = hostBuilder.Build();
 
@@ -58,10 +59,13 @@ public class MicroserviceClientRegistrationTests
         var hostBuilder = CreateHostBuilder()
             .ConfigureServices(services =>
                 services.AddSingleton<ResolverFactory>(staticResolver))
-            .UseGrpcMicroserviceAddressResolver(
-                new KubernetesServiceDiscoveryAddressResolver())
-            .AddGrpcPreConfiguredClient<TestGrpcClient>("first-service")
-            .AddGrpcPreConfiguredClient<SecondTestGrpcClient>("second-service");
+            .ConfigureServices(services => services.UseGrpcMicroserviceAddressResolver(
+                new KubernetesServiceDiscoveryAddressResolver()))
+            .ConfigureServices(services =>
+            {
+                services.AddGrpcPreConfiguredClient<TestGrpcClient>("first-service");
+                services.AddGrpcPreConfiguredClient<SecondTestGrpcClient>("second-service");
+            });
 
         using var host = hostBuilder.Build();
         var resolverFactories = host.Services.GetServices<ResolverFactory>().ToArray();
@@ -74,11 +78,12 @@ public class MicroserviceClientRegistrationTests
     public void GrpcServiceDiscovery_EnabledForServiceDiscoveryModeWithoutDnsScheme()
     {
         var hostBuilder = CreateHostBuilder()
-            .UseGrpcMicroserviceAddressResolver(
+            .ConfigureServices(services => services.UseGrpcMicroserviceAddressResolver(
                 new FixedMicroserviceAddressResolver(
                     new Uri("http://test-service:5006"),
-                    EndpointResolutionMode.ServiceDiscovery))
-            .AddGrpcPreConfiguredClient<TestGrpcClient>("test-service");
+                    EndpointResolutionMode.ServiceDiscovery)))
+            .ConfigureServices(services =>
+                services.AddGrpcPreConfiguredClient<TestGrpcClient>("test-service"));
 
         using var host = hostBuilder.Build();
 
@@ -92,11 +97,13 @@ public class MicroserviceClientRegistrationTests
     {
         var refreshInterval = TimeSpan.FromSeconds(10);
         var hostBuilder = CreateHostBuilder()
-            .ConfigureGrpcServiceDiscovery(options =>
-                options.DnsRefreshInterval = refreshInterval)
-            .UseGrpcMicroserviceAddressResolver(
-                new KubernetesServiceDiscoveryAddressResolver())
-            .AddGrpcPreConfiguredClient<TestGrpcClient>("test-service");
+            .ConfigureServices(services =>
+                services.ConfigureGrpcServiceDiscovery(options =>
+                    options.DnsRefreshInterval = refreshInterval))
+            .ConfigureServices(services => services.UseGrpcMicroserviceAddressResolver(
+                new KubernetesServiceDiscoveryAddressResolver()))
+            .ConfigureServices(services =>
+                services.AddGrpcPreConfiguredClient<TestGrpcClient>("test-service"));
 
         using var host = hostBuilder.Build();
 
@@ -111,21 +118,23 @@ public class MicroserviceClientRegistrationTests
     }
 
     [Theory]
-    [InlineData(EndpointResolutionMode.Direct, false)]
-    [InlineData(EndpointResolutionMode.ServiceDiscovery, true)]
-    public void HttpHostRegistration_UsesResolvedAddressAndMode(
-        EndpointResolutionMode resolutionMode,
-        bool serviceDiscoveryExpected)
+    [InlineData(EndpointResolutionMode.Direct)]
+    [InlineData(EndpointResolutionMode.ServiceDiscovery)]
+    public void HttpRegistration_UsesResolvedAddressAndMode(EndpointResolutionMode resolutionMode)
     {
         var address = new Uri("http://test-service:5005");
         ServiceDescriptor[] registrations = [];
         var hostBuilder = CreateHostBuilder()
-            .UseHttpMicroserviceAddressResolver(
-                new FixedMicroserviceAddressResolver(address, resolutionMode))
-            .AddRestHttpPreConfiguredClient<ITestHttpClient, TestHttpClient>(
-                "test-service",
-                client => client.DefaultRequestHeaders.Add("x-test", "value"))
-            .ConfigureServices((_, services) => registrations = [.. services]);
+            .ConfigureServices(services => services.UseHttpMicroserviceAddressResolver(
+                new FixedMicroserviceAddressResolver(address, resolutionMode)))
+            .ConfigureServices((_, services) =>
+            {
+                services.AddRestHttpPreConfiguredClient<ITestHttpClient, TestHttpClient>(
+                    "test-service",
+                    client => client.DefaultRequestHeaders.Add("x-test", "value"));
+
+                registrations = [.. services];
+            });
 
         using var host = hostBuilder.Build();
         var client = Assert.IsType<TestHttpClient>(
@@ -135,31 +144,40 @@ public class MicroserviceClientRegistrationTests
         Assert.Equal(
             "value",
             client.ConfiguredHttpClient.DefaultRequestHeaders.GetValues("x-test").Single());
-        Assert.Equal(
-            serviceDiscoveryExpected,
-            registrations.Any(descriptor =>
-                descriptor.ServiceType.FullName
-                    == "Microsoft.Extensions.ServiceDiscovery.ServiceEndpointWatcherFactory"));
+
+        // Name-based HTTP registrations always enable service discovery: the DNS endpoint provider
+        // resolves ClusterIP names to the single service endpoint and headless names to pod endpoints.
+        Assert.Contains(registrations, descriptor =>
+            descriptor.ServiceType.FullName
+                == "Microsoft.Extensions.ServiceDiscovery.ServiceEndpointWatcherFactory");
+        Assert.Contains(registrations, descriptor =>
+            descriptor.ServiceType.Name == "IServiceEndpointProviderFactory"
+            && descriptor.ImplementationType?.Name == "DnsServiceEndpointProviderFactory");
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void GrpcHostRegistration_UsesExplicitAddress(bool consoleClient)
+    public void GrpcRegistration_UsesExplicitAddress(bool consoleClient)
     {
         GrpcClientFactoryOptions? clientOptions = null;
-        var hostBuilder = CreateHostBuilder();
+        var options = new GrpcClientOptions
+        {
+            ClientOptionsAction = actionOptions => clientOptions = actionOptions,
+        };
 
-        if (consoleClient)
-            hostBuilder.AddGrpcPreConfiguredConsoleClient<TestGrpcClient>(
-                new Uri("http://localhost:5006"),
-                options => options.ClientOptionsAction = actionOptions => clientOptions = actionOptions);
-        else
-            hostBuilder.AddGrpcPreConfiguredClient<TestGrpcClient>(
-                new Uri("http://localhost:5006"),
-                options => options.ClientOptionsAction = actionOptions => clientOptions = actionOptions);
+        using var host = CreateHostBuilder()
+            .ConfigureServices(services =>
+            {
+                if (consoleClient)
+                    services.AddGrpcPreConfiguredConsoleClient<TestGrpcClient>(
+                        new Uri("http://localhost:5006"), options: options);
+                else
+                    services.AddGrpcPreConfiguredClient<TestGrpcClient>(
+                        new Uri("http://localhost:5006"), options: options);
+            })
+            .Build();
 
-        using var host = hostBuilder.Build();
         Assert.NotNull(host.Services.GetRequiredService<TestGrpcClient>());
 
         Assert.Equal(new Uri("http://localhost:5006"), clientOptions!.Address);
@@ -171,12 +189,12 @@ public class MicroserviceClientRegistrationTests
         // grpc-dotnet rejects any address scheme other than http/https without explicit
         // credentials, so e.g. an ipv4:/// address must get Insecure credentials even in
         // Direct mode, while round-robin balancing stays a Service Discovery-only feature.
-        var hostBuilder = CreateHostBuilder()
-            .AddGrpcPreConfiguredClient<TestGrpcClient>(
-                new Uri("ipv4:///10.0.0.1:5006"),
-                options => options.Name = "test-ipv4-client");
+        using var host = CreateHostBuilder()
+            .ConfigureServices(services =>
+                services.AddGrpcPreConfiguredClient<TestGrpcClient>(
+                    "test-ipv4-client", new Uri("ipv4:///10.0.0.1:5006")))
+            .Build();
 
-        using var host = hostBuilder.Build();
         var channelOptions = GetConfiguredChannelOptions(host.Services, "test-ipv4-client");
 
         Assert.Same(ChannelCredentials.Insecure, channelOptions.Credentials);
@@ -186,12 +204,12 @@ public class MicroserviceClientRegistrationTests
     [Fact]
     public void GrpcChannelCredentials_NotOverriddenForHttpScheme()
     {
-        var hostBuilder = CreateHostBuilder()
-            .AddGrpcPreConfiguredClient<TestGrpcClient>(
-                new Uri("http://localhost:5006"),
-                options => options.Name = "test-http-client");
+        using var host = CreateHostBuilder()
+            .ConfigureServices(services =>
+                services.AddGrpcPreConfiguredClient<TestGrpcClient>(
+                    "test-http-client", new Uri("http://localhost:5006")))
+            .Build();
 
-        using var host = hostBuilder.Build();
         var channelOptions = GetConfiguredChannelOptions(host.Services, "test-http-client");
 
         Assert.NotSame(ChannelCredentials.Insecure, channelOptions.Credentials);
@@ -213,12 +231,12 @@ public class MicroserviceClientRegistrationTests
     }
 
     [Fact]
-    public void RestHostRegistration_UsesExplicitAddress()
+    public void RestRegistration_UsesExplicitAddress()
     {
         var hostBuilder = CreateHostBuilder()
-            .AddRestHttpPreConfiguredClient<ITestHttpClient, TestHttpClient>(
+            .ConfigureServices((_, services) => services.AddRestHttpPreConfiguredClient<ITestHttpClient, TestHttpClient>(
                 new Uri("http://test-service:5005"),
-                client => client.DefaultRequestHeaders.Add("x-test", "value"));
+                client => client.DefaultRequestHeaders.Add("x-test", "value")));
 
         using var host = hostBuilder.Build();
         var client = Assert.IsType<TestHttpClient>(host.Services.GetRequiredService<ITestHttpClient>());
@@ -232,17 +250,16 @@ public class MicroserviceClientRegistrationTests
     }
 
     [Fact]
-    public void ClientHostRegistrations_RejectRelativeAddress()
+    public void ClientRegistrations_RejectRelativeAddress()
     {
-        var hostBuilder = CreateHostBuilder();
-        var address = new Uri("test-service/path", UriKind.Relative);
+        var relativeAddress = new Uri("test-service/path", UriKind.Relative);
 
         Assert.Throws<ArgumentException>(
-            () => hostBuilder.AddGrpcPreConfiguredClient<TestGrpcClient>(address));
+            () => new ServiceCollection().AddGrpcPreConfiguredClient<TestGrpcClient>(relativeAddress));
         Assert.Throws<ArgumentException>(
-            () => hostBuilder.AddGrpcPreConfiguredConsoleClient<TestGrpcClient>(address));
+            () => new ServiceCollection().AddGrpcPreConfiguredConsoleClient<TestGrpcClient>(relativeAddress));
         Assert.Throws<ArgumentException>(
-            () => hostBuilder.AddRestHttpPreConfiguredClient<ITestHttpClient, TestHttpClient>(address));
+            () => new ServiceCollection().AddRestHttpPreConfiguredClient<ITestHttpClient, TestHttpClient>(relativeAddress));
     }
 
     static IHostBuilder CreateHostBuilder() =>
