@@ -209,8 +209,12 @@ public static class ServiceCollectionExtensions
                 client.BaseAddress = resolvedAddress.Address;
                 client.Timeout = Timeout.InfiniteTimeSpan;
 
-                client.AddTrailingSlash();
                 configureHttpClient?.Invoke(client);
+
+                // A configure delegate may replace the base address with a prefixed one
+                // (e.g. new(client.BaseAddress!, "api/pl")); normalize after it so relative request
+                // paths keep the prefix instead of replacing its last segment (RFC 3986 merge).
+                client.AddTrailingSlash();
             })
             .AddServiceDiscovery();
     }

@@ -155,6 +155,26 @@ public class MicroserviceClientRegistrationTests
             && descriptor.ImplementationType?.Name == "DnsServiceEndpointProviderFactory");
     }
 
+    [Fact]
+    public void HttpRegistration_ConfigureDelegateBaseAddressGetsTrailingSlash()
+    {
+        // Relative RestHttpClient request paths are merged into the base address per RFC 3986:
+        // a base without a trailing slash loses its last path segment on every request.
+        using var host = CreateHostBuilder()
+            .ConfigureServices(services => services.UseHttpMicroserviceAddressResolver(
+                new FixedMicroserviceAddressResolver(new Uri("http://test-service:5005"))))
+            .ConfigureServices((_, services) =>
+                services.AddRestHttpPreConfiguredClient<ITestHttpClient, TestHttpClient>(
+                    "test-service",
+                    client => client.BaseAddress = new(client.BaseAddress!, "api/pl")))
+            .Build();
+
+        var client = Assert.IsType<TestHttpClient>(
+            host.Services.GetRequiredService<ITestHttpClient>());
+
+        Assert.Equal(new Uri("http://test-service:5005/api/pl/"), client.ConfiguredHttpClient.BaseAddress);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
