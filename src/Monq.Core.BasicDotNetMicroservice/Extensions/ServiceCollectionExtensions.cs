@@ -64,7 +64,8 @@ public static class ServiceCollectionExtensions
     /// Configures OAuth2 introspection authentication for an authentication service addressed by
     /// application name. The authority is resolved from the registered
     /// <see cref="IMicroserviceAddressProvider"/> when the authentication options are created,
-    /// using the HTTP address resolver selected for the application.
+    /// using the HTTP address resolver selected for the application. Microservice addressing
+    /// must be configured on the host before registering clients and authentication.
     /// </summary>
     /// <param name="services">The service collection to add authentication to.</param>
     /// <param name="configuration">The configuration containing authentication credentials and settings.</param>
@@ -82,8 +83,6 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
-
-        services.AddMicroserviceAddressing();
 
         ConfigureMonqAuthentication(
             services,
@@ -146,6 +145,25 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
+    /// Adds the default MONQ microservice addressing policy: Kubernetes ClusterIP for HTTP and
+    /// Kubernetes Service Discovery for gRPC.
+    /// </summary>
+    /// <remarks>
+    /// A resolver selected before this call is preserved; a later
+    /// <c>UseMicroserviceAddressResolver</c> call still overrides the policy registered here.
+    /// </remarks>
+    /// <param name="services">The service collection to add the addressing policy to.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddMonqMicroserviceAddressing(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        return services.TryUseMicroserviceAddressResolver(new ProtocolMicroserviceAddressResolver(
+            httpResolver: new KubernetesClusterIpAddressResolver(),
+            grpcResolver: new KubernetesServiceDiscoveryAddressResolver()));
+    }
+
+    /// <summary>
     /// Enables gRPC request validation with message validation and default error message handler.
     /// </summary>
     /// <param name="services">The service collection to add gRPC validation to.</param>
@@ -162,10 +180,10 @@ public static class ServiceCollectionExtensions
 
     /// <summary>
     /// Adds a pre-configured REST HTTP client whose base address is resolved by application name when
-    /// the typed client is created, using the addressing configured on the host. Service discovery is
-    /// enabled for the client: Kubernetes Service names are watched through the DNS endpoint provider,
-    /// so ClusterIP addresses resolve to the single service endpoint and headless Service names to the
-    /// ready pod endpoints.
+    /// the typed client is created, using the addressing configured on the host. HTTP endpoint discovery
+    /// is enabled for the client only when the configured resolvers select
+    /// <see cref="EndpointResolutionMode.ServiceDiscovery"/>; ClusterIP resolutions connect to the
+    /// Service address without endpoint discovery.
     /// </summary>
     /// <typeparam name="TClient">The typed client interface.</typeparam>
     /// <typeparam name="TImplementation">The implementation type inheriting from <see cref="RestHttpClient"/>.</typeparam>
@@ -175,6 +193,10 @@ public static class ServiceCollectionExtensions
     /// <param name="port">Port for address resolution. When <see langword="null"/>, the resolver selects the port.</param>
     /// <param name="addressResolver">Resolver that takes precedence over host-level resolvers.</param>
     /// <returns>An <see cref="IHttpClientBuilder"/> for further client configuration.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// The endpoint resolution mode cannot be determined from the service collection. Register the
+    /// microservice address resolvers before registering name-based REST clients.
+    /// </exception>
     public static IHttpClientBuilder AddRestHttpPreConfiguredClient<
         TClient,
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
@@ -189,16 +211,14 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
 
-        services.AddServiceDiscoveryCore();
+        var resolutionMode = services.TryPeekEndpointResolutionMode(
+                applicationName, MicroserviceProtocol.Http, port, addressResolver)
+            ?? throw new InvalidOperationException(
+                $"The endpoint resolution mode for application '{applicationName}' cannot be "
+                + "determined at registration time. Register the microservice address resolvers "
+                + "before registering name-based REST clients.");
 
-        if (!services.Any(descriptor =>
-                descriptor.ServiceType.Name == "IServiceEndpointProviderFactory"
-                && descriptor.ImplementationType?.Name == "DnsServiceEndpointProviderFactory"))
-        {
-            services.AddDnsServiceEndpointProvider();
-        }
-
-        return services
+        var builder = services
             .AddHttpClient<TClient, TImplementation>()
             .ConfigureHttpClient((provider, client) =>
             {
@@ -211,12 +231,22 @@ public static class ServiceCollectionExtensions
 
                 configureHttpClient?.Invoke(client);
 
-                // A configure delegate may replace the base address with a prefixed one
-                // (e.g. new(client.BaseAddress!, "api/pl")); normalize after it so relative request
-                // paths keep the prefix instead of replacing its last segment (RFC 3986 merge).
                 client.AddTrailingSlash();
-            })
-            .AddServiceDiscovery();
+            });
+
+        if (resolutionMode == EndpointResolutionMode.ServiceDiscovery)
+        {
+            if (!services.Any(descriptor =>
+                    descriptor.ServiceType.Name == "IServiceEndpointProviderFactory"
+                    && descriptor.ImplementationType?.Name == "DnsServiceEndpointProviderFactory"))
+            {
+                services.AddDnsServiceEndpointProvider();
+            }
+
+            builder.AddServiceDiscovery();
+        }
+
+        return builder;
     }
 
     /// <summary>

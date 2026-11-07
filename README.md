@@ -479,10 +479,13 @@ builder.Services.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(Application
 ```
 
 The service-discovery resolver uses
-`http://{applicationName}-http.{namespace}.svc.cluster.local:5005`. Every
-name-based REST registration always enables HTTP endpoint discovery through
-the DNS endpoint provider, so URI schemes do not need to distinguish a
-regular HTTP ClusterIP Service from a headless HTTP Service.
+`http://{applicationName}-http.{namespace}.svc.cluster.local:5005`. A
+name-based REST registration enables HTTP endpoint discovery only when the
+configured resolvers select `EndpointResolutionMode.ServiceDiscovery`, so URI
+schemes do not need to distinguish a regular HTTP ClusterIP Service from a
+headless HTTP Service. Because the mode is read at registration time, register
+the resolvers before the clients; an unresolvable mode fails the registration
+with `InvalidOperationException`.
 
 The service-discovery resolver uses application/container port `5005` by
 default because the headless Service resolves directly to pod IP addresses.
@@ -491,8 +494,9 @@ port.
 
 For a regular ClusterIP Service, select `KubernetesClusterIpAddressResolver` or
 use it implicitly as the default. It produces
-`http://{applicationName}.{namespace}.svc.cluster.local:80`; the DNS endpoint
-provider watches that name and resolves it to the single Service endpoint:
+`http://{applicationName}.{namespace}.svc.cluster.local:80`; no endpoint
+discovery is attached to the client, which connects to the Service ClusterIP
+returned by cluster DNS:
 
 ```csharp
 builder.Services.AddRestHttpPreConfiguredClient<IMyClient, MyClient>(
@@ -543,9 +547,9 @@ two client types targeting the same application to use different strategies.
 
 For gRPC, the DNS resolver and `round_robin` are enabled when the resolved
 address uses `EndpointResolutionMode.ServiceDiscovery` or the standard
-`dns:///` scheme. For REST, the DNS endpoint provider is registered by
-`AddRestHttpPreConfiguredClient` for every name-based client, so no synthetic
-URI scheme or extra registration is required.
+`dns:///` scheme. For REST, `AddRestHttpPreConfiguredClient` enables the DNS
+endpoint provider for the client only in `ServiceDiscovery` mode, so no
+synthetic URI scheme or extra registration is required.
 
 Client-side discovery has no ClusterIP fallback: while the headless Service is
 missing or publishes no ready endpoints, gRPC calls fail with `UNAVAILABLE` and
@@ -597,21 +601,22 @@ public sealed class RealtimeClientFactory(IMicroserviceAddressProvider addresses
 ```
 
 Console hosts can select the resolver inside `ConfigureServices` when the final
-configuration is only available from `HostBuilderContext`. The application owns
-the environment check; the non-development branch repeats the standard Basic.NET
-policy because a single resolver must be selected:
+configuration is only available from `HostBuilderContext`. Basic registers the
+standard policy with `AddMonqMicroserviceAddressing()` — Kubernetes ClusterIP
+for HTTP and Service Discovery for gRPC — which an application can override
+later with a single-use registration; here only the development branch is
+needed:
 
 ```csharp
 hostBuilder
     .ConfigureBasicConsoleMicroservice()
-    .ConfigureServices((context, services) => services.UseMicroserviceAddressResolver(
-        context.HostingEnvironment.IsDevelopment()
-            ? new FixedMicroserviceAddressResolver(
+    .ConfigureServices((context, services) =>
+    {
+        if (context.HostingEnvironment.IsDevelopment())
+            services.UseMicroserviceAddressResolver(new FixedMicroserviceAddressResolver(
                 context.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
-                    ?? throw new InvalidOperationException("BaseUri not found at configuration."))
-            : new ProtocolMicroserviceAddressResolver(
-                httpResolver: new KubernetesClusterIpAddressResolver(),
-                grpcResolver: new KubernetesServiceDiscoveryAddressResolver())));
+                    ?? throw new InvalidOperationException("BaseUri not found at configuration.")));
+    });
 ```
 
 The default resolver applies to every REST and gRPC registration.

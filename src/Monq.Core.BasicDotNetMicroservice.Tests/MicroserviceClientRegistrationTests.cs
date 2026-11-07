@@ -5,6 +5,7 @@ using Grpc.Net.ClientFactory;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
@@ -145,14 +146,131 @@ public class MicroserviceClientRegistrationTests
             "value",
             client.ConfiguredHttpClient.DefaultRequestHeaders.GetValues("x-test").Single());
 
-        // Name-based HTTP registrations always enable service discovery: the DNS endpoint provider
-        // resolves ClusterIP names to the single service endpoint and headless names to pod endpoints.
-        Assert.Contains(registrations, descriptor =>
+        // HTTP endpoint discovery is registered only for Service Discovery resolutions;
+        // ClusterIP (Direct) clients get no endpoint watcher and connect to the Service ClusterIP.
+        var hasServiceDiscovery = resolutionMode == EndpointResolutionMode.ServiceDiscovery;
+        Assert.Equal(
+            hasServiceDiscovery,
+            registrations.Any(descriptor =>
+                descriptor.ServiceType.FullName
+                    == "Microsoft.Extensions.ServiceDiscovery.ServiceEndpointWatcherFactory"));
+        Assert.Equal(
+            hasServiceDiscovery,
+            registrations.Any(descriptor =>
+                descriptor.ServiceType.Name == "IServiceEndpointProviderFactory"
+                && descriptor.ImplementationType?.Name == "DnsServiceEndpointProviderFactory"));
+    }
+
+    [Fact]
+    public void HttpRegistration_WithoutDeterminableResolutionModeThrows()
+    {
+        InvalidOperationException? failure = null;
+        using var host = CreateHostBuilder()
+            .ConfigureServices(services => services.UseHttpMicroserviceAddressResolver(
+                new ThrowingAddressResolver()))
+            .ConfigureServices((_, services) =>
+                failure = Assert.Throws<InvalidOperationException>(
+                    () => services.AddRestHttpPreConfiguredClient<ITestHttpClient, TestHttpClient>("test-service")))
+            .Build();
+
+        Assert.NotNull(failure);
+        Assert.Contains("test-service", failure!.Message);
+    }
+
+    [Fact]
+    public void HttpRegistration_MultipleClientsPerApplication_MixedResolutionModes()
+    {
+        IHttpClientBuilder discoveryBuilder = null!;
+        IHttpClientBuilder directBuilder = null!;
+
+        using var host = CreateHostBuilder()
+            .ConfigureServices(services => services.UseHttpMicroserviceAddressResolver(
+                new FixedMicroserviceAddressResolver(
+                    new Uri("http://test-service-http:5005"),
+                    EndpointResolutionMode.ServiceDiscovery)))
+            .ConfigureServices((_, services) =>
+            {
+                discoveryBuilder = services.AddRestHttpPreConfiguredClient<ITestHttpClient, TestHttpClient>("test-service");
+                directBuilder = services.AddRestHttpPreConfiguredClient<IOtherTestHttpClient, OtherTestHttpClient>(
+                    "test-service",
+                    addressResolver: new FixedMicroserviceAddressResolver(new Uri("http://test-service:8080")));
+            })
+            .Build();
+
+        var clientOptions = host.Services.GetRequiredService<IOptionsMonitor<HttpClientFactoryOptions>>();
+
+        Assert.NotEmpty(clientOptions.Get(discoveryBuilder.Name).HttpMessageHandlerBuilderActions);
+        Assert.Empty(clientOptions.Get(directBuilder.Name).HttpMessageHandlerBuilderActions);
+
+        var discoveryClient = Assert.IsType<TestHttpClient>(
+            host.Services.GetRequiredService<ITestHttpClient>());
+        var directClient = Assert.IsType<OtherTestHttpClient>(
+            host.Services.GetRequiredService<IOtherTestHttpClient>());
+
+        Assert.Equal("http://test-service-http:5005/", discoveryClient.ConfiguredHttpClient.BaseAddress!.AbsoluteUri);
+        Assert.Equal("http://test-service:8080/", directClient.ConfiguredHttpClient.BaseAddress!.AbsoluteUri);
+    }
+
+    [Fact]
+    public void HttpRegistration_MultipleServiceDiscoveryClients_RegisterInfrastructureOnce()
+    {
+        ServiceDescriptor[] registrations = [];
+        IHttpClientBuilder discoveryBuilderOne = null!;
+        IHttpClientBuilder discoveryBuilderTwo = null!;
+
+        using var host = CreateHostBuilder()
+            .ConfigureServices(services => services.UseHttpMicroserviceAddressResolver(
+                new FixedMicroserviceAddressResolver(
+                    new Uri("http://test-service-http:5005"),
+                    EndpointResolutionMode.ServiceDiscovery)))
+            .ConfigureServices((_, services) =>
+            {
+                discoveryBuilderOne = services.AddRestHttpPreConfiguredClient<ITestHttpClient, TestHttpClient>(
+                    "test-service");
+                discoveryBuilderTwo = services.AddRestHttpPreConfiguredClient<IOtherTestHttpClient, OtherTestHttpClient>(
+                    "test-service",
+                    addressResolver: new FixedMicroserviceAddressResolver(
+                        new Uri("http://test-service-http:5005"),
+                        EndpointResolutionMode.ServiceDiscovery));
+
+                registrations = [.. services];
+            })
+            .Build();
+
+        Assert.Single(registrations, descriptor =>
             descriptor.ServiceType.FullName
                 == "Microsoft.Extensions.ServiceDiscovery.ServiceEndpointWatcherFactory");
-        Assert.Contains(registrations, descriptor =>
+        Assert.Single(registrations, descriptor =>
             descriptor.ServiceType.Name == "IServiceEndpointProviderFactory"
             && descriptor.ImplementationType?.Name == "DnsServiceEndpointProviderFactory");
+
+        var clientOptions = host.Services.GetRequiredService<IOptionsMonitor<HttpClientFactoryOptions>>();
+        Assert.NotEmpty(clientOptions.Get(discoveryBuilderOne.Name).HttpMessageHandlerBuilderActions);
+        Assert.NotEmpty(clientOptions.Get(discoveryBuilderTwo.Name).HttpMessageHandlerBuilderActions);
+    }
+
+    [Fact]
+    public void HttpRegistration_BuiltInClusterIpResolverRegistersNoServiceDiscovery()
+    {
+        ServiceDescriptor[] registrations = [];
+        using var host = CreateHostBuilder()
+            .ConfigureServices(services => services.AddMicroserviceAddressing())
+            .ConfigureServices((_, services) =>
+            {
+                services.AddRestHttpPreConfiguredClient<ITestHttpClient, TestHttpClient>("test-service");
+                registrations = [.. services];
+            })
+            .Build();
+
+        var client = Assert.IsType<TestHttpClient>(
+            host.Services.GetRequiredService<ITestHttpClient>());
+
+        Assert.Equal(
+            "http://test-service.production.svc.cluster.local/",
+            client.ConfiguredHttpClient.BaseAddress!.AbsoluteUri);
+        Assert.DoesNotContain(registrations, descriptor =>
+            descriptor.ServiceType.FullName
+                == "Microsoft.Extensions.ServiceDiscovery.ServiceEndpointWatcherFactory");
     }
 
     [Fact]
@@ -282,6 +400,24 @@ public class MicroserviceClientRegistrationTests
             () => new ServiceCollection().AddRestHttpPreConfiguredClient<ITestHttpClient, TestHttpClient>(relativeAddress));
     }
 
+    [Fact]
+    public void AddMonqMicroserviceAddressing_SelectsClusterIpForHttpAndDiscoveryForGrpc()
+    {
+        using var host = CreateHostBuilder()
+            .ConfigureServices(services => services.AddMonqMicroserviceAddressing())
+            .Build();
+
+        var provider = host.Services.GetRequiredService<IMicroserviceAddressProvider>();
+
+        var http = provider.Resolve("orders-service", MicroserviceProtocol.Http);
+        var grpc = provider.Resolve("orders-service", MicroserviceProtocol.Grpc);
+
+        Assert.Equal(EndpointResolutionMode.Direct, http.ResolutionMode);
+        Assert.Equal("http://orders-service.production.svc.cluster.local/", http.Address.AbsoluteUri);
+        Assert.Equal(EndpointResolutionMode.ServiceDiscovery, grpc.ResolutionMode);
+        Assert.Equal("dns:///orders-service-grpc.production.svc.cluster.local:5006", grpc.Address.AbsoluteUri);
+    }
+
     static IHostBuilder CreateHostBuilder() =>
         new HostBuilder()
             .ConfigureServices(services =>
@@ -323,13 +459,38 @@ public class MicroserviceClientRegistrationTests
             new(configuration);
     }
 
+    sealed class ThrowingAddressResolver : IMicroserviceAddressResolver
+    {
+        public ResolvedMicroserviceAddress Resolve(MicroserviceAddressContext context) =>
+            throw new InvalidOperationException("Resolver failed.");
+    }
+
     interface ITestHttpClient
+    {
+    }
+
+    interface IOtherTestHttpClient
     {
     }
 
     sealed class TestHttpClient : RestHttpClient, ITestHttpClient
     {
         public TestHttpClient(
+            HttpClient httpClient,
+            ILoggerFactory loggerFactory,
+            RestHttpClientOptions configuration,
+            IHttpContextAccessor httpContextAccessor)
+            : base(httpClient, loggerFactory, configuration, httpContextAccessor)
+        {
+            ConfiguredHttpClient = httpClient;
+        }
+
+        internal HttpClient ConfiguredHttpClient { get; }
+    }
+
+    sealed class OtherTestHttpClient : RestHttpClient, IOtherTestHttpClient
+    {
+        public OtherTestHttpClient(
             HttpClient httpClient,
             ILoggerFactory loggerFactory,
             RestHttpClientOptions configuration,

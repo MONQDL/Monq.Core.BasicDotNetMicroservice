@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,7 +10,6 @@ using Monq.Core.BasicDotNetMicroservice.Enrichers.User;
 using Monq.Core.BasicDotNetMicroservice.Helpers;
 using Monq.Core.BasicDotNetMicroservice.Middleware;
 using Monq.Core.HttpClientExtensions;
-using Monq.Core.MicroserviceAddressing.Addressing;
 using Serilog;
 using System.Security.Cryptography.X509Certificates;
 using static Monq.Core.BasicDotNetMicroservice.MicroserviceConstants.HostConfiguration;
@@ -191,10 +190,6 @@ public static class BasicMicroserviceConfigurationExtensions
     {
         hostBuilder.ConfigureCustomCertificates();
         hostBuilder.ConfigureConsul(consulConfigurationOptions);
-        hostBuilder.ConfigureServices((_, services) => services.TryUseMicroserviceAddressResolver(
-            new ProtocolMicroserviceAddressResolver(
-                httpResolver: new KubernetesClusterIpAddressResolver(),
-                grpcResolver: new KubernetesServiceDiscoveryAddressResolver())));
         hostBuilder.ConfigureSerilogLogging();
         hostBuilder.ConfigBasicHttpService(opts =>
         {
@@ -214,6 +209,7 @@ public static class BasicMicroserviceConfigurationExtensions
             services.Configure<AppConfiguration>(context.Configuration);
             services.AddMonqMetrics();
             services.AddMonqOpenTelemetry(context);
+            services.AddMonqMicroserviceAddressing();
         });
 
         return hostBuilder;
