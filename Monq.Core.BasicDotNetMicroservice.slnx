@@ -9,6 +9,7 @@
     <File Path=".gitignore" />
     <File Path="LICENSE" />
     <File Path="README.md" />
+    <File Path="v11-MIGRATION.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Monq.Core.BasicDotNetMicroservice.Tests/Monq.Core.BasicDotNetMicroservice.Tests.csproj" />

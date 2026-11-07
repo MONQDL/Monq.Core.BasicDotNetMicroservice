@@ -224,9 +224,13 @@ The address strategy can still be selected per client. The DNS refresh interval
 is application-wide because gRPC selects one resolver factory for the `dns`
 URI scheme.
 
-For REST clients, name-based registrations always enable HTTP endpoint discovery
-through the DNS endpoint provider, so `ResolutionMode` does not need to be used
-to distinguish ClusterIP from a headless Service.
+For REST clients, name-based registrations enable HTTP endpoint discovery only
+when the configured resolvers select `EndpointResolutionMode.ServiceDiscovery`.
+In `Direct` mode no endpoint discovery is attached: `HttpClient` connects to the
+resolved address like to any other host, cluster DNS returns the Service
+ClusterIP, and the cluster routes the request. Register the resolvers before the
+clients because the mode is read at registration time; an unresolvable mode
+fails the registration with `InvalidOperationException`.
 
 ### Per-client strategy
 
@@ -254,23 +258,20 @@ Resolver precedence is:
 ### Console and background application migration
 
 Console applications configure the host builder and register gRPC and REST
-clients on `IServiceCollection`. Select the resolver inside `ConfigureServices` to
-use the final host configuration and environment:
+clients on `IServiceCollection`. `ConfigureBasicConsoleMicroservice` selects the
+standard policy through `AddMonqMicroserviceAddressing()`, so only an
+environment-dependent override is needed inside `ConfigureServices`:
 
 ```csharp
 using var host = Host.CreateDefaultBuilder(args)
     .ConfigureBasicConsoleMicroservice()
     .ConfigureServices((context, services) =>
     {
-        services.UseMicroserviceAddressResolver(
-            context.HostingEnvironment.IsDevelopment()
-                ? new FixedMicroserviceAddressResolver(
-                    context.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
-                        ?? throw new InvalidOperationException(
-                            "BaseUri not found at configuration."))
-                : new ProtocolMicroserviceAddressResolver(
-                    httpResolver: new KubernetesClusterIpAddressResolver(),
-                    grpcResolver: new KubernetesServiceDiscoveryAddressResolver()));
+        if (context.HostingEnvironment.IsDevelopment())
+            services.UseMicroserviceAddressResolver(new FixedMicroserviceAddressResolver(
+                context.Configuration.GetValue<Uri>(nameof(AppConfiguration.BaseUri))
+                    ?? throw new InvalidOperationException(
+                        "BaseUri not found at configuration.")));
 
         services.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
             ApplicationNames.Orders);
