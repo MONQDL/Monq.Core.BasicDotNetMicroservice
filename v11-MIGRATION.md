@@ -18,6 +18,13 @@ The primary changes are:
 3. **gRPC channel defaults live in `Monq.Core.GrpcClientExtensions`** — unsafe
    call credentials, the 51 MB receive limit and call context propagation are
    applied by the library for every client.
+4. **`Authentication:AuthenticationEndpoint` is not read anymore** — the
+   configuration-based `ConfigureMonqAuthentication(configuration)` overload no
+   longer reads it and resolves the default authentication service
+   (`pl-identity-service`) through the configured HTTP resolver, like passing
+   that application name explicitly. Keep the deprecated authority by calling
+   the `Uri` overload with the address from configuration, then remove the key
+   from Consul and application configuration.
 
 New in 11.0.0:
 

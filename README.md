@@ -795,21 +795,20 @@ builder.Host.ConfigureStaticAuthentication(
     });
 ```
 
-The configuration-based `IServiceCollection.ConfigureMonqAuthentication` overload is
-retained for backward compatibility.
+The configuration-based `IServiceCollection.ConfigureMonqAuthentication(builder.Configuration)`
+overload addresses the default authentication service (`pl-identity-service`) through the
+configured HTTP resolver, equivalently to passing that application name explicitly.
 
 The example of the configuration in JSON format:
 
 > [!NOTE]
-> The `AuthenticationEndpoint` key is read only by this deprecated overload. After all
-> consumers are migrated to `ConfigureMonqAuthentication(applicationName)` (see above),
-> remove `Authentication:AuthenticationEndpoint` from Consul and application
-> configuration; `Monq.Core.HttpClientExtensions` 8.0.0 no longer reads it.
+> The `Authentication:AuthenticationEndpoint` key is no longer read by any overload. Remove it
+> from Consul and application configuration; `Monq.Core.HttpClientExtensions` 8.0.0 no longer
+> reads it either.
 
 ```json
 {
   "Authentication": {
-    "AuthenticationEndpoint": "https://identity.example.com",
     "ApiResource": {
       "Login": "service-api",
       "Password": "RIHY1vsevEO7WEVC"
