@@ -20,21 +20,19 @@ namespace Monq.Core.BasicDotNetMicroservice.Extensions;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Configures OAuth2 introspection authentication using Duende library.
+    /// Configures OAuth2 introspection authentication for the default authentication service
+    /// application name (<see cref="HostBuilderExtensions.DefaultAuthenticationApplicationName" />).
+    /// The authority is resolved like in the application-name overload; credentials and settings
+    /// are read from the <c>Authentication</c> configuration section.
     /// </summary>
     /// <param name="services">The service collection to add authentication to.</param>
-    /// <param name="configuration">The configuration containing authentication settings.</param>
+    /// <param name="configuration">The configuration containing authentication credentials and settings.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection ConfigureMonqAuthentication(this IServiceCollection services, IConfiguration configuration)
-    {
-        ArgumentNullException.ThrowIfNull(configuration);
-
-        var authConfig = configuration.GetSection("Authentication");
-        return ConfigureMonqAuthentication(
+        => ConfigureMonqAuthentication(
             services,
             configuration,
-            configureEndpoint: x => x.Authority = authConfig[AuthConstants.AuthenticationConfiguration.Authority]);
-    }
+            HostBuilderExtensions.DefaultAuthenticationApplicationName);
 
     /// <summary>
     /// Configures OAuth2 introspection authentication using an explicitly resolved authentication endpoint.

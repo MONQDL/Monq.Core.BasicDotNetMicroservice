@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Monq.Core.BasicDotNetMicroservice.Extensions;
+using Monq.Core.MicroserviceAddressing.Addressing;
+using Moq;
 using System;
 using System.Collections.Generic;
 using Xunit;
@@ -100,6 +102,38 @@ public class MonqAuthenticationOptionsTests
         Assert.Equal("https://identity.example.com/", options.Authority);
     }
 
+    [Fact(DisplayName = "Resolve the authority for the default authentication application.")]
+    public void ShouldResolveAuthorityForDefaultAuthenticationApplication()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["Authentication:ApiResource:Login"] = "login",
+                    ["Authentication:ApiResource:Password"] = "password"
+                })
+            .Build();
+
+        var resolver = new RecordingResolver(new Uri("https://identity.example.com"));
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton(Mock.Of<IHostEnvironment>());
+        services.UseMicroserviceAddressResolver(resolver);
+        services.ConfigureMonqAuthentication(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider
+            .GetRequiredService<IOptionsMonitor<OAuth2IntrospectionOptions>>()
+            .Get("Bearer");
+
+        Assert.Equal("https://identity.example.com/", options.Authority);
+        Assert.Equal(
+            HostBuilderExtensions.DefaultAuthenticationApplicationName,
+            resolver.ApplicationName);
+    }
+
     [Fact(DisplayName = "Reject a relative authentication endpoint on the service collection.")]
     public void ShouldRejectRelativeAuthenticationEndpoint()
     {
@@ -109,5 +143,16 @@ public class MonqAuthenticationOptionsTests
             () => services.ConfigureMonqAuthentication(
                 new ConfigurationBuilder().Build(),
                 new Uri("identity.example.com", UriKind.Relative)));
+    }
+
+    sealed class RecordingResolver(Uri address) : IMicroserviceAddressResolver
+    {
+        public string? ApplicationName { get; private set; }
+
+        public ResolvedMicroserviceAddress Resolve(MicroserviceAddressContext context)
+        {
+            ApplicationName = context.TargetApplicationName;
+            return new ResolvedMicroserviceAddress(address);
+        }
     }
 }
