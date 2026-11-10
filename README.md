@@ -324,7 +324,7 @@ The library provides extensions for configuring `Grpc.AspNetCore` clients both f
 Client registration is provided by `Monq.Core.GrpcClientExtensions` as
 `IServiceCollection` extensions (available transitively with this package). The
 legacy `IServiceCollection` overloads that accepted `IConfiguration` and read a
-shared `BaseUri` were removed in 11.0.0. Register clients by application name,
+shared `BaseUri` were removed in 10.2.0. Register clients by application name,
 which obtains the address from a resolver, or pass an explicit absolute `Uri`
 that is used as is, without consulting any resolver:
 
@@ -460,7 +460,7 @@ builder.Services.AddInlineValidator<YourRequest>(rules =>
 The library provides extensions for configuring REST HTTP clients. More info: <https://github.com/MONQDL/Monq.Core.HttpClientExtensions/blob/master/README.md>.
 
 The legacy `IServiceCollection` overload that accepted `IConfiguration` and
-read `BaseUri` was removed in 11.0.0. Use the application-name overload, or
+read `BaseUri` was removed in 10.2.0. Use the application-name overload, or
 pass an explicit absolute `Uri`:
 
 ```csharp
@@ -585,6 +585,14 @@ application name when an explicit URL is enough: use the `Uri` overload instead.
 The `addressResolver` parameter is reserved for resolvers that require the
 resolution context: configuration, environment, application name, protocol,
 or port.
+
+The `{namespace}` part of a resolved Kubernetes address comes from the
+environment name (`IHostEnvironment.EnvironmentName`, lower-cased). Set the
+`ASPNETCORE_URL_NAMESPACE` environment variable to use an explicit namespace as
+provided instead (only surrounding whitespace is trimmed), for example
+`integration` in the `DEV` profile of `launchSettings.json` when debugging
+locally against a shared cluster environment. Available since
+`Monq.Core.MicroserviceAddressing` 0.4.0.
 
 Clients that are not registered through the REST or gRPC extensions, such as
 SignalR or WebSocket clients, can use the same selected resolver through the
@@ -1098,6 +1106,6 @@ public class MyBackgroundWorker : BackgroundService
 
 ## Migration guides
 
-- [Migration to v11](v11-MIGRATION.md)
+- [Migration to 10.2](v10.2-MIGRATION.md)
 - [Migration to v10](v10-MIGRATION.md)
 - [Migration to v9](v9-MIGRATION.md)
