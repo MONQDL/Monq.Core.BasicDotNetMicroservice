@@ -64,7 +64,7 @@
   <ItemGroup>
     <PackageReference Include="Monq.Core.HttpClientExtensions" Version="8.0.0-rev-42814499907" />
     <PackageReference Include="Monq.Core.MicroserviceAddressing" Version="0.4.0-rev-42810395704" />
-    <PackageReference Include="Monq.Core.GrpcClientExtensions" Version="0.1.0-rev-42814505774" />
+    <PackageReference Include="Monq.Core.GrpcClientExtensions" Version="0.1.0-rev-42845369618" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
