@@ -62,9 +62,9 @@
 
   <!-- Published as CI prereleases; switch to the stable versions once tagged. -->
   <ItemGroup>
-    <PackageReference Include="Monq.Core.HttpClientExtensions" Version="8.0.0-rev-42501844653" />
+    <PackageReference Include="Monq.Core.HttpClientExtensions" Version="8.0.0-rev-42814499907" />
     <PackageReference Include="Monq.Core.MicroserviceAddressing" Version="0.4.0-rev-42810395704" />
-    <PackageReference Include="Monq.Core.GrpcClientExtensions" Version="0.1.0-rev-42482768285" />
+    <PackageReference Include="Monq.Core.GrpcClientExtensions" Version="0.1.0-rev-42814505774" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
