@@ -1,6 +1,6 @@
-# Migration guide from 10.1 to 10.2
+# Migration guide from v10 to v11
 
-Version 10.2.0 is a feature release with breaking changes compared to 10.1.0.
+Version 11.0.0 is a major release with breaking changes compared to 10.1.0.
 The primary changes are:
 
 1. **`BaseUri`-based client overloads removed** — the `IServiceCollection`
@@ -26,7 +26,7 @@ The primary changes are:
    the `Uri` overload with the address from configuration, then remove the key
    from Consul and application configuration.
 
-New in 10.2.0:
+New in 11.0.0:
 
 - **Microservice addressing** — application-name based client registration
   through `IServiceCollection` extensions. The resolver API lives in the separate
@@ -40,7 +40,7 @@ New in 10.2.0:
   the introspection cache is configured with
   `Authentication:CacheDurationSeconds` (default 300 seconds).
 
-> Libraries that call the removed overloads must be rebuilt against 10.2.0
+> Libraries that call the removed overloads must be rebuilt against 11.0.0
 > before an application upgrades, otherwise the removed methods cause
 > `MissingMethodException` at runtime.
 
@@ -104,7 +104,7 @@ builder.Services.AddRestHttpPreConfiguredClient<IMyHttpClient, MyHttpClient>(
     builder.Configuration);
 ```
 
-These overloads were removed in 10.2.0. Before replacing them:
+These overloads were removed in 11.0.0. Before replacing them:
 
 1. Determine the Kubernetes application or Service name.
 2. Add that name to the application's constants library.
@@ -344,9 +344,9 @@ discovery fails the request.
 
 ## Migration checklist
 
-- Update `Monq.Core.BasicDotNetMicroservice` to 10.2.0.
+- Update `Monq.Core.BasicDotNetMicroservice` to 11.0.0.
 - Update libraries that call client registration APIs to versions built
-  against 10.2.0 before deploying.
+  against 11.0.0 before deploying.
 - Replace configured client addresses with verified application-name constants.
 - Override the standard Basic.NET policy only when the application requires a
   different protocol or fixed-address strategy. The override works whether it
