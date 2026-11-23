@@ -1,7 +1,9 @@
 using Calzolari.Grpc.AspNetCore.Validation;
 using Duende.AspNetCore.Authentication.OAuth2Introspection;
+using Monq.Core.BasicDotNetMicroservice.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Monq.Core.BasicDotNetMicroservice.Configuration;
@@ -124,9 +126,46 @@ public static class ServiceCollectionExtensions
                 x.CacheDuration = TimeSpan.FromSeconds(cacheDurationSeconds);
                 x.NameClaimType = "fullName";
                 x.DiscoveryPolicy.RequireHttps = requireHttps;
+                x.Events.OnTokenValidated = context =>
+                {
+                    var token = context.SecurityToken;
+                    if (token is not null
+                        && context.HttpContext.RequestServices
+                            .GetRequiredService<ITokenRevocationStore>()
+                            .IsRevoked(token))
+                    {
+                        context.Fail("The access token has been revoked.");
+                    }
+
+                    return Task.CompletedTask;
+                };
 
                 configureEndpoint?.Invoke(x);
             });
+
+        services.AddMonqTokenRevocation(TimeSpan.FromSeconds(cacheDurationSeconds));
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the transport-independent local reference-token revocation store.
+    /// A transport adapter can resolve <see cref="ITokenRevocationStore"/> and call
+    /// <see cref="ITokenRevocationStore.Revoke"/> when it receives a revocation event.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="retention">How long a revoked key must be rejected locally.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddMonqTokenRevocation(
+        this IServiceCollection services,
+        TimeSpan retention)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        if (retention <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(retention));
+
+        services.TryAddSingleton<ITokenRevocationStore>(_ =>
+            new TokenRevocationStore(TimeProvider.System, retention));
 
         return services;
     }

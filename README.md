@@ -839,6 +839,86 @@ validation results, the legacy `EnableCaching` key (and the old
 `IdentityModel.AspNetCore.OAuth2Introspection` handler's ability to disable
 caching) is no longer supported.
 
+#### Reference token revocation
+
+Introspection results are cached locally in every service instance. To revoke a
+reference token before the introspection cache expires, the library registers a
+local `ITokenRevocationStore` when `ConfigureMonqAuthentication` is called.
+The store keeps revoked persisted-grant keys in memory for the configured
+`CacheDurationSeconds` period. During token validation, the raw token is mapped
+to its reference-token persisted-grant key and checked against this store.
+
+The store is transport-independent. An external message transport adapter, such
+as a RabbitMQ integration, receives a token-revoked event and calls
+`ITokenRevocationStore.Revoke` with each revoked persisted-grant key. The
+adapter and RabbitMQ configuration stay outside this library.
+
+Every API service that validates user reference tokens must register an
+appropriate transport adapter and subscribe to the token-revocation event. The
+subscription must be configured so that every service replica receives the
+event. The adapter passes each received persisted-grant key to the store:
+
+```csharp
+tokenRevocationStore.Revoke(revokedGrantKey);
+```
+
+The transport-specific registration and routing-key configuration belong to the
+adapter library and are intentionally not part of this package. Once the event
+is processed, the revoked token is rejected locally with `401 Unauthorized`,
+while unrelated tokens continue to use the introspection cache normally.
+
+An adapter library can hide its transport details behind a dedicated extension.
+The following example shows the intended structure; message and RabbitMQ types
+depend on the transport library:
+
+```csharp
+public static class TokenRevocationConsumerExtensions
+{
+    public static IRabbitMqConsumerBuilder AddTokenRevocationHandler(
+        this IRabbitMqConsumerBuilder builder,
+        params string[] routingKeys)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        var keys = routingKeys is { Length: > 0 }
+            ? routingKeys
+            : [TokenRevocationRoutingKeys.TokenRevoked];
+
+        return builder.AddHandler<TokenRevokedMessageHandler>(keys);
+    }
+}
+
+sealed class TokenRevokedMessageHandler(
+    ITokenRevocationStore tokenRevocationStore) : IMessageHandler<TokenRevokedMessage>
+{
+    public Task HandleAsync(TokenRevokedMessage message, CancellationToken cancellationToken)
+    {
+        foreach (var grantKey in message.RevokedGrantKeys)
+            tokenRevocationStore.Revoke(grantKey);
+
+        return Task.CompletedTask;
+    }
+}
+```
+
+The client then only configures its RabbitMQ consumer and the event routing key:
+
+```csharp
+builder.Services
+    .AddRabbitMqConsumer(builder.Configuration.GetSection("RabbitMQ"))
+    .AddTokenRevocationHandler(TokenRevocationRoutingKeys.TokenRevoked);
+```
+
+The extension belongs to the adapter library, while the client owns the queue,
+exchange, credentials and subscription settings. A subscription queue must be
+used when every replica has to process the event; a shared work queue would
+deliver each message to only one replica.
+
+The identity service publishes the event after persisting the token revocation.
+The event contains persisted-grant keys, not raw access tokens. This keeps token
+values out of the message transport and lets each consumer maintain only its
+own short-lived local revocation state.
+
 ### Metrics sending
 
 Metrics are handled by OpenTelemetry. See the [OpenTelemetry](#opentelemetry) section for configuration.
